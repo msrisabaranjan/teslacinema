@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tesla Browser — Browser Launcher</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Gotham:wght@400;500;700&display=swap');
+
+    :root{
+      --bg:#0a0a0a;
+      --muted:#b0b0b0;
+      --accent:#ffb84d;
+      --card:rgba(20,20,20,0.6);
+      --hover:rgba(40,40,40,0.7);
+    }
+    html,body{
+      height:100%;margin:0;
+      font-family:'Gotham', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial;
+      color:#fff;
+      background:var(--bg);
+      backdrop-filter:blur(12px);
+    }
+    header{
+      padding:20px;
+      text-align:center;
+      border-bottom:1px solid rgba(255,255,255,0.1);
+      background:rgba(15,15,15,0.6);
+      backdrop-filter:blur(8px);
+    }
+    header h1{
+      margin:0;
+      font-size:24px;
+      font-weight:600;
+    }
+    section{
+      margin:20px 0;
+    }
+    section h2{
+      margin:0 20px 10px;
+      font-size:18px;
+      font-weight:600;
+      color:var(--accent);
+      border-left:4px solid var(--accent);
+      padding-left:10px;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+      gap:20px;
+      padding:0 20px 20px;
+    }
+    .card{
+      border-radius:16px;
+      overflow:hidden;
+      cursor:pointer;
+      transition:transform .4s ease, background .3s ease, opacity .6s ease;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      height:90px;
+      background:var(--card);
+      box-shadow:0 8px 24px rgba(0,0,0,0.5);
+      backdrop-filter:blur(10px) saturate(120%);
+      opacity:0;
+      transform:translateY(20px);
+      animation:fadeInUp .6s forwards;
+    }
+    .card:hover{transform:scale(1.05);background:var(--hover);}
+    .card img{
+      max-width:70%;
+      max-height:60%;
+      object-fit:contain;
+    }
+    .launch-btn{
+      display:block;
+      margin:40px auto;
+      padding:14px 32px;
+      font-size:16px;
+      border:none;
+      border-radius:9999px;
+      background:var(--accent);
+      color:#000;
+      cursor:pointer;
+      font-weight:600;
+      transition:background .3s ease, transform .2s ease;
+      box-shadow:0 6px 20px rgba(255,184,77,0.4);
+      backdrop-filter:blur(6px);
+    }
+    .launch-btn:hover{
+      background:#e69a25;
+      transform:scale(1.05);
+    }
+    @keyframes fadeInUp {
+      to {opacity:1; transform:translateY(0);}
+    }
+    .card:nth-child(1){animation-delay:.1s}
+    .card:nth-child(2){animation-delay:.2s}
+    .card:nth-child(3){animation-delay:.3s}
+    .card:nth-child(4){animation-delay:.4s}
+    .card:nth-child(5){animation-delay:.5s}
+    .card:nth-child(6){animation-delay:.6s}
+    .card:nth-child(7){animation-delay:.7s}
+    .card:nth-child(8){animation-delay:.8s}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Tesla Browser</h1>
+  </header>
+
+  <section>
+    <h2>Streaming</h2>
+    <div class="grid" id="streaming"></div>
+  </section>
+
+  <section>
+    <h2>Tools</h2>
+    <div class="grid" id="tools"></div>
+  </section>
+
+  <button class="launch-btn" onclick="openTeslaMode('https://www.youtube.com/redirect?q=https://testube.app')">Launch Fullscreen</button>
+
+<script>
+const STREAMING = [
+  {name:'Netflix', url:'https://www.netflix.com', img:'https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg'},
+  {name:'YouTube', url:'https://www.youtube.com', img:'https://upload.wikimedia.org/wikipedia/commons/4/42/YouTube_icon_%282013-2017%29.png'},
+  {name:'Hulu', url:'https://www.hulu.com', img:'https://upload.wikimedia.org/wikipedia/commons/e/e4/Hulu_Logo.svg'},
+  {name:'Disney+', url:'https://www.disneyplus.com', img:'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg'},
+  {name:'Crunchyroll', url:'https://www.crunchyroll.com', img:'https://static.crunchyroll.com/uix_resource/crunchyroll/favicon.svg'},
+  {name:'HBO Max', url:'https://www.max.com', img:'https://upload.wikimedia.org/wikipedia/commons/1/17/Max_logo.svg'},
+  {name:'Peacock', url:'https://www.peacocktv.com', img:'https://upload.wikimedia.org/wikipedia/commons/d/d3/Peacock_logo.svg'},
+  {name:'Apple TV+', url:'https://tv.apple.com', img:'https://upload.wikimedia.org/wikipedia/commons/2/28/Apple_TV_Plus_Logo.svg'},
+  {name:'Anime Kai', url:'https://animekai.to/home', img:'https://upload.wikimedia.org/wikipedia/commons/d/d3/Peacock_logo.svg'},
+  {name:'Anime Kai', url:'https://movhub.ws/home', img:'https://upload.wikimedia.org/wikipedia/commons/d/d3/Peacock_logo.svg'},
+];
+
+const TOOLS = [
+  {name:'Spotify', url:'https://open.spotify.com', img:'https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg'},
+  {name:'Twitch', url:'https://www.twitch.tv', img:'https://upload.wikimedia.org/wikipedia/commons/2/26/Twitch_logo.svg'},
+  {name:'Reddit', url:'https://www.reddit.com', img:'https://www.redditinc.com/assets/images/site/reddit-logo.png'},
+  {name:'Google', url:'https://www.google.com', img:'https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg'}
+];
+
+function renderSites(list, containerId){
+  const container = document.getElementById(containerId);
+  list.forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML = `<img src="${s.img}" alt="${s.name} logo" />`;
+    el.addEventListener('click', ()=> openTeslaMode(s.url));
+    container.appendChild(el);
+  });
+}
+
+function openTeslaMode(url){
+  if (document.fullscreenEnabled){
+    document.documentElement.requestFullscreen().catch(()=>{}).finally(()=>{
+      window.location.href = url;
+    });
+  } else {
+    window.location.href = url;
+  }
+}
+
+renderSites(STREAMING, 'streaming');
+renderSites(TOOLS, 'tools');
+</script>
+</body>
+</html>
