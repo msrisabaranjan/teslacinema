@@ -1,191 +1,753 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Tesla Cinema</title>
-  <link rel="icon" type="images/png" href="images/miff4.png" /> 
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>T / Cinema</title>
+  <link rel="icon" href="images/miff4.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Gotham:wght@400;500;700&display=swap');
-
     :root{
-      --bg:#0a0a0a;
-      --muted:#b0b0b0;
-      --accent:#ffb84d;
-      --card:rgba(20,20,20,0.6);
-      --hover:rgba(40,40,40,0.7);
+      --bg:#000;
+      --surface:rgba(255,255,255,0.04);
+      --surface-hover:rgba(255,255,255,0.07);
+      --border:rgba(255,255,255,0.07);
+      --border-em:rgba(255,255,255,0.14);
+      --accent:#E31937;
+      --accent-dim:rgba(227,25,55,0.15);
+      --accent-glow:rgba(227,25,55,0.35);
+      --text:#fff;
+      --muted:rgba(255,255,255,0.45);
+      --muted2:rgba(255,255,255,0.2);
+      --green:#22c55e;
+      --red:#E31937;
     }
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     html,body{
-      height:100%;margin:0;
-      font-family:'Gotham', Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial;
-      color:#fff;
       background:var(--bg);
-      backdrop-filter:blur(12px);
+      color:var(--text);
+      font-family:'Outfit',system-ui,sans-serif;
+      min-height:100vh;
+      overflow-x:hidden;
     }
-    header{
-      padding:20px;
-      text-align:center;
-      border-bottom:1px solid rgba(255,255,255,0.1);
-      background:rgba(15,15,15,0.6);
-      backdrop-filter:blur(8px);
+
+    /* ── TICKER ── */
+    .ticker-bar{
+      position:sticky;
+      top:0;
+      z-index:200;
+      background:#0a0a0a;
+      border-bottom:1px solid var(--border);
+      overflow:hidden;
+      height:38px;
+      display:flex;
+      align-items:center;
     }
-    header h1{
-      margin:0;
-      font-size:24px;
-      font-weight:600;
-    }
-    section{
-      margin:20px 0;
-    }
-    section h2{
-      margin:0 20px 10px;
-      font-size:18px;
-      font-weight:600;
+    .ticker-label{
+      flex-shrink:0;
+      padding:0 14px 0 16px;
+      font-size:10px;
+      font-weight:700;
+      letter-spacing:.12em;
       color:var(--accent);
-      border-left:4px solid var(--accent);
-      padding-left:10px;
+      border-right:1px solid var(--border);
+      height:100%;
+      display:flex;
+      align-items:center;
+      background:#0a0a0a;
     }
+    .ticker-mask{
+      flex:1;
+      overflow:hidden;
+      position:relative;
+    }
+    .ticker-mask::before,.ticker-mask::after{
+      content:'';
+      position:absolute;
+      top:0;bottom:0;
+      width:32px;
+      z-index:10;
+      pointer-events:none;
+    }
+    .ticker-mask::before{left:0;background:linear-gradient(to right,#0a0a0a,transparent);}
+    .ticker-mask::after{right:0;background:linear-gradient(to left,#0a0a0a,transparent);}
+    .ticker-track{
+      display:flex;
+      white-space:nowrap;
+      animation:scroll-left 60s linear infinite;
+      will-change:transform;
+    }
+    .ticker-track:hover{animation-play-state:paused;}
+    @keyframes scroll-left{
+      from{transform:translateX(0)}
+      to{transform:translateX(-50%)}
+    }
+    .t-item{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:0 20px;
+      font-size:12px;
+      font-weight:500;
+    }
+    .t-sym{
+      font-weight:700;
+      font-size:11px;
+      letter-spacing:.06em;
+      color:rgba(255,255,255,0.7);
+    }
+    .t-price{color:#fff;}
+    .t-chg{font-size:11px;font-weight:600;}
+    .t-chg.up{color:var(--green);}
+    .t-chg.dn{color:var(--red);}
+    .t-dot{color:var(--muted2);font-size:9px;}
+
+    /* ── HEADER ── */
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:18px 28px;
+      border-bottom:1px solid var(--border);
+    }
+    .logo{
+      display:flex;
+      align-items:center;
+      gap:14px;
+    }
+    .logo-t{
+      width:28px;height:28px;
+      background:var(--accent);
+      border-radius:4px;
+      display:flex;align-items:center;justify-content:center;
+      font-weight:700;font-size:14px;color:#fff;
+      letter-spacing:-.02em;
+    }
+    .logo-name{
+      font-size:17px;
+      font-weight:600;
+      letter-spacing:-.01em;
+    }
+    .logo-name span{
+      color:var(--muted);
+      font-weight:300;
+      margin-left:4px;
+    }
+    .header-right{
+      display:flex;
+      align-items:center;
+      gap:20px;
+    }
+    #clock{
+      font-size:22px;
+      font-weight:300;
+      letter-spacing:-.01em;
+      font-variant-numeric:tabular-nums;
+    }
+    .fullscreen-btn{
+      padding:8px 20px;
+      font-family:'Outfit',sans-serif;
+      font-size:12px;
+      font-weight:600;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      border:1px solid var(--border-em);
+      border-radius:6px;
+      background:transparent;
+      color:var(--muted);
+      cursor:pointer;
+      transition:color .2s,border-color .2s,background .2s;
+      user-select:none;
+    }
+    .fullscreen-btn:active{
+      background:var(--accent-dim);
+      border-color:var(--accent);
+      color:#fff;
+    }
+
+    /* ── SECTIONS ── */
+    main{padding:8px 0 60px;}
+    section{margin:28px 0;}
+    .sec-head{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:0 24px 14px;
+    }
+    .sec-head::before{
+      content:'';
+      width:3px;height:14px;
+      background:var(--accent);
+      border-radius:2px;
+      flex-shrink:0;
+    }
+    .sec-head span{
+      font-size:11px;
+      font-weight:700;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+    .sec-head::after{
+      content:'';
+      flex:1;
+      height:1px;
+      background:var(--border);
+    }
+
+    /* ── GRID ── */
     .grid{
       display:grid;
-      grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
-      gap:20px;
-      padding:0 20px 20px;
+      grid-template-columns:repeat(auto-fill,minmax(170px,1fr));
+      gap:10px;
+      padding:0 24px;
     }
     .card{
-      border-radius:16px;
+      border-radius:12px;
       overflow:hidden;
       cursor:pointer;
-      transition:transform .4s ease, background .3s ease, opacity .6s ease;
+      height:130px;
+      background:var(--surface);
+      border:1px solid var(--border);
       display:flex;
       align-items:center;
       justify-content:center;
-      height:140px;
-      background:var(--card);
-      box-shadow:0 8px 24px rgba(0,0,0,0.5);
-      backdrop-filter:blur(10px) saturate(120%);
+      transition:background .15s,border-color .15s,transform .1s;
       opacity:0;
-      transform:translateY(20px);
-      animation:fadeInUp .6s forwards;
+      transform:translateY(14px);
+      animation:fadeUp .5s ease forwards;
+      user-select:none;
+      position:relative;
     }
-    .card:hover{transform:scale(1.05);background:var(--hover);}
+    .card::after{
+      content:'';
+      position:absolute;
+      inset:0;
+      border-radius:12px;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);
+      pointer-events:none;
+    }
+    .card:active{
+      transform:scale(0.94);
+      background:var(--accent-dim);
+      border-color:rgba(227,25,55,0.4);
+    }
     .card img{
-      max-width:90%;
-      max-height:80%;
+      max-width:76%;
+      max-height:60%;
       object-fit:contain;
+      pointer-events:none;
+      transition:opacity .15s;
     }
-    .launch-btn{
-      display:block;
-      margin:40px auto;
-      padding:14px 32px;
-      font-size:16px;
-      border:none;
-      border-radius:9999px;
-      background:var(--accent);
-      color:#000;
+    .card:active img{opacity:.85;}
+
+    @keyframes fadeUp{
+      to{opacity:1;transform:translateY(0)}
+    }
+    .grid .card:nth-child(1){animation-delay:.05s}
+    .grid .card:nth-child(2){animation-delay:.1s}
+    .grid .card:nth-child(3){animation-delay:.15s}
+    .grid .card:nth-child(4){animation-delay:.2s}
+    .grid .card:nth-child(5){animation-delay:.25s}
+    .grid .card:nth-child(6){animation-delay:.3s}
+    .grid .card:nth-child(7){animation-delay:.35s}
+    .grid .card:nth-child(8){animation-delay:.4s}
+    .grid .card:nth-child(9){animation-delay:.45s}
+    .grid .card:nth-child(10){animation-delay:.5s}
+
+    /* ── STATUS DOT ── */
+    .status{
+      position:absolute;
+      bottom:8px;right:8px;
+      width:6px;height:6px;
+      border-radius:50%;
+      background:#22c55e;
+      opacity:.6;
+    }
+
+    /* ── LOADING PULSE ── */
+    .t-loading .t-price,.t-loading .t-chg{
+      background:rgba(255,255,255,0.1);
+      border-radius:3px;
+      color:transparent;
+      animation:pulse .9s ease infinite;
+    }
+    @keyframes pulse{
+      0%,100%{opacity:.4}50%{opacity:1}
+    }
+
+    /* ── NEWS STRIP ── */
+    .news-strip{
+      margin:0 24px 28px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      overflow:hidden;
+      background:var(--surface);
+    }
+    .news-header{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:9px 14px;
+      border-bottom:1px solid var(--border);
+    }
+    .news-label{
+      font-size:9px;
+      font-weight:700;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      color:var(--accent);
+    }
+    .news-source{
+      font-size:9px;
+      font-weight:500;
+      letter-spacing:.08em;
+      color:var(--muted);
+    }
+    .news-dot{color:var(--muted2);font-size:8px;margin:0 2px;}
+    .news-updated{
+      margin-left:auto;
+      font-size:9px;
+      color:var(--muted2);
+      font-variant-numeric:tabular-nums;
+    }
+    .news-items{
+      overflow:hidden;
+      position:relative;
+      height:36px;
+    }
+    .news-slide{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      padding:0 16px;
+      gap:12px;
+      opacity:0;
+      transform:translateY(8px);
+      transition:opacity .5s ease, transform .5s ease;
+      pointer-events:none;
+    }
+    .news-slide.active{
+      opacity:1;
+      transform:translateY(0);
+      pointer-events:auto;
       cursor:pointer;
-      font-weight:600;
-      transition:background .3s ease, transform .2s ease;
-      box-shadow:0 6px 20px rgba(255,184,77,0.4);
-      backdrop-filter:blur(6px);
     }
-    .launch-btn:hover{
-      background:#e69a25;
-      transform:scale(1.05);
+    .news-slide.exit{
+      opacity:0;
+      transform:translateY(-8px);
     }
-    @keyframes fadeInUp {
-      to {opacity:1; transform:translateY(0);}
+    .news-idx{
+      font-size:9px;
+      font-weight:700;
+      color:var(--accent);
+      flex-shrink:0;
+      font-variant-numeric:tabular-nums;
     }
-    .card:nth-child(1){animation-delay:.1s}
-    .card:nth-child(2){animation-delay:.2s}
-    .card:nth-child(3){animation-delay:.3s}
-    .card:nth-child(4){animation-delay:.4s}
-    .card:nth-child(5){animation-delay:.5s}
-    .card:nth-child(6){animation-delay:.6s}
-    .card:nth-child(7){animation-delay:.7s}
-    .card:nth-child(8){animation-delay:.8s}
-    .card:nth-child(9){animation-delay:.9s}
-    .card:nth-child(10){animation-delay:1s}
-    .card:nth-child(10){animation-delay:1.1s}
+    .news-title{
+      font-size:12px;
+      font-weight:400;
+      color:rgba(255,255,255,0.75);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      flex:1;
+      letter-spacing:.01em;
+    }
+    .news-time{
+      flex-shrink:0;
+      font-size:10px;
+      color:var(--muted2);
+      font-variant-numeric:tabular-nums;
+    }
+    .news-dots{
+      display:flex;
+      gap:5px;
+      padding:7px 14px;
+      border-top:1px solid var(--border);
+      align-items:center;
+    }
+    .news-pip{
+      width:16px;height:2px;
+      border-radius:1px;
+      background:var(--border-em);
+      transition:background .3s, width .3s;
+      cursor:pointer;
+    }
+    .news-pip.on{
+      background:var(--accent);
+      width:22px;
+    }
+    .news-skeleton{
+      height:36px;
+      display:flex;
+      align-items:center;
+      padding:0 16px;
+      gap:10px;
+    }
+    .news-skel-bar{
+      height:10px;
+      border-radius:4px;
+      background:rgba(255,255,255,0.06);
+      animation:pulse .9s ease infinite;
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar{width:3px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--border-em);border-radius:2px}
   </style>
 </head>
 <body>
+
+  <!-- STOCK TICKER -->
+  <div class="ticker-bar">
+    <div class="ticker-label" id="tickerLabel">LIVE</div>
+    <div class="ticker-mask">
+      <div class="ticker-track" id="tickerTrack">
+        <!-- populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- HEADER -->
   <header>
-    <h1>Tesla Cinema 🛰️</h1>
+    <div class="logo">
+      <div class="logo-t">T</div>
+      <div class="logo-name">Cinema<span>/ Drive</span></div>
+    </div>
+    <div class="header-right">
+      <div id="clock">--:--</div>
+      <button class="fullscreen-btn" id="fsBtn">Fullscreen</button>
+    </div>
   </header>
 
-  <section>
-    <h2>Streaming</h2>
-    <div class="grid" id="streaming"></div>
-  </section>
+  <!-- CONTENT -->
+  <main>
 
-  <section>
-    <h2>Music</h2>
-    <div class="grid" id="music"></div>
-  </section>
+    <!-- NEWS STRIP -->
+    <div class="news-strip" id="newsStrip" style="margin:20px 24px 0;">
+      <div class="news-header">
+        <span class="news-label">News</span>
+        <span class="news-dot">·</span>
+        <span class="news-source">Top Headlines</span>
+        <span class="news-updated" id="newsUpdated"></span>
+      </div>
+      <div class="news-items" id="newsItems">
+        <div class="news-skeleton">
+          <div class="news-skel-bar" style="width:28px"></div>
+          <div class="news-skel-bar" style="width:68%;animation-delay:.15s"></div>
+          <div class="news-skel-bar" style="width:32px;margin-left:auto;animation-delay:.3s"></div>
+        </div>
+      </div>
+      <div class="news-dots" id="newsDots"></div>
+    </div>
 
-  <section>
-    <h2>Tools</h2>
-    <div class="grid" id="tools"></div>
-  </section>
-
-  <button class="launch-btn" onclick="openTeslaMode('https://www.youtube.com/redirect?q=https://msrisabaranjan.github.io/teslacinema/')">Launch Fullscreen</button>
+    <section style="margin-top:0">
+      <div class="sec-head"><span>Streaming</span></div>
+      <div class="grid" id="streaming"></div>
+    </section>
+    <section>
+      <div class="sec-head"><span>Music</span></div>
+      <div class="grid" id="music"></div>
+    </section>
+    <section>
+      <div class="sec-head"><span>Apps &amp; Tools</span></div>
+      <div class="grid" id="tools"></div>
+    </section>
+  </main>
 
 <script>
+/* ── DATA ── */
 const STREAMING = [
-  {name:'Netflix', url:'https://www.netflix.com', img:'https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg'},
-  {name:'YouTube', url:'https://www.youtube.com', img:'https://upload.wikimedia.org/wikipedia/commons/4/42/YouTube_icon_%282013-2017%29.png'},
-  {name:'Hulu', url:'https://www.hulu.com', img:'https://upload.wikimedia.org/wikipedia/commons/0/0f/Hulu_Japan_green_logo.svg'},
-  {name:'Disney+', url:'https://www.disneyplus.com', img:'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg'},
-  {name:'Crunchyroll', url:'https://www.crunchyroll.com', img:'https://upload.wikimedia.org/wikipedia/commons/d/d9/Crunchyroll_2024.svg'},
-  {name:'HBO Max', url:'https://www.max.com', img:'https://upload.wikimedia.org/wikipedia/commons/1/17/HBO_Max_Logo.svg'},
-  {name:'Plex', url:'https://app.plex.tv', img:'https://upload.wikimedia.org/wikipedia/commons/3/34/Plex_logo_2022_full_color_on_black.png'},
-  {name:'Amazon Video', url:'https://www.amazon.com/gp/video/storefront', img:'https://upload.wikimedia.org/wikipedia/commons/4/43/Amazon_Prime_Video_logo_%282022%29.svg'},
-  {name:'Anime Kai', url:'https://animekai.to/home', img:'https://upload.wikimedia.org/wikipedia/commons/1/12/ANIME%2B_logo.svg'},
-  {name:'Movhub', url:'https://movhub.ws/home', img:'https://upload.wikimedia.org/wikipedia/commons/2/20/Movies_logo.png'}
+  {name:'Netflix',    url:'https://www.netflix.com',                    img:'https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg'},
+  {name:'YouTube',    url:'https://www.youtube.com',                    img:'https://upload.wikimedia.org/wikipedia/commons/4/42/YouTube_icon_%282013-2017%29.png'},
+  {name:'Hulu',       url:'https://www.hulu.com',                       img:'https://upload.wikimedia.org/wikipedia/commons/0/0f/Hulu_Japan_green_logo.svg'},
+  {name:'Disney+',    url:'https://www.disneyplus.com',                 img:'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg'},
+  {name:'Crunchyroll',url:'https://www.crunchyroll.com',                img:'https://upload.wikimedia.org/wikipedia/commons/d/d9/Crunchyroll_2024.svg'},
+  {name:'Max',        url:'https://www.max.com',                        img:'https://upload.wikimedia.org/wikipedia/commons/1/17/HBO_Max_Logo.svg'},
+  {name:'Plex',       url:'https://app.plex.tv',                        img:'https://upload.wikimedia.org/wikipedia/commons/3/34/Plex_logo_2022_full_color_on_black.png'},
+  {name:'Prime Video',url:'https://www.amazon.com/gp/video/storefront', img:'https://upload.wikimedia.org/wikipedia/commons/4/43/Amazon_Prime_Video_logo_%282022%29.svg'},
+  {name:'Anime Kai',  url:'https://animekai.to/home',                   img:'https://upload.wikimedia.org/wikipedia/commons/1/12/ANIME%2B_logo.svg'},
+  {name:'Movhub',     url:'https://movhub.ws/home',                     img:'https://upload.wikimedia.org/wikipedia/commons/2/20/Movies_logo.png'}
 ];
-
 const MUSIC = [
-  {name:'Spotify', url:'https://open.spotify.com', img:'https://upload.wikimedia.org/wikipedia/commons/2/24/Spotify_New_Full_Logo_RGB_Green.png'},
-  {name:'Apple Music', url:'https://music.apple.com', img:'https://upload.wikimedia.org/wikipedia/commons/9/9e/Itunes-music-app-icon.png'},
-  {name:'Soundcloud', url:'https://soundcloud.com', img:'https://upload.wikimedia.org/wikipedia/commons/7/78/Soundcloud_logo.svg'}
+  {name:'Spotify',     url:'https://open.spotify.com',  img:'https://upload.wikimedia.org/wikipedia/commons/2/24/Spotify_New_Full_Logo_RGB_Green.png'},
+  {name:'Apple Music', url:'https://music.apple.com',   img:'https://upload.wikimedia.org/wikipedia/commons/9/9e/Itunes-music-app-icon.png'},
+  {name:'SoundCloud',  url:'https://soundcloud.com',    img:'https://upload.wikimedia.org/wikipedia/commons/7/78/Soundcloud_logo.svg'}
 ];
-
 const TOOLS = [
-  {name:'Tesla Nav', url:'https://www.teslanav.com/', img:'images/cybertruck_3.png'},
-  {name:'Twitch', url:'https://www.twitch.tv', img:'https://upload.wikimedia.org/wikipedia/commons/2/26/Twitch_logo.svg'},
-  {name:'Kick', url:'https://kick.com', img:'https://upload.wikimedia.org/wikipedia/commons/d/dd/Kick_logo.svg'},
-  {name:'TikTok', url:'https://www.tiktok.com', img:'https://upload.wikimedia.org/wikipedia/commons/c/c3/Tiktok_logo_text_White.jpg'},
-  {name:'Reddit', url:'https://www.reddit.com', img:'https://upload.wikimedia.org/wikipedia/commons/2/2f/Reddit_wordmark.svg'},
-  {name:'Google Photos', url:'https://photos.google.com', img:'https://upload.wikimedia.org/wikipedia/commons/6/60/Google_Photos_icon_%282015-2020%29.svg'},
-  {name:'Google Drive', url:'https://drive.google.com', img:'https://upload.wikimedia.org/wikipedia/commons/f/fb/Google_Drive_-_New_Logo.png'},
-  {name:'Xbox', url:'https://www.xbox.com/en-US/play', img:'https://upload.wikimedia.org/wikipedia/commons/8/8c/XBOX_logo_2012.svg'},
-  {name:'Discord', url:'https://discord.com/login', img:'https://upload.wikimedia.org/wikipedia/commons/7/73/Discord_Color_Text_Logo_%282015-2021%29.svg'}
+  {name:'Tesla Nav',     url:'https://www.teslanav.com/',              img:'images/cybertruck_3.png'},
+  {name:'Twitch',        url:'https://www.twitch.tv',                  img:'https://upload.wikimedia.org/wikipedia/commons/2/26/Twitch_logo.svg'},
+  {name:'Kick',          url:'https://kick.com',                       img:'https://upload.wikimedia.org/wikipedia/commons/d/dd/Kick_logo.svg'},
+  {name:'TikTok',        url:'https://www.tiktok.com',                 img:'https://upload.wikimedia.org/wikipedia/commons/c/c3/Tiktok_logo_text_White.jpg'},
+  {name:'Reddit',        url:'https://www.reddit.com',                 img:'https://upload.wikimedia.org/wikipedia/commons/2/2f/Reddit_wordmark.svg'},
+  {name:'Google Photos', url:'https://photos.google.com',              img:'https://upload.wikimedia.org/wikipedia/commons/6/60/Google_Photos_icon_%282015-2020%29.svg'},
+  {name:'Google Drive',  url:'https://drive.google.com',               img:'https://upload.wikimedia.org/wikipedia/commons/f/fb/Google_Drive_-_New_Logo.png'},
+  {name:'Xbox',          url:'https://www.xbox.com/en-US/play',        img:'https://upload.wikimedia.org/wikipedia/commons/8/8c/XBOX_logo_2012.svg'},
+  {name:'Discord',       url:'https://discord.com/login',              img:'https://upload.wikimedia.org/wikipedia/commons/7/73/Discord_Color_Text_Logo_%282015-2021%29.svg'}
 ];
 
-function renderSites(list, containerId){
+/* ── RENDER CARDS ── */
+function renderCards(list, containerId){
   const container = document.getElementById(containerId);
   list.forEach(s => {
     const el = document.createElement('div');
     el.className = 'card';
-    el.innerHTML = `<img src="${s.img}" alt="${s.name} logo" />`;
-    el.addEventListener('click', ()=> openTeslaMode(s.url));
+    el.innerHTML = `<img src="${s.img}" alt="${s.name}" loading="lazy"/><div class="status"></div>`;
+    el.addEventListener('click', () => openUrl(s.url));
     container.appendChild(el);
   });
 }
 
-function openTeslaMode(url){
-  if (document.fullscreenEnabled){
-    document.documentElement.requestFullscreen().catch(()=>{}).finally(()=>{
-      window.location.href = url;
-    });
+function openUrl(url){
+  if(document.fullscreenEnabled && !document.fullscreenElement){
+    document.documentElement.requestFullscreen().catch(()=>{}).finally(()=> window.location.href = url);
   } else {
     window.location.href = url;
   }
 }
 
-renderSites(STREAMING, 'streaming');
-renderSites(MUSIC, 'music');
-renderSites(TOOLS, 'tools');
+/* ── CLOCK ── */
+function updateClock(){
+  const now = new Date();
+  const h = now.getHours().toString().padStart(2,'0');
+  const m = now.getMinutes().toString().padStart(2,'0');
+  document.getElementById('clock').textContent = `${h}:${m}`;
+}
+updateClock();
+setInterval(updateClock, 15000);
+
+/* ── FULLSCREEN ── */
+document.getElementById('fsBtn').addEventListener('click', () => {
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  } else {
+    document.exitFullscreen();
+  }
+});
+
+/* ── STOCK TICKER ── */
+const STOCK_SYMS  = ['TSLA','AMD','NVDA','MSFT','AMZN','GOOGL','META','NIO'];
+const CRYPTO_IDS  = {'BTC-USD':'bitcoin','LTC-USD':'litecoin'};
+const ALL_SYMS    = [...STOCK_SYMS,'BTC-USD','LTC-USD'];
+
+const MOCK = {
+  TSLA:     {price:248.23, change:+3.21,  pct:+1.31, closed:false},
+  AMD:      {price:96.54,  change:-1.12,  pct:-1.15, closed:false},
+  NVDA:     {price:110.72, change:+2.44,  pct:+2.25, closed:false},
+  MSFT:     {price:391.85, change:+1.18,  pct:+0.30, closed:false},
+  AMZN:     {price:195.22, change:-0.88,  pct:-0.45, closed:false},
+  GOOGL:    {price:161.51, change:+1.23,  pct:+0.77, closed:false},
+  META:     {price:512.83, change:+8.91,  pct:+1.77, closed:false},
+  NIO:      {price:3.87,   change:+0.12,  pct:+3.20, closed:false},
+  'BTC-USD':{price:84510,  change:+1240,  pct:+1.49, closed:false},
+  'LTC-USD':{price:84.31,  change:+2.14,  pct:+2.61, closed:false},
+};
+
+let stockData = Object.assign({}, MOCK);
+const PROXY = 'https://api.allorigins.win/raw?url=';
+
+function fmtPrice(sym, p){
+  if(sym === 'BTC-USD') return '$' + Math.round(p).toLocaleString('en-US');
+  return '$' + p.toFixed(2);
+}
+
+function buildTickerHTML(){
+  return ALL_SYMS.map(sym => {
+    const d   = stockData[sym];
+    const up  = d.change >= 0;
+    const sign= up ? '+' : '';
+    const cls = up ? 'up' : 'dn';
+    const closedTag = d.closed ? `<span style="font-size:8px;color:var(--muted2);margin-left:2px">CLOSE</span>` : '';
+    return `<span class="t-item">
+      <span class="t-sym">${sym}</span>
+      <span class="t-price">${fmtPrice(sym, d.price)}</span>${closedTag}
+      <span class="t-chg ${cls}">${sign}${d.change.toFixed(2)} (${sign}${d.pct.toFixed(2)}%)</span>
+    </span><span class="t-dot">•</span>`;
+  }).join('');
+}
+
+function renderTicker(){
+  const track = document.getElementById('tickerTrack');
+  const html  = buildTickerHTML();
+  track.innerHTML = html + html;
+}
+
+/* Fetch one stock from Yahoo Finance via allorigins */
+async function fetchYahoo(sym){
+  const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=5d`;
+  const res   = await fetch(PROXY + encodeURIComponent(yfUrl), {signal: AbortSignal.timeout(10000)});
+  if(!res.ok) throw new Error('proxy fail');
+  const json  = await res.json();
+  const meta  = json.chart.result[0].meta;
+  const state = (meta.marketState || '').toUpperCase();
+  const isOpen= state === 'REGULAR';
+  // When market closed use regularMarketPrice (last close); change vs previousClose
+  const price = meta.regularMarketPrice;
+  const prev  = meta.previousClose || meta.chartPreviousClose || price;
+  const change= +(price - prev).toFixed(4);
+  const pct   = +((change / prev) * 100).toFixed(4);
+  return {price, change, pct, closed: !isOpen};
+}
+
+/* Fetch BTC + LTC from CoinGecko (CORS-open, no key needed) */
+async function fetchCrypto(){
+  const ids = Object.values(CRYPTO_IDS).join(',');
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
+  const res = await fetch(url, {signal: AbortSignal.timeout(10000)});
+  if(!res.ok) throw new Error('coingecko fail');
+  const data = await res.json();
+  const out  = {};
+  Object.entries(CRYPTO_IDS).forEach(([sym, id]) => {
+    if(!data[id]) return;
+    const price = data[id].usd;
+    const pct   = +(data[id].usd_24h_change || 0).toFixed(2);
+    const change= +(price * pct / 100).toFixed(2);
+    out[sym]    = {price, change, pct, closed: false};
+  });
+  return out;
+}
+
+/* Update ticker label to LIVE / CLOSED based on market state */
+function setTickerState(anyClosed){
+  const lbl = document.getElementById('tickerLabel');
+  if(!lbl) return;
+  if(anyClosed){
+    lbl.textContent = 'CLOSED';
+    lbl.style.color = 'var(--muted)';
+  } else {
+    lbl.textContent = 'LIVE';
+    lbl.style.color = 'var(--accent)';
+  }
+}
+
+async function refreshStocks(){
+  let anyClosed = false;
+  /* Stocks — fetch in parallel, keep mock on failure */
+  const stockResults = await Promise.allSettled(
+    STOCK_SYMS.map(sym => fetchYahoo(sym).then(d => ({sym, d})))
+  );
+  stockResults.forEach(r => {
+    if(r.status === 'fulfilled' && r.value?.d){
+      stockData[r.value.sym] = r.value.d;
+      if(r.value.d.closed) anyClosed = true;
+    }
+  });
+
+  /* Crypto */
+  try {
+    const crypto = await fetchCrypto();
+    Object.assign(stockData, crypto);
+  } catch(_){}
+
+  setTickerState(anyClosed);
+  renderTicker();
+}
+
+renderTicker();
+refreshStocks();
+setInterval(refreshStocks, 90000);
+
+/* ── NEWS STRIP ── */
+let newsItems = [];
+let newsIdx   = 0;
+let newsTimer = null;
+
+function timeAgo(dateStr){
+  const diff = (Date.now() - new Date(dateStr).getTime()) / 60000;
+  if(isNaN(diff) || diff < 0) return '';
+  if(diff < 1)    return 'just now';
+  if(diff < 60)   return Math.round(diff) + 'm ago';
+  if(diff < 1440) return Math.round(diff / 60) + 'h ago';
+  return Math.round(diff / 1440) + 'd ago';
+}
+
+function renderNewsItems(){
+  const container = document.getElementById('newsItems');
+  const dots      = document.getElementById('newsDots');
+  if(!container || !dots) return;
+  container.innerHTML = '';
+  dots.innerHTML      = '';
+  newsItems.forEach((item, i) => {
+    const slide = document.createElement('div');
+    slide.className = 'news-slide' + (i === 0 ? ' active' : '');
+    const t = (item.title || '').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#39;/g,"'").replace(/&quot;/g,'"');
+    slide.innerHTML = `<span class="news-idx">${String(i+1).padStart(2,'0')}</span><span class="news-title">${t}</span><span class="news-time">${timeAgo(item.pubDate)}</span>`;
+    if(item.link) slide.addEventListener('click', () => window.open(item.link, '_blank'));
+    container.appendChild(slide);
+
+    const pip = document.createElement('div');
+    pip.className = 'news-pip' + (i === 0 ? ' on' : '');
+    pip.addEventListener('click', () => goToNews(i));
+    dots.appendChild(pip);
+  });
+  clearInterval(newsTimer);
+  newsTimer = setInterval(advanceNews, 6000);
+}
+
+function goToNews(next){
+  const slides = document.querySelectorAll('.news-slide');
+  const pips   = document.querySelectorAll('.news-pip');
+  if(!slides.length) return;
+  const prev = newsIdx;
+  newsIdx = next;
+  slides[prev].classList.remove('active');
+  slides[prev].classList.add('exit');
+  setTimeout(()=>{ if(slides[prev]) slides[prev].classList.remove('exit'); }, 550);
+  pips[prev] && pips[prev].classList.remove('on');
+  slides[newsIdx] && slides[newsIdx].classList.add('active');
+  pips[newsIdx]   && pips[newsIdx].classList.add('on');
+}
+
+function advanceNews(){
+  if(!newsItems.length) return;
+  goToNews((newsIdx + 1) % newsItems.length);
+}
+
+/* Parse BBC RSS XML fetched via allorigins */
+async function fetchNews(){
+  const RSS = 'https://feeds.bbci.co.uk/news/rss.xml';
+  try {
+    const res  = await fetch(PROXY + encodeURIComponent(RSS), {signal: AbortSignal.timeout(10000)});
+    if(!res.ok) throw new Error('fetch fail');
+    const text   = await res.text();
+    const parser = new DOMParser();
+    const doc    = parser.parseFromString(text, 'text/xml');
+    const items  = Array.from(doc.querySelectorAll('item')).slice(0, 14);
+    if(!items.length) throw new Error('no items');
+    newsItems = items.map(el => {
+      /* BBC RSS uses <link> as a text node AFTER the <title> node */
+      const title   = el.querySelector('title')?.textContent?.trim() || '';
+      const pubDate = el.querySelector('pubDate')?.textContent?.trim() || '';
+      /* <link> in BBC RSS is a sibling text node, not an attribute */
+      let link = '';
+      el.childNodes.forEach(n => { if(n.nodeName === 'link') link = n.textContent?.trim() || ''; });
+      if(!link) link = el.querySelector('guid')?.textContent?.trim() || '';
+      return {title, pubDate, link};
+    }).filter(i => i.title && !i.title.toLowerCase().includes('bbc'));
+
+    renderNewsItems();
+    const el = document.getElementById('newsUpdated');
+    if(el){
+      const now = new Date();
+      el.textContent = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+    }
+  } catch(err){
+    console.warn('News fetch failed:', err);
+    /* retry silently — leave skeleton or last good data in place */
+  }
+}
+
+fetchNews();
+setInterval(fetchNews, 5 * 60 * 1000);
+
+/* ── BOOT ── */
+renderCards(STREAMING, 'streaming');
+renderCards(MUSIC,     'music');
+renderCards(TOOLS,     'tools');
 </script>
 </body>
 </html>
