@@ -58,11 +58,9 @@
     .ticker-mask::after{right:0;background:linear-gradient(to left,#080808,transparent);}
     .ticker-track{
       display:flex;white-space:nowrap;
-      animation:scroll-left 70s linear infinite;
       will-change:transform;
     }
     .ticker-track:hover{animation-play-state:paused;}
-    @keyframes scroll-left{from{transform:translateX(0)}to{transform:translateX(-50%)}}
     .t-item{
       display:inline-flex;align-items:center;gap:7px;
       padding:0 22px;
@@ -310,28 +308,53 @@
       position:fixed;
       bottom:0;left:0;right:0;
       z-index:300;
-      background:#111;
+      background:#0e0e0e;
       border-top:1px solid var(--border);
       display:none;
       align-items:center;
       gap:14px;
       padding:10px 20px;
+      min-height:58px;
     }
     .now-playing.visible{display:flex;}
+    /* when an iframe stream is active, taller to fit the player */
+    .now-playing.has-frame{
+      align-items:flex-start;
+      padding:10px 20px;
+      gap:16px;
+    }
     .np-pulse{
       width:10px;height:10px;border-radius:50%;
       background:var(--accent);flex-shrink:0;
+      margin-top:2px;
       animation:ping 1.4s ease-out infinite;
     }
+    .now-playing.has-frame .np-pulse{margin-top:6px;}
     .np-info{flex:1;min-width:0;}
     .np-name{font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .np-genre{font-size:11px;color:var(--muted);}
+    .np-genre{font-size:11px;color:var(--muted);margin-top:1px;}
+    /* mini embedded player shown inside the bar */
+    .np-frame-wrap{
+      flex-shrink:0;
+      width:160px;height:90px;
+      border-radius:8px;
+      overflow:hidden;
+      border:1px solid var(--border-em);
+      display:none;
+      background:#000;
+    }
+    .now-playing.has-frame .np-frame-wrap{display:block;}
+    .np-frame-wrap iframe{
+      width:100%;height:100%;
+      border:none;display:block;
+    }
     .np-stop{
       flex-shrink:0;
       width:36px;height:36px;border-radius:50%;
       background:var(--accent);border:none;cursor:pointer;
       display:flex;align-items:center;justify-content:center;
       transition:background .15s,transform .1s;
+      align-self:center;
     }
     .np-stop:active{transform:scale(0.9);}
     .np-stop svg{width:12px;height:12px;fill:#fff;}
@@ -412,6 +435,9 @@
       <div class="np-name" id="npName">—</div>
       <div class="np-genre" id="npGenre">Live Radio</div>
     </div>
+    <div class="np-frame-wrap" id="npFrameWrap">
+      <iframe id="npFrame" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+    </div>
     <button class="np-stop" id="npStop" title="Stop">
       <svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="1"/></svg>
     </button>
@@ -437,7 +463,6 @@ const MUSIC = [
   {name:'SoundCloud',  url:'https://soundcloud.com',    img:'https://upload.wikimedia.org/wikipedia/commons/7/78/Soundcloud_logo.svg'}
 ];
 const TOOLS = [
-  {name:'Tesla Nav',     url:'https://www.teslanav.com/',              img:'images/cybertruck_3.png'},
   {name:'Twitch',        url:'https://www.twitch.tv',                  img:'https://upload.wikimedia.org/wikipedia/commons/2/26/Twitch_logo.svg'},
   {name:'Kick',          url:'https://kick.com',                       img:'https://upload.wikimedia.org/wikipedia/commons/d/dd/Kick_logo.svg'},
   {name:'TikTok',        url:'https://www.tiktok.com',                 img:'https://upload.wikimedia.org/wikipedia/commons/c/c3/Tiktok_logo_text_White.jpg'},
@@ -479,16 +504,17 @@ updateClock();
 setInterval(updateClock, 15000);
 
 /* ── FULLSCREEN ── */
+/* Tesla's browser does not honour requestFullscreen().
+   The trick: navigate to a youtube.com/redirect URL pointing back to this
+   page — Tesla intercepts it and opens the destination in fullscreen theater mode. */
+const THIS_URL = 'https://msrisabaranjan.github.io/teslacinema/';
+const FS_URL   = 'https://www.youtube.com/redirect?q=' + encodeURIComponent(THIS_URL);
 document.getElementById('fsBtn').addEventListener('click', () => {
-  if(!document.fullscreenElement){
-    document.documentElement.requestFullscreen().catch(()=>{});
-  } else {
-    document.exitFullscreen();
-  }
+  window.location.href = FS_URL;
 });
 
 /* ── STOCK TICKER ── */
-const STOCK_SYMS  = ['TSLA','AMD','NVDA','MSFT','AMZN','GOOGL','META','NIO'];
+const STOCK_SYMS  = ['TSLA','AMD','NVDA','AMZN','GOOGL','META','NIO'];
 const CRYPTO_IDS  = {'BTC-USD':'bitcoin','LTC-USD':'litecoin'};
 const ALL_SYMS    = [...STOCK_SYMS,'BTC-USD','LTC-USD'];
 
@@ -496,7 +522,6 @@ const MOCK = {
   TSLA:     {price:248.23, change:+3.21,  pct:+1.31, closed:false},
   AMD:      {price:96.54,  change:-1.12,  pct:-1.15, closed:false},
   NVDA:     {price:110.72, change:+2.44,  pct:+2.25, closed:false},
-  MSFT:     {price:391.85, change:+1.18,  pct:+0.30, closed:false},
   AMZN:     {price:195.22, change:-0.88,  pct:-0.45, closed:false},
   GOOGL:    {price:161.51, change:+1.23,  pct:+0.77, closed:false},
   META:     {price:512.83, change:+8.91,  pct:+1.77, closed:false},
@@ -528,11 +553,61 @@ function buildTickerHTML(){
   }).join('');
 }
 
-function renderTicker(){
+/* ── JS INFINITE TICKER ── */
+/* Render 4 copies so content is always wider than viewport at any size.
+   RAF loop shifts translateX by px/frame; when we've scrolled one copy's
+   width we snap back to 0 — perfectly seamless regardless of window size. */
+const TICKER_PX_PER_SEC = 60; // scroll speed
+let tickerX   = 0;
+let tickerW   = 0; // width of ONE copy of the content
+let tickerLast= null;
+let tickerPaused = false;
+let tickerRAF = null;
+
+function buildTickerContent(){
   const track = document.getElementById('tickerTrack');
   const html  = buildTickerHTML();
-  track.innerHTML = html + html;
+  // 4 identical copies — guarantees seamless loop at any viewport width
+  track.innerHTML = html + html + html + html;
+  // measure after next paint so layout is complete
+  requestAnimationFrame(() => {
+    tickerW = track.scrollWidth / 4;
+    tickerX = 0;
+    track.style.transform = 'translateX(0px)';
+  });
 }
+
+function tickerStep(ts){
+  if(tickerLast === null) tickerLast = ts;
+  const dt = (ts - tickerLast) / 1000;
+  tickerLast = ts;
+  if(!tickerPaused && tickerW > 0){
+    tickerX += TICKER_PX_PER_SEC * dt;
+    if(tickerX >= tickerW) tickerX -= tickerW; // seamless reset
+    document.getElementById('tickerTrack').style.transform = `translateX(-${tickerX.toFixed(2)}px)`;
+  }
+  tickerRAF = requestAnimationFrame(tickerStep);
+}
+
+function renderTicker(){
+  buildTickerContent();
+}
+
+// pause on touch-hold
+const tickerEl = document.getElementById('tickerTrack');
+tickerEl.addEventListener('touchstart', ()=>{ tickerPaused=true; }, {passive:true});
+tickerEl.addEventListener('touchend',   ()=>{ tickerPaused=false; });
+tickerEl.addEventListener('mouseenter', ()=>{ tickerPaused=true; });
+tickerEl.addEventListener('mouseleave', ()=>{ tickerPaused=false; });
+
+// re-measure on resize so tickerW stays accurate
+window.addEventListener('resize', () => {
+  const track = document.getElementById('tickerTrack');
+  tickerW = track.scrollWidth / 4;
+  if(tickerX >= tickerW) tickerX = tickerX % tickerW;
+});
+
+requestAnimationFrame(tickerStep);
 
 /* Fetch one stock from Yahoo Finance via allorigins */
 async function fetchYahoo(sym){
@@ -704,17 +779,36 @@ setInterval(fetchNews, 5 * 60 * 1000);
 
 /* ── RADIO ── */
 const RADIO_STATIONS = [
-  {name:'BBC Radio 1',   genre:'Pop · Dance',      stream:'https://stream.live.vc.bbcmedia.co.uk/bbc_radio_one',    color:'#E31937', text:'#fff',  initials:'R1'},
-  {name:'BBC Radio 2',   genre:'Classic Hits',      stream:'https://stream.live.vc.bbcmedia.co.uk/bbc_radio_two',    color:'#ff6b35', text:'#fff',  initials:'R2'},
-  {name:'BBC 6 Music',   genre:'Alternative',       stream:'https://stream.live.vc.bbcmedia.co.uk/bbc_6music',       color:'#8b5cf6', text:'#fff',  initials:'6M'},
-  {name:'Groove Salad',  genre:'Ambient · Chill',   stream:'https://ice2.somafm.com/groovesalad-128-mp3',            color:'#16a34a', text:'#fff',  initials:'GS'},
-  {name:'Drone Zone',    genre:'Deep Ambient',      stream:'https://ice2.somafm.com/dronezone-128-mp3',              color:'#0e7490', text:'#fff',  initials:'DZ'},
-  {name:'Indie Pop',     genre:'Indie · Alt',       stream:'https://ice2.somafm.com/indiepop-128-mp3',               color:'#db2777', text:'#fff',  initials:'IP'},
-  {name:'Radio Paradise',genre:'Eclectic Rock',     stream:'https://stream.radioparadise.com/mp3-128',               color:'#d97706', text:'#fff',  initials:'RP'},
-  {name:'lofi hip hop',  genre:'Beats · Study',     stream:'https://streams.ilovemusic.de/iloveradio17.mp3',         color:'#4f46e5', text:'#fff',  initials:'LO'},
+  {
+    name:'Lofi Girl',
+    genre:'Tap to open on YouTube',
+    type:'link',
+    url:'https://www.youtube.com/watch?v=jfKfPfyJRdk',
+    color:'#ec4899', text:'#fff', initials:'LG'
+  },
+  {
+    name:'Hasanabi',
+    genre:'Twitch · Live',
+    type:'twitch',
+    embedUrl:'https://player.twitch.tv/?channel=hasanabi&parent=msrisabaranjan.github.io&autoplay=true&muted=false',
+    color:'#9146ff', text:'#fff', initials:'HS'
+  },
+  {
+    name:'Lofi Hip Hop',
+    genre:'Beats · Study',
+    type:'audio',
+    stream:'https://streams.ilovemusic.de/iloveradio17.mp3',
+    color:'#4f46e5', text:'#fff', initials:'LO'
+  },
 ];
 
-let radioAudio = null;
+const npEl       = document.getElementById('nowPlaying');
+const npFrame    = document.getElementById('npFrame');
+const npFrameWrap= document.getElementById('npFrameWrap');
+const npNameEl   = document.getElementById('npName');
+const npGenreEl  = document.getElementById('npGenre');
+
+let radioAudio      = null;
 let activeRadioCard = null;
 
 function stopRadio(){
@@ -723,31 +817,38 @@ function stopRadio(){
     radioAudio.src = '';
     radioAudio = null;
   }
+  /* Kill iframe by clearing src — stops all audio/video */
+  npFrame.src = '';
+  npEl.classList.remove('visible','has-frame');
   if(activeRadioCard){
     activeRadioCard.classList.remove('playing');
     activeRadioCard = null;
   }
-  document.getElementById('nowPlaying').classList.remove('visible');
 }
 
 function playStation(station, cardEl){
-  /* If tapping already-playing station → stop */
-  if(activeRadioCard === cardEl){
-    stopRadio();
+  if(station.type === 'link'){
+    openUrl(station.url);
     return;
   }
+  if(activeRadioCard === cardEl){ stopRadio(); return; }
   stopRadio();
 
-  radioAudio = new Audio(station.stream);
-  radioAudio.crossOrigin = 'anonymous';
-  radioAudio.play().catch(()=>{});
+  if(station.type === 'audio'){
+    radioAudio = new Audio(station.stream);
+    radioAudio.crossOrigin = 'anonymous';
+    radioAudio.play().catch(()=>{});
+    npEl.classList.add('visible');
+    npEl.classList.remove('has-frame');
+  } else {
+    npFrame.src = station.embedUrl;
+    npEl.classList.add('visible','has-frame');
+  }
 
   cardEl.classList.add('playing');
   activeRadioCard = cardEl;
-
-  document.getElementById('npName').textContent  = station.name;
-  document.getElementById('npGenre').textContent = station.genre;
-  document.getElementById('nowPlaying').classList.add('visible');
+  npNameEl.textContent  = station.name;
+  npGenreEl.textContent = station.genre;
 }
 
 function renderRadio(){
