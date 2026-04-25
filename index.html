@@ -7,6 +7,7 @@
   <link rel="icon" href="images/miff4.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     :root{
       --bg:#000;
@@ -315,14 +316,17 @@
       gap:14px;
       padding:10px 20px;
       min-height:58px;
+      transition:right .35s cubic-bezier(.4,0,.2,1);
     }
     .now-playing.visible{display:flex;}
-    /* when an iframe stream is active, taller to fit the player */
     .now-playing.has-frame{
       align-items:flex-start;
       padding:10px 20px;
       gap:16px;
     }
+    /* shift bar left when chat is open */
+    .now-playing.chat-open{right:340px;}
+    .now-playing.chat-mini{right:52px;}
     .np-pulse{
       width:10px;height:10px;border-radius:50%;
       background:var(--accent);flex-shrink:0;
@@ -333,7 +337,6 @@
     .np-info{flex:1;min-width:0;}
     .np-name{font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .np-genre{font-size:11px;color:var(--muted);margin-top:1px;}
-    /* mini embedded player shown inside the bar */
     .np-frame-wrap{
       flex-shrink:0;
       width:160px;height:90px;
@@ -344,20 +347,325 @@
       background:#000;
     }
     .now-playing.has-frame .np-frame-wrap{display:block;}
-    .np-frame-wrap iframe{
-      width:100%;height:100%;
-      border:none;display:block;
-    }
+    .np-frame-wrap iframe{width:100%;height:100%;border:none;display:block;}
     .np-stop{
       flex-shrink:0;
-      width:36px;height:36px;border-radius:50%;
+      width:44px;height:44px;border-radius:50%;
       background:var(--accent);border:none;cursor:pointer;
       display:flex;align-items:center;justify-content:center;
       transition:background .15s,transform .1s;
       align-self:center;
     }
-    .np-stop:active{transform:scale(0.9);}
-    .np-stop svg{width:12px;height:12px;fill:#fff;}
+    .np-stop:active{transform:scale(0.88);}
+    .np-stop svg{width:13px;height:13px;fill:#fff;}
+
+    /* ── CHAT PANEL ── */
+    .chat-panel{
+      position:fixed;
+      top:0;right:0;bottom:0;
+      width:340px;
+      z-index:400;
+      background:#0d0d0d;
+      border-left:1px solid var(--border);
+      display:flex;
+      flex-direction:column;
+      transform:translateX(100%);
+      transition:transform .35s cubic-bezier(.4,0,.2,1);
+      will-change:transform;
+    }
+    .chat-panel.open{transform:translateX(0);}
+
+    .chat-header{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:0 14px;
+      height:54px;
+      border-bottom:1px solid var(--border);
+      flex-shrink:0;
+      background:#0d0d0d;
+    }
+    .chat-live-dot{
+      width:8px;height:8px;border-radius:50%;
+      background:#9146ff;flex-shrink:0;
+      animation:ping 1.4s ease-out infinite;
+    }
+    .chat-title{
+      flex:1;
+      font-size:13px;font-weight:600;
+      color:#fff;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .chat-subtitle{
+      font-size:10px;color:var(--muted);font-weight:400;
+    }
+
+    /* header icon buttons */
+    .chat-btn{
+      flex-shrink:0;
+      width:44px;height:44px;
+      border:none;background:transparent;cursor:pointer;
+      border-radius:10px;
+      display:flex;align-items:center;justify-content:center;
+      color:var(--muted);
+      transition:background .15s,color .15s,transform .1s;
+    }
+    .chat-btn:active{background:rgba(255,255,255,0.08);transform:scale(0.9);color:#fff;}
+    .chat-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+
+    .chat-body{
+      flex:1;
+      overflow:hidden;
+      position:relative;
+    }
+    .chat-body iframe{
+      width:100%;height:100%;
+      border:none;display:block;
+    }
+
+    /* ── CHAT MINIMIZED PILL ── */
+    .chat-pill{
+      position:fixed;
+      right:0;
+      /* vertically centered but nudged up from bottom */
+      top:50%;
+      transform:translateY(-50%) translateX(100%);
+      z-index:401;
+      background:#9146ff;
+      border-radius:12px 0 0 12px;
+      width:52px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      padding:14px 0;
+      cursor:pointer;
+      border:1px solid rgba(145,70,255,0.4);
+      border-right:none;
+      transition:transform .35s cubic-bezier(.4,0,.2,1),background .15s;
+      user-select:none;
+    }
+    .chat-pill.visible{transform:translateY(-50%) translateX(0);}
+    .chat-pill:active{background:#7c3aed;}
+    .chat-pill svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+    .chat-pill-label{
+      font-size:9px;font-weight:700;letter-spacing:.1em;
+      color:#fff;text-transform:uppercase;
+      writing-mode:vertical-rl;
+      text-orientation:mixed;
+      transform:rotate(180deg);
+    }
+
+    /* ── CALENDAR PANEL ── */
+    .cal-panel{
+      position:fixed;
+      top:0;left:0;bottom:0;
+      width:min(680px,100vw);
+      z-index:400;
+      background:#0d0d0d;
+      border-right:1px solid var(--border);
+      display:flex;
+      flex-direction:column;
+      transform:translateX(-100%);
+      transition:transform .38s cubic-bezier(.4,0,.2,1);
+      will-change:transform;
+    }
+    .cal-panel.open{transform:translateX(0);}
+
+    .cal-header{
+      display:flex;align-items:center;gap:10px;
+      padding:0 18px;height:56px;
+      border-bottom:1px solid var(--border);
+      flex-shrink:0;
+    }
+    .cal-header-icon{
+      width:32px;height:32px;border-radius:8px;
+      background:linear-gradient(135deg,#4285f4,#34a853);
+      display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;
+    }
+    .cal-header-icon svg{width:18px;height:18px;fill:#fff;}
+    .cal-header-title{flex:1;}
+    .cal-header-title h3{font-size:14px;font-weight:600;color:#fff;margin:0;}
+    .cal-header-title p{font-size:10px;color:var(--muted);margin:0;}
+    .cal-close-btn{
+      width:44px;height:44px;border:none;background:transparent;cursor:pointer;
+      border-radius:10px;display:flex;align-items:center;justify-content:center;
+      color:var(--muted);transition:background .15s,color .15s,transform .1s;
+    }
+    .cal-close-btn:active{background:rgba(255,255,255,0.08);transform:scale(0.9);color:#fff;}
+    .cal-close-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+
+    /* Setup / connect screen */
+    .cal-setup{
+      flex:1;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      gap:20px;padding:32px 28px;
+      text-align:center;
+    }
+    .cal-setup-icon{
+      width:64px;height:64px;border-radius:18px;
+      background:linear-gradient(135deg,#4285f4 0%,#34a853 100%);
+      display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;
+    }
+    .cal-setup-icon svg{width:34px;height:34px;fill:#fff;}
+    .cal-setup h2{font-size:18px;font-weight:600;color:#fff;margin:0;}
+    .cal-setup p{font-size:13px;color:var(--muted);margin:0;line-height:1.6;max-width:340px;}
+    .cal-input-group{width:100%;max-width:380px;display:flex;flex-direction:column;gap:10px;}
+    .cal-input{
+      width:100%;padding:13px 16px;
+      background:rgba(255,255,255,0.06);
+      border:1px solid var(--border-em);
+      border-radius:10px;
+      color:#fff;font-family:'Outfit',sans-serif;font-size:13px;
+      outline:none;transition:border-color .2s;
+    }
+    .cal-input:focus{border-color:#4285f4;}
+    .cal-input::placeholder{color:var(--muted);}
+    .cal-connect-btn{
+      width:100%;max-width:380px;
+      padding:14px;border:none;border-radius:10px;
+      background:linear-gradient(135deg,#4285f4,#34a853);
+      color:#fff;font-family:'Outfit',sans-serif;
+      font-size:14px;font-weight:600;cursor:pointer;
+      transition:opacity .2s,transform .1s;
+      display:flex;align-items:center;justify-content:center;gap:8px;
+    }
+    .cal-connect-btn:active{opacity:.85;transform:scale(0.98);}
+    .cal-connect-btn svg{width:18px;height:18px;fill:#fff;}
+    .cal-hint{font-size:11px;color:var(--muted2);max-width:340px;line-height:1.5;}
+
+    /* Signed-in calendar view */
+    .cal-body{
+      flex:1;display:flex;flex-direction:column;
+      overflow:hidden;
+    }
+    .cal-week-nav{
+      display:flex;align-items:center;gap:8px;
+      padding:10px 18px;border-bottom:1px solid var(--border);
+      flex-shrink:0;
+    }
+    .cal-nav-btn{
+      width:40px;height:40px;border:1px solid var(--border-em);
+      border-radius:8px;background:transparent;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      color:var(--muted);transition:background .15s,color .15s,transform .1s;
+    }
+    .cal-nav-btn:active{background:rgba(255,255,255,0.08);color:#fff;transform:scale(0.9);}
+    .cal-nav-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+    .cal-week-label{flex:1;text-align:center;font-size:13px;font-weight:600;color:#fff;}
+    .cal-today-btn{
+      padding:8px 14px;border:1px solid var(--border-em);
+      border-radius:8px;background:transparent;cursor:pointer;
+      font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;
+      color:var(--muted);letter-spacing:.06em;text-transform:uppercase;
+      transition:background .15s,color .15s,border-color .15s;
+    }
+    .cal-today-btn:active{background:#4285f420;border-color:#4285f4;color:#4285f4;}
+
+    .cal-grid-wrap{flex:1;overflow-y:auto;padding:14px 18px 24px;}
+
+    /* 7-column day grid */
+    .cal-days{
+      display:grid;
+      grid-template-columns:repeat(7,1fr);
+      gap:8px;
+    }
+    .cal-day{
+      display:flex;flex-direction:column;
+      gap:5px;min-height:120px;
+    }
+    .cal-day-head{
+      display:flex;flex-direction:column;
+      align-items:center;gap:3px;
+      padding-bottom:6px;
+      border-bottom:1px solid var(--border);
+    }
+    .cal-day-name{
+      font-size:9px;font-weight:700;letter-spacing:.1em;
+      text-transform:uppercase;color:var(--muted);
+    }
+    .cal-day-num{
+      width:30px;height:30px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:14px;font-weight:600;color:#fff;
+      transition:background .15s;
+    }
+    .cal-day.today .cal-day-num{
+      background:#4285f4;color:#fff;
+    }
+    .cal-day.today .cal-day-name{color:#4285f4;}
+
+    /* event chips */
+    .cal-event{
+      border-radius:5px;
+      padding:4px 6px;
+      font-size:10px;font-weight:500;
+      line-height:1.3;
+      cursor:default;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      border-left:2px solid;
+    }
+    .cal-event-time{
+      font-size:9px;font-weight:700;opacity:.75;
+      display:block;margin-bottom:1px;
+    }
+    .cal-allday{
+      font-size:9px;font-weight:600;
+      border-radius:4px;padding:3px 5px;
+      opacity:.85;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .cal-empty{
+      font-size:10px;color:var(--muted2);
+      text-align:center;padding-top:12px;
+    }
+    .cal-loading{
+      flex:1;display:flex;align-items:center;justify-content:center;
+      gap:10px;color:var(--muted);font-size:13px;
+    }
+    .cal-spinner{
+      width:20px;height:20px;border-radius:50%;
+      border:2px solid var(--border-em);
+      border-top-color:#4285f4;
+      animation:spin .7s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .cal-error{
+      flex:1;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;gap:12px;padding:24px;text-align:center;
+    }
+    .cal-error p{font-size:13px;color:var(--muted);max-width:280px;line-height:1.6;}
+    .cal-reconnect-btn{
+      padding:11px 22px;border:1px solid var(--border-em);
+      border-radius:8px;background:transparent;cursor:pointer;
+      font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;
+      color:var(--muted);transition:background .15s,color .15s,border-color .15s;
+    }
+    .cal-reconnect-btn:active{background:#4285f420;border-color:#4285f4;color:#4285f4;}
+
+    /* calendar pill on header */
+    .cal-pill-btn{
+      width:44px;height:44px;border:1px solid var(--border-em);
+      border-radius:10px;background:transparent;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      color:var(--muted);transition:background .15s,border-color .15s,color .15s,transform .1s;
+      flex-shrink:0;position:relative;
+    }
+    .cal-pill-btn:active{background:#4285f420;border-color:#4285f4;color:#4285f4;transform:scale(0.93);}
+    .cal-pill-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+    .cal-badge{
+      position:absolute;top:6px;right:6px;
+      width:7px;height:7px;border-radius:50%;
+      background:#4285f4;border:1.5px solid var(--bg);
+      display:none;
+    }
+    .cal-pill-btn.connected .cal-badge{display:block;}
+
     ::-webkit-scrollbar{width:3px}
     ::-webkit-scrollbar-track{background:transparent}
     ::-webkit-scrollbar-thumb{background:var(--border-em);border-radius:2px}
@@ -383,6 +691,10 @@
     </div>
     <div class="header-right">
       <div id="clock">--:--</div>
+      <button class="cal-pill-btn" id="calBtn" title="Calendar">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <div class="cal-badge" id="calBadge"></div>
+      </button>
       <button class="fs-btn" id="fsBtn" title="Fullscreen">
         <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
       </button>
@@ -441,6 +753,91 @@
     <button class="np-stop" id="npStop" title="Stop">
       <svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="1"/></svg>
     </button>
+  </div>
+
+  <!-- CALENDAR PANEL -->
+  <div class="cal-panel" id="calPanel">
+    <div class="cal-header">
+      <div class="cal-header-icon">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      </div>
+      <div class="cal-header-title">
+        <h3>Calendar</h3>
+        <p id="calHeaderSub">Google Calendar</p>
+      </div>
+      <button class="cal-close-btn" id="calCloseBtn">
+        <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="calContent">
+      <!-- Setup screen (default) -->
+      <div class="cal-setup" id="calSetup">
+        <div class="cal-setup-icon">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>
+        </div>
+        <h2>Connect Google Calendar</h2>
+        <p>Enter your Google OAuth Client ID to sync your calendar. Your events are fetched directly — nothing is stored.</p>
+        <div class="cal-input-group">
+          <input class="cal-input" id="calClientId" type="text" placeholder="OAuth Client ID  (…apps.googleusercontent.com)" autocomplete="off" spellcheck="false"/>
+          <button class="cal-connect-btn" id="calConnectBtn">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="#fff"/></svg>
+            Sign in with Google
+          </button>
+        </div>
+        <p class="cal-hint">ⓘ One-time setup. Create a project at console.cloud.google.com → APIs → Google Calendar API → OAuth 2.0 Client ID (Web). Add <strong>msrisabaranjan.github.io</strong> as an authorised origin.</p>
+      </div>
+      <!-- Calendar view (shown after auth) -->
+      <div class="cal-body" id="calBody" style="display:none">
+        <div class="cal-week-nav">
+          <button class="cal-nav-btn" id="calPrevWeek">
+            <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <span class="cal-week-label" id="calWeekLabel"></span>
+          <button class="cal-today-btn" id="calTodayBtn">Today</button>
+          <button class="cal-nav-btn" id="calNextWeek">
+            <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+        <div class="cal-grid-wrap" id="calGridWrap">
+          <div class="cal-loading" id="calLoading">
+            <div class="cal-spinner"></div><span>Loading events…</span>
+          </div>
+          <div class="cal-days" id="calDays" style="display:none"></div>
+          <div class="cal-error" id="calErrMsg" style="display:none">
+            <p id="calErrText">Could not load events.</p>
+            <button class="cal-reconnect-btn" id="calReconnectBtn">Reconnect</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TWITCH CHAT PANEL -->
+  <div class="chat-panel" id="chatPanel">
+    <div class="chat-header">
+      <div class="chat-live-dot"></div>
+      <div>
+        <div class="chat-title" id="chatTitle">Live Chat</div>
+        <div class="chat-subtitle">Twitch</div>
+      </div>
+      <!-- Minimize -->
+      <button class="chat-btn" id="chatMinBtn" title="Minimize">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+      </button>
+      <!-- Close -->
+      <button class="chat-btn" id="chatCloseBtn" title="Close chat">
+        <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="chat-body">
+      <iframe id="chatFrame" allow="autoplay" title="Twitch Chat"></iframe>
+    </div>
+  </div>
+
+  <!-- CHAT MINIMIZED PILL -->
+  <div class="chat-pill" id="chatPill" title="Expand chat">
+    <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    <span class="chat-pill-label">Chat</span>
   </div>
 
 <script>
@@ -790,6 +1187,7 @@ const RADIO_STATIONS = [
     name:'Hasanabi',
     genre:'Twitch · Live',
     type:'twitch',
+    channel:'hasanabi',
     embedUrl:'https://player.twitch.tv/?channel=hasanabi&parent=msrisabaranjan.github.io&autoplay=true&muted=false',
     color:'#9146ff', text:'#fff', initials:'HS'
   },
@@ -802,35 +1200,76 @@ const RADIO_STATIONS = [
   },
 ];
 
-const npEl       = document.getElementById('nowPlaying');
-const npFrame    = document.getElementById('npFrame');
-const npFrameWrap= document.getElementById('npFrameWrap');
-const npNameEl   = document.getElementById('npName');
-const npGenreEl  = document.getElementById('npGenre');
+const npEl        = document.getElementById('nowPlaying');
+const npFrame     = document.getElementById('npFrame');
+const npNameEl    = document.getElementById('npName');
+const npGenreEl   = document.getElementById('npGenre');
+const chatPanel   = document.getElementById('chatPanel');
+const chatFrame   = document.getElementById('chatFrame');
+const chatTitle   = document.getElementById('chatTitle');
+const chatPill    = document.getElementById('chatPill');
+const chatMinBtn  = document.getElementById('chatMinBtn');
+const chatCloseBtn= document.getElementById('chatCloseBtn');
 
 let radioAudio      = null;
 let activeRadioCard = null;
+let chatOpen        = false;   // panel visible
+let chatMinimized   = false;   // panel hidden, pill visible
 
-function stopRadio(){
-  if(radioAudio){
-    radioAudio.pause();
-    radioAudio.src = '';
-    radioAudio = null;
-  }
-  /* Kill iframe by clearing src — stops all audio/video */
-  npFrame.src = '';
-  npEl.classList.remove('visible','has-frame');
-  if(activeRadioCard){
-    activeRadioCard.classList.remove('playing');
-    activeRadioCard = null;
-  }
+/* ── CHAT PANEL ── */
+function openChat(channelName, channelDisplay){
+  chatFrame.src = `https://www.twitch.tv/embed/${channelName}/chat?parent=msrisabaranjan.github.io&darkpopout`;
+  chatTitle.textContent = channelDisplay;
+  chatPanel.classList.add('open');
+  chatPill.classList.remove('visible');
+  npEl.classList.add('chat-open');
+  npEl.classList.remove('chat-mini');
+  chatOpen      = true;
+  chatMinimized = false;
 }
 
+function minimizeChat(){
+  chatPanel.classList.remove('open');
+  chatPill.classList.add('visible');
+  npEl.classList.remove('chat-open');
+  npEl.classList.add('chat-mini');
+  chatMinimized = true;
+  chatOpen      = false;
+}
+
+function closeChat(){
+  chatPanel.classList.remove('open');
+  chatPill.classList.remove('visible');
+  npEl.classList.remove('chat-open','chat-mini');
+  /* small delay so transition finishes before clearing src */
+  setTimeout(()=>{ chatFrame.src = ''; }, 380);
+  chatOpen      = false;
+  chatMinimized = false;
+}
+
+chatMinBtn.addEventListener('click',   minimizeChat);
+chatCloseBtn.addEventListener('click', closeChat);
+chatPill.addEventListener('click', () => {
+  chatPanel.classList.add('open');
+  chatPill.classList.remove('visible');
+  npEl.classList.add('chat-open');
+  npEl.classList.remove('chat-mini');
+  chatOpen      = true;
+  chatMinimized = false;
+});
+
+/* ── STOP RADIO ── */
+function stopRadio(){
+  if(radioAudio){ radioAudio.pause(); radioAudio.src=''; radioAudio=null; }
+  npFrame.src = '';
+  closeChat();
+  npEl.classList.remove('visible','has-frame');
+  if(activeRadioCard){ activeRadioCard.classList.remove('playing'); activeRadioCard=null; }
+}
+
+/* ── PLAY STATION ── */
 function playStation(station, cardEl){
-  if(station.type === 'link'){
-    openUrl(station.url);
-    return;
-  }
+  if(station.type === 'link'){ openUrl(station.url); return; }
   if(activeRadioCard === cardEl){ stopRadio(); return; }
   stopRadio();
 
@@ -840,17 +1279,20 @@ function playStation(station, cardEl){
     radioAudio.play().catch(()=>{});
     npEl.classList.add('visible');
     npEl.classList.remove('has-frame');
-  } else {
+  } else if(station.type === 'twitch'){
     npFrame.src = station.embedUrl;
     npEl.classList.add('visible','has-frame');
+    /* open chat panel alongside */
+    openChat(station.channel, station.name);
   }
 
   cardEl.classList.add('playing');
-  activeRadioCard = cardEl;
+  activeRadioCard   = cardEl;
   npNameEl.textContent  = station.name;
   npGenreEl.textContent = station.genre;
 }
 
+/* ── RENDER RADIO ── */
 function renderRadio(){
   const container = document.getElementById('radio');
   RADIO_STATIONS.forEach((s, i) => {
@@ -867,6 +1309,244 @@ function renderRadio(){
 }
 
 document.getElementById('npStop').addEventListener('click', stopRadio);
+
+/* ══════════════════════════════════════════
+   GOOGLE CALENDAR
+   ══════════════════════════════════════════ */
+const CAL_SCOPE     = 'https://www.googleapis.com/auth/calendar.events.readonly';
+const CAL_STORE_KEY = 'tcal_client_id';
+const EVENT_COLORS  = ['#4285f4','#34a853','#ea4335','#fbbc04','#9c27b0','#00bcd4','#ff5722','#607d8b'];
+
+let calClient      = null;   // google.accounts.oauth2 token client
+let calToken       = null;   // access token string
+let calWeekOffset  = 0;      // 0 = current week
+let calEventsCache = {};     // keyed by weekOffset
+
+/* ── UI refs ── */
+const calPanel      = document.getElementById('calPanel');
+const calSetup      = document.getElementById('calSetup');
+const calBody       = document.getElementById('calBody');
+const calClientIdEl = document.getElementById('calClientId');
+const calConnectBtn = document.getElementById('calConnectBtn');
+const calDays       = document.getElementById('calDays');
+const calLoading    = document.getElementById('calLoading');
+const calErrMsg     = document.getElementById('calErrMsg');
+const calErrText    = document.getElementById('calErrText');
+const calWeekLabel  = document.getElementById('calWeekLabel');
+const calHeaderSub  = document.getElementById('calHeaderSub');
+const calBadgeEl    = document.getElementById('calBadge');
+const calBtnEl      = document.getElementById('calBtn');
+
+/* ── Panel open / close ── */
+function openCalPanel(){
+  calPanel.classList.add('open');
+  const stored = localStorage.getItem(CAL_STORE_KEY);
+  if(stored && calToken){
+    showCalView();
+    loadWeek();
+  } else if(stored){
+    calClientIdEl.value = stored;
+    /* auto-trigger sign-in silently */
+    initCalClient(stored, true);
+  }
+}
+function closeCalPanel(){ calPanel.classList.remove('open'); }
+
+document.getElementById('calBtn').addEventListener('click', openCalPanel);
+document.getElementById('calCloseBtn').addEventListener('click', closeCalPanel);
+
+/* ── Init Google client ── */
+function initCalClient(clientId, silent=false){
+  if(!window.google?.accounts?.oauth2){
+    /* GSI not loaded yet — retry */
+    setTimeout(()=> initCalClient(clientId, silent), 500);
+    return;
+  }
+  calClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope:     CAL_SCOPE,
+    callback:  (resp) => {
+      if(resp.error){ showCalError('Sign-in cancelled or failed. Try again.'); return; }
+      calToken = resp.access_token;
+      localStorage.setItem(CAL_STORE_KEY, clientId);
+      calBtnEl.classList.add('connected');
+      showCalView();
+      loadWeek();
+    }
+  });
+  if(!silent) calClient.requestAccessToken({prompt:''});
+  else        calClient.requestAccessToken({prompt:''});
+}
+
+/* ── Connect button ── */
+calConnectBtn.addEventListener('click', ()=>{
+  const id = calClientIdEl.value.trim();
+  if(!id){ calClientIdEl.focus(); return; }
+  initCalClient(id);
+});
+
+/* also allow Enter key in input */
+calClientIdEl.addEventListener('keydown', e=>{ if(e.key==='Enter') calConnectBtn.click(); });
+
+document.getElementById('calReconnectBtn').addEventListener('click', ()=>{
+  const stored = localStorage.getItem(CAL_STORE_KEY);
+  if(stored) initCalClient(stored);
+  else       showCalSetup();
+});
+
+/* ── Show / hide screens ── */
+function showCalView(){
+  calSetup.style.display = 'none';
+  calBody.style.display  = 'flex';
+  calHeaderSub.textContent = 'This Week';
+}
+function showCalSetup(){
+  calSetup.style.display = 'flex';
+  calBody.style.display  = 'none';
+  calToken = null;
+}
+function showCalError(msg){
+  calLoading.style.display = 'none';
+  calDays.style.display    = 'none';
+  calErrMsg.style.display  = 'flex';
+  calErrText.textContent   = msg;
+}
+
+/* ── Week helpers ── */
+function weekStart(offset){
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  const day = d.getDay(); // 0=Sun
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
+  return monday;
+}
+
+function fmtWeekLabel(start){
+  const end = new Date(start); end.setDate(start.getDate()+6);
+  const opts = {month:'short',day:'numeric'};
+  if(start.getMonth() === end.getMonth())
+    return `${start.toLocaleDateString('en-US',{month:'short'})} ${start.getDate()}–${end.getDate()}, ${start.getFullYear()}`;
+  return `${start.toLocaleDateString('en-US',opts)} – ${end.toLocaleDateString('en-US',opts)}, ${end.getFullYear()}`;
+}
+
+/* ── Fetch events from Calendar API ── */
+async function fetchCalEvents(timeMin, timeMax){
+  const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
+  url.searchParams.set('timeMin',      timeMin.toISOString());
+  url.searchParams.set('timeMax',      timeMax.toISOString());
+  url.searchParams.set('singleEvents', 'true');
+  url.searchParams.set('orderBy',      'startTime');
+  url.searchParams.set('maxResults',   '100');
+  const res = await fetch(url, {
+    headers:{ Authorization:`Bearer ${calToken}` },
+    signal: AbortSignal.timeout(10000)
+  });
+  if(res.status === 401){ calToken=null; throw new Error('auth'); }
+  if(!res.ok) throw new Error('api');
+  return (await res.json()).items || [];
+}
+
+/* ── Render week grid ── */
+function colorForId(id){
+  let h = 0;
+  for(let i=0;i<id.length;i++) h = (h*31+id.charCodeAt(i))&0xffffffff;
+  return EVENT_COLORS[Math.abs(h) % EVENT_COLORS.length];
+}
+
+function fmtEvtTime(dt){
+  if(!dt) return '';
+  const d = new Date(dt);
+  return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
+}
+
+function renderWeekGrid(events, weekStartDate){
+  calLoading.style.display = 'none';
+  calErrMsg.style.display  = 'none';
+  calDays.style.display    = 'grid';
+  calDays.innerHTML = '';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  for(let i=0;i<7;i++){
+    const dayDate = new Date(weekStartDate);
+    dayDate.setDate(weekStartDate.getDate() + i);
+    const isToday = dayDate.getTime() === today.getTime();
+    const dateStr = dayDate.toISOString().slice(0,10);
+
+    const dayEvents = events.filter(ev => {
+      const s = ev.start?.dateTime || ev.start?.date || '';
+      return s.startsWith(dateStr);
+    });
+
+    const col = document.createElement('div');
+    col.className = 'cal-day' + (isToday ? ' today' : '');
+    let html = `<div class="cal-day-head">
+      <span class="cal-day-name">${DAY_NAMES[i]}</span>
+      <span class="cal-day-num">${dayDate.getDate()}</span>
+    </div>`;
+
+    if(!dayEvents.length){
+      html += `<div class="cal-empty">—</div>`;
+    } else {
+      dayEvents.forEach(ev => {
+        const color = colorForId(ev.id||ev.summary||'x');
+        const isAllDay = !!ev.start?.date && !ev.start?.dateTime;
+        const title   = (ev.summary||'Event').replace(/</g,'&lt;');
+        if(isAllDay){
+          html += `<div class="cal-allday" style="background:${color}22;color:${color}" title="${title}">${title}</div>`;
+        } else {
+          const t = fmtEvtTime(ev.start?.dateTime);
+          html += `<div class="cal-event" style="background:${color}18;color:${color};border-color:${color}" title="${t} ${title}">
+            <span class="cal-event-time">${t}</span>${title}
+          </div>`;
+        }
+      });
+    }
+    col.innerHTML = html;
+    calDays.appendChild(col);
+  }
+}
+
+/* ── Load week ── */
+async function loadWeek(){
+  calLoading.style.display = 'flex';
+  calDays.style.display    = 'none';
+  calErrMsg.style.display  = 'none';
+
+  const start = weekStart(calWeekOffset);
+  const end   = new Date(start); end.setDate(start.getDate()+7);
+  calWeekLabel.textContent  = fmtWeekLabel(start);
+  calHeaderSub.textContent  = calWeekOffset===0 ? 'This Week' : calWeekOffset<0 ? 'Past Week' : 'Next Week';
+
+  if(calEventsCache[calWeekOffset]){
+    renderWeekGrid(calEventsCache[calWeekOffset], start);
+    return;
+  }
+  try {
+    const evts = await fetchCalEvents(start, end);
+    calEventsCache[calWeekOffset] = evts;
+    renderWeekGrid(evts, start);
+    calBtnEl.classList.add('connected');
+  } catch(e){
+    if(e.message==='auth'){
+      showCalError('Session expired. Tap Reconnect to sign in again.');
+    } else {
+      showCalError('Could not load events. Check your connection.');
+    }
+  }
+}
+
+/* ── Week navigation ── */
+document.getElementById('calPrevWeek').addEventListener('click', ()=>{ calWeekOffset--; loadWeek(); });
+document.getElementById('calNextWeek').addEventListener('click', ()=>{ calWeekOffset++; loadWeek(); });
+document.getElementById('calTodayBtn').addEventListener('click', ()=>{ calWeekOffset=0; loadWeek(); });
+
+/* Auto-connect if client ID already saved */
+window.addEventListener('load', ()=>{
+  const stored = localStorage.getItem(CAL_STORE_KEY);
+  if(stored) calBtnEl.classList.add('connected');
+});
 
 /* ── BOOT ── */
 renderCards(STREAMING, 'streaming');
