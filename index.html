@@ -324,9 +324,9 @@
       padding:10px 20px;
       gap:16px;
     }
-    /* shift bar left when chat is open */
-    .now-playing.chat-open{right:340px;}
-    .now-playing.chat-mini{right:52px;}
+    /* shift bar right when chat is open on left */
+    .now-playing.chat-open{left:360px;}
+    .now-playing.chat-mini{left:52px;}
     .np-pulse{
       width:10px;height:10px;border-radius:50%;
       background:var(--accent);flex-shrink:0;
@@ -362,14 +362,14 @@
     /* ── CHAT PANEL ── */
     .chat-panel{
       position:fixed;
-      top:0;right:0;bottom:0;
-      width:340px;
+      top:0;left:0;bottom:0;
+      width:360px;
       z-index:400;
       background:#0d0d0d;
-      border-left:1px solid var(--border);
+      border-right:1px solid var(--border);
       display:flex;
       flex-direction:column;
-      transform:translateX(100%);
+      transform:translateX(-100%);
       transition:transform .35s cubic-bezier(.4,0,.2,1);
       will-change:transform;
     }
@@ -390,15 +390,19 @@
       background:#9146ff;flex-shrink:0;
       animation:ping 1.4s ease-out infinite;
     }
+    .chat-title-wrap{flex:1;min-width:0;}
     .chat-title{
-      flex:1;
       font-size:13px;font-weight:600;
       color:#fff;
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+      display:block;
     }
-    .chat-subtitle{
-      font-size:10px;color:var(--muted);font-weight:400;
+    .chat-viewers{
+      font-size:10px;color:#9146ff;font-weight:600;
+      display:none;align-items:center;gap:4px;margin-top:1px;
     }
+    .chat-viewers.visible{display:flex;}
+    .chat-viewers svg{width:10px;height:10px;fill:#9146ff;}
 
     /* header icon buttons */
     .chat-btn{
@@ -417,22 +421,28 @@
       flex:1;
       overflow:hidden;
       position:relative;
+      background:#0e0e10;
     }
+    /* Scale iframe up 1.25x for bigger chat text — works in Chromium/Tesla */
     .chat-body iframe{
-      width:100%;height:100%;
+      position:absolute;
+      top:0;left:0;
+      width:80%;
+      height:80%;
       border:none;display:block;
+      transform:scale(1.25);
+      transform-origin:top left;
     }
 
-    /* ── CHAT MINIMIZED PILL ── */
+    /* ── CHAT MINIMIZED PILL — left side ── */
     .chat-pill{
       position:fixed;
-      right:0;
-      /* vertically centered but nudged up from bottom */
+      left:0;
       top:50%;
-      transform:translateY(-50%) translateX(100%);
+      transform:translateY(-50%) translateX(-100%);
       z-index:401;
       background:#9146ff;
-      border-radius:12px 0 0 12px;
+      border-radius:0 12px 12px 0;
       width:52px;
       display:flex;
       flex-direction:column;
@@ -442,7 +452,7 @@
       padding:14px 0;
       cursor:pointer;
       border:1px solid rgba(145,70,255,0.4);
-      border-right:none;
+      border-left:none;
       transition:transform .35s cubic-bezier(.4,0,.2,1),background .15s;
       user-select:none;
     }
@@ -454,7 +464,6 @@
       color:#fff;text-transform:uppercase;
       writing-mode:vertical-rl;
       text-orientation:mixed;
-      transform:rotate(180deg);
     }
 
     /* ── CALENDAR SECTION ── */
@@ -712,9 +721,12 @@
   <div class="chat-panel" id="chatPanel">
     <div class="chat-header">
       <div class="chat-live-dot"></div>
-      <div>
-        <div class="chat-title" id="chatTitle">Live Chat</div>
-        <div class="chat-subtitle">Twitch</div>
+      <div class="chat-title-wrap">
+        <span class="chat-title" id="chatTitle">Live Chat</span>
+        <div class="chat-viewers" id="chatViewers">
+          <svg viewBox="0 0 12 12"><circle cx="6" cy="4" r="2.5"/><path d="M1 11c0-2.76 2.24-5 5-5s5 2.24 5 5" fill="#9146ff" stroke="none"/></svg>
+          <span id="chatViewerCount">—</span> watching
+        </div>
       </div>
       <!-- Minimize -->
       <button class="chat-btn" id="chatMinBtn" title="Minimize">
@@ -726,7 +738,7 @@
       </button>
     </div>
     <div class="chat-body">
-      <iframe id="chatFrame" allow="autoplay" title="Twitch Chat"></iframe>
+      <iframe id="chatFrame" allow="autoplay; scripts" sandbox="allow-scripts allow-same-origin allow-popups allow-modals allow-storage-access-by-user-activation" title="Twitch Chat"></iframe>
     </div>
   </div>
 
@@ -1103,25 +1115,76 @@ const npGenreEl   = document.getElementById('npGenre');
 const chatPanel   = document.getElementById('chatPanel');
 const chatFrame   = document.getElementById('chatFrame');
 const chatTitle   = document.getElementById('chatTitle');
+const chatViewers = document.getElementById('chatViewers');
+const chatViewerCount = document.getElementById('chatViewerCount');
 const chatPill    = document.getElementById('chatPill');
 const chatMinBtn  = document.getElementById('chatMinBtn');
 const chatCloseBtn= document.getElementById('chatCloseBtn');
 
 let radioAudio      = null;
 let activeRadioCard = null;
-let chatOpen        = false;   // panel visible
-let chatMinimized   = false;   // panel hidden, pill visible
+let chatOpen        = false;
+let chatMinimized   = false;
+let viewerPollTimer = null;
+let currentChannel  = null;
+
+/* ── VIEWER COUNT via Twitch GQL (no OAuth needed) ── */
+async function fetchViewerCount(channel){
+  try {
+    const res = await fetch('https://gql.twitch.tv/gql', {
+      method: 'POST',
+      headers:{
+        'Client-ID':'kimne78kx3ncx6brgo4mv6wki5h1ko',
+        'Content-Type':'application/json'
+      },
+      body: JSON.stringify({
+        query:`{user(login:"${channel}"){stream{viewersCount}}}`
+      }),
+      signal: AbortSignal.timeout(6000)
+    });
+    const data = await res.json();
+    const count = data?.data?.user?.stream?.viewersCount;
+    if(typeof count === 'number'){
+      chatViewerCount.textContent = count.toLocaleString('en-US');
+      chatViewers.classList.add('visible');
+    }
+  } catch(_){}
+}
+
+function startViewerPoll(channel){
+  stopViewerPoll();
+  fetchViewerCount(channel);
+  viewerPollTimer = setInterval(()=> fetchViewerCount(channel), 60000);
+}
+function stopViewerPoll(){
+  clearInterval(viewerPollTimer);
+  viewerPollTimer = null;
+  chatViewers.classList.remove('visible');
+  chatViewerCount.textContent = '—';
+}
+
+/* ── LOAD CHAT — delayed so panel is fully rendered before iframe fires ── */
+function loadChatFrame(channel){
+  /* Clear first to force a fresh load even if same channel */
+  chatFrame.src = '';
+  /* Small delay so the CSS transition has painted the panel at full size */
+  setTimeout(()=>{
+    chatFrame.src = `https://www.twitch.tv/embed/${channel}/chat?parent=msrisabaranjan.github.io&darkpopout`;
+  }, 420);
+}
 
 /* ── CHAT PANEL ── */
-function openChat(channelName, channelDisplay){
-  chatFrame.src = `https://www.twitch.tv/embed/${channelName}/chat?parent=msrisabaranjan.github.io&darkpopout`;
-  chatTitle.textContent = channelDisplay;
+function openChat(channel, displayName){
+  currentChannel = channel;
+  chatTitle.textContent = displayName;
   chatPanel.classList.add('open');
   chatPill.classList.remove('visible');
   npEl.classList.add('chat-open');
   npEl.classList.remove('chat-mini');
   chatOpen      = true;
   chatMinimized = false;
+  loadChatFrame(channel);
+  startViewerPoll(channel);
 }
 
 function minimizeChat(){
@@ -1131,27 +1194,31 @@ function minimizeChat(){
   npEl.classList.add('chat-mini');
   chatMinimized = true;
   chatOpen      = false;
+  /* Don't unload iframe — keep chat running in background */
 }
 
 function closeChat(){
   chatPanel.classList.remove('open');
   chatPill.classList.remove('visible');
   npEl.classList.remove('chat-open','chat-mini');
-  /* small delay so transition finishes before clearing src */
   setTimeout(()=>{ chatFrame.src = ''; }, 380);
+  stopViewerPoll();
+  currentChannel = null;
   chatOpen      = false;
   chatMinimized = false;
 }
 
-chatMinBtn.addEventListener('click',   minimizeChat);
+chatMinBtn.addEventListener('click', minimizeChat);
 chatCloseBtn.addEventListener('click', closeChat);
-chatPill.addEventListener('click', () => {
+chatPill.addEventListener('click', ()=>{
   chatPanel.classList.add('open');
   chatPill.classList.remove('visible');
   npEl.classList.add('chat-open');
   npEl.classList.remove('chat-mini');
   chatOpen      = true;
   chatMinimized = false;
+  /* If iframe was cleared, reload it */
+  if(!chatFrame.src && currentChannel) loadChatFrame(currentChannel);
 });
 
 /* ── STOP RADIO ── */
@@ -1178,7 +1245,6 @@ function playStation(station, cardEl){
   } else if(station.type === 'twitch'){
     npFrame.src = station.embedUrl;
     npEl.classList.add('visible','has-frame');
-    /* open chat panel alongside */
     openChat(station.channel, station.name);
   }
 
