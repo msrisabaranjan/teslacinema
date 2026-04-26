@@ -103,7 +103,32 @@
     .fs-btn:active{background:var(--accent-dim);border-color:var(--accent);color:#fff;}
     .fs-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;}
 
-    /* ── NEWS STRIP ── */
+    /* ── YEAR PROGRESS WIDGET ── */
+    .yr-widget{
+      display:flex;align-items:center;gap:9px;
+      padding:7px 12px;
+      border:1px solid var(--border);
+      border-radius:9px;
+      background:var(--surface);
+      cursor:default;
+      user-select:none;
+      flex-shrink:0;
+    }
+    .yr-text{display:flex;flex-direction:column;align-items:flex-end;gap:1px;}
+    .yr-days{
+      font-size:13px;font-weight:600;color:#fff;
+      font-variant-numeric:tabular-nums;line-height:1;
+    }
+    .yr-label{font-size:9px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+    /* arc SVG */
+    .yr-arc{flex-shrink:0;}
+    .yr-arc-track{stroke:rgba(255,255,255,0.08);fill:none;stroke-linecap:round;}
+    .yr-arc-fill{fill:none;stroke-linecap:round;transition:stroke-dashoffset .6s ease;}
+    .yr-arc-pct{
+      font-size:8px;font-weight:700;fill:var(--muted);
+      text-anchor:middle;dominant-baseline:middle;
+      font-family:'Outfit',sans-serif;
+    }
     .news-strip{
       margin:14px 20px;
       border:1px solid var(--border);border-radius:12px;
@@ -624,6 +649,24 @@
     </div>
     <div class="header-right">
       <div id="clock">--:--</div>
+
+      <!-- Year progress widget -->
+      <div class="yr-widget" id="yrWidget">
+        <div class="yr-text">
+          <span class="yr-days" id="yrDays">—</span>
+          <span class="yr-label">days left</span>
+        </div>
+        <svg class="yr-arc" id="yrArc" width="38" height="38" viewBox="0 0 38 38">
+          <!-- track -->
+          <circle class="yr-arc-track" cx="19" cy="19" r="15" stroke-width="3"/>
+          <!-- fill — dasharray/offset set by JS -->
+          <circle class="yr-arc-fill" id="yrFill" cx="19" cy="19" r="15" stroke-width="3"
+            stroke-dasharray="94.25" stroke-dashoffset="94.25"
+            transform="rotate(-90 19 19)"/>
+          <text class="yr-arc-pct" id="yrPct" x="19" y="19.5">0%</text>
+        </svg>
+      </div>
+
       <button class="fs-btn" id="fsBtn" title="Fullscreen">
         <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
       </button>
@@ -815,6 +858,35 @@ function updateClock(){
 }
 updateClock();
 setInterval(updateClock, 15000);
+
+/* ── YEAR PROGRESS ── */
+function updateYearProgress(){
+  const now     = new Date();
+  const year    = now.getFullYear();
+  const start   = new Date(year, 0, 1);
+  const end     = new Date(year + 1, 0, 1);
+  const elapsed = now - start;
+  const total   = end - start;
+  const pct     = elapsed / total;
+  const daysLeft= Math.ceil((end - now) / 86400000);
+
+  document.getElementById('yrDays').textContent = daysLeft.toLocaleString('en-US');
+  document.getElementById('yrPct').textContent  = Math.round(pct * 100) + '%';
+
+  /* arc: circumference = 2π×15 ≈ 94.25; offset = circ × (1 − pct) */
+  const circ  = 2 * Math.PI * 15;
+  const fill  = document.getElementById('yrFill');
+  fill.setAttribute('stroke-dasharray', circ.toFixed(2));
+  fill.setAttribute('stroke-dashoffset', (circ * (1 - pct)).toFixed(2));
+
+  /* colour shifts green → amber → red as year progresses */
+  const colour = pct < 0.5  ? '#34a853'
+               : pct < 0.75 ? '#fbbc04'
+               :               '#ea4335';
+  fill.setAttribute('stroke', colour);
+  document.getElementById('yrPct').setAttribute('fill', colour);
+}
+updateYearProgress();
 
 /* ── FULLSCREEN ── */
 /* Tesla's browser does not honour requestFullscreen().
