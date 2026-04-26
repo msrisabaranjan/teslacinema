@@ -633,13 +633,12 @@
   <!-- CONTENT -->
   <main>
 
-    <!-- CALENDAR STRIP (above news) -->
-    <div class="cal-strip">
-      <div class="cal-strip-header">
-        <span class="cal-label">Calendar</span>
-        <span class="cal-hdot">·</span>
-        <span class="cal-week-range" id="calWeekRange">Google Calendar</span>
-        <div class="cal-nav-grp" id="calNavGrp" style="display:none">
+    <!-- CALENDAR SECTION (above news) -->
+    <div class="cal-section">
+      <div class="cal-topbar">
+        <span class="cal-sec-label">Calendar</span>
+        <span class="cal-week-label" id="calWeekLabel"></span>
+        <div class="cal-nav-group" id="calNavGroup" style="display:none">
           <button class="cal-nav-btn" id="calPrevWeek">
             <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
@@ -649,22 +648,31 @@
           </button>
         </div>
       </div>
-      <!-- setup row -->
-      <div class="cal-setup-row" id="calSetupRow">
-        <span class="cal-setup-hint">Connect Google Calendar:</span>
-        <input class="cal-input" id="calClientId" type="text" placeholder="Paste OAuth Client ID  (…apps.googleusercontent.com)" autocomplete="off" spellcheck="false"/>
-        <button class="cal-connect-btn" id="calConnectBtn">Sign in</button>
+
+      <!-- setup screen -->
+      <div class="cal-setup" id="calSetup">
+        <div class="cal-setup-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+        </div>
+        <h2>Connect Google Calendar</h2>
+        <p>Enter your Google OAuth Client ID to sync your calendar. Events are fetched directly — nothing is stored externally.</p>
+        <div class="cal-input-group">
+          <input class="cal-input" id="calClientId" type="text" placeholder="Paste Client ID  (…apps.googleusercontent.com)" autocomplete="off" spellcheck="false"/>
+          <button class="cal-connect-btn" id="calConnectBtn">Sign in with Google</button>
+        </div>
+        <p class="cal-hint">ⓘ One-time setup — console.cloud.google.com → Google Calendar API → OAuth 2.0 Client ID (Web). Authorised origin: <strong>msrisabaranjan.github.io</strong></p>
       </div>
-      <!-- loading -->
-      <div class="cal-loading-row" id="calLoading" style="display:none">
-        <div class="cal-spinner"></div><span>Loading…</span>
-      </div>
-      <!-- grid -->
-      <div class="cal-days" id="calDays" style="display:none"></div>
-      <!-- error -->
-      <div class="cal-err-row" id="calErrMsg" style="display:none">
-        <p id="calErrText">Could not load events.</p>
-        <button class="cal-reconnect-btn" id="calReconnectBtn">Reconnect</button>
+
+      <!-- calendar body (shown after auth) -->
+      <div class="cal-body" id="calBody">
+        <div class="cal-loading" id="calLoading" style="display:none">
+          <div class="cal-spinner"></div><span>Loading events…</span>
+        </div>
+        <div class="cal-days" id="calDays" style="display:none"></div>
+        <div class="cal-error" id="calErrMsg" style="display:none">
+          <p id="calErrText">Could not load events.</p>
+          <button class="cal-reconnect-btn" id="calReconnectBtn">Reconnect</button>
+        </div>
       </div>
     </div>
 
@@ -1273,7 +1281,7 @@ function renderRadio(){
 document.getElementById('npStop').addEventListener('click', stopRadio);
 
 /* ══════════════════════════════════════════
-   GOOGLE CALENDAR (inline strip)
+   GOOGLE CALENDAR (inline section)
    ══════════════════════════════════════════ */
 const CAL_SCOPE     = 'https://www.googleapis.com/auth/calendar.events.readonly';
 const CAL_STORE_KEY = 'tcal_client_id';
@@ -1284,28 +1292,27 @@ let calToken       = null;
 let calWeekOffset  = 0;
 let calEventsCache = {};
 
-const calSetupRow   = document.getElementById('calSetupRow');
+const calSetup      = document.getElementById('calSetup');
+const calBody       = document.getElementById('calBody');
 const calDays       = document.getElementById('calDays');
 const calLoadingEl  = document.getElementById('calLoading');
 const calErrMsg     = document.getElementById('calErrMsg');
 const calErrText    = document.getElementById('calErrText');
-const calWeekRange  = document.getElementById('calWeekRange');
-const calNavGrp     = document.getElementById('calNavGrp');
+const calWeekLabel  = document.getElementById('calWeekLabel');
+const calNavGroup   = document.getElementById('calNavGroup');
 const calClientIdEl = document.getElementById('calClientId');
 const calConnectBtn = document.getElementById('calConnectBtn');
 
-function showCalGrid(){
-  calSetupRow.style.display  = 'none';
-  calLoadingEl.style.display = 'none';
-  calNavGrp.style.display    = 'flex';
+function showCalBody(){
+  calSetup.style.display    = 'none';
+  calBody.classList.add('visible');
+  calNavGroup.style.display = 'flex';
 }
 function showCalSetup(){
-  calSetupRow.style.display  = 'flex';
-  calLoadingEl.style.display = 'none';
-  calDays.style.display      = 'none';
-  calErrMsg.style.display    = 'none';
-  calNavGrp.style.display    = 'none';
-  calWeekRange.textContent   = 'Google Calendar';
+  calSetup.style.display    = 'flex';
+  calBody.classList.remove('visible');
+  calNavGroup.style.display = 'none';
+  calWeekLabel.textContent  = '';
   calToken = null;
 }
 function showCalError(msg){
@@ -1327,7 +1334,7 @@ function initCalClient(clientId, silent=false){
       if(resp.error){ showCalError('Sign-in failed or cancelled.'); return; }
       calToken = resp.access_token;
       localStorage.setItem(CAL_STORE_KEY, clientId);
-      showCalGrid();
+      showCalBody();
       loadWeek();
     }
   });
@@ -1352,7 +1359,7 @@ function weekStart(offset){
   m.setDate(d.getDate() - (day===0?6:day-1) + offset*7);
   return m;
 }
-function fmtWeekRange(start){
+function fmtWeekLabel(start){
   const end = new Date(start); end.setDate(start.getDate()+6);
   if(start.getMonth()===end.getMonth())
     return `${start.toLocaleDateString('en-US',{month:'short'})} ${start.getDate()}–${end.getDate()}`;
@@ -1402,7 +1409,7 @@ function renderWeekGrid(events, start){
     if(!evts.length){
       html+=`<div class="cal-empty">—</div>`;
     } else {
-      evts.slice(0,3).forEach(ev=>{
+      evts.slice(0,4).forEach(ev=>{
         const color    = colorForId(ev.id||ev.summary||'x');
         const isAllDay = !!ev.start?.date&&!ev.start?.dateTime;
         const title    = (ev.summary||'Event').replace(/</g,'&lt;');
@@ -1410,10 +1417,11 @@ function renderWeekGrid(events, start){
           html+=`<div class="cal-allday" style="background:${color}22;color:${color}">${title}</div>`;
         } else {
           const t = fmtEvtTime(ev.start?.dateTime);
-          html+=`<div class="cal-event" style="background:${color}18;color:${color};border-color:${color}">${t} ${title}</div>`;
+          html+=`<div class="cal-event" style="background:${color}18;color:${color};border-color:${color}">
+            <span class="cal-event-time">${t}</span>${title}</div>`;
         }
       });
-      if(evts.length>3) html+=`<div class="cal-empty">+${evts.length-3} more</div>`;
+      if(evts.length>4) html+=`<div class="cal-empty">+${evts.length-4} more</div>`;
     }
     col.innerHTML=html; calDays.appendChild(col);
   }
@@ -1425,14 +1433,14 @@ async function loadWeek(){
   calErrMsg.style.display    = 'none';
   const start = weekStart(calWeekOffset);
   const end   = new Date(start); end.setDate(start.getDate()+7);
-  calWeekRange.textContent = fmtWeekRange(start);
+  calWeekLabel.textContent = fmtWeekLabel(start);
   if(calEventsCache[calWeekOffset]){ renderWeekGrid(calEventsCache[calWeekOffset],start); return; }
   try {
     const evts = await fetchCalEvents(start,end);
     calEventsCache[calWeekOffset]=evts;
     renderWeekGrid(evts,start);
   } catch(e){
-    showCalError(e.message==='auth'?'Session expired — tap Reconnect.':'Could not load events.');
+    showCalError(e.message==='auth'?'Session expired — tap Reconnect.':'Could not load events. Check your connection.');
   }
 }
 
