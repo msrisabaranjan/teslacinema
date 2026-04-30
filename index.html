@@ -638,7 +638,212 @@
     .cal-reconnect-btn:active{background:#4285f420;border-color:#4285f4;color:#4285f4;}
 
 
-    ::-webkit-scrollbar{width:3px}
+    /* ══════════════════════════════════════════
+       ROUTE SUGGESTION STRIP
+       ══════════════════════════════════════════ */
+    .route-strip{
+      margin:14px 20px 0;
+      border:1px solid var(--border);
+      border-radius:12px;
+      overflow:hidden;
+      background:var(--surface);
+      display:none; /* shown by JS when geofence matched */
+    }
+    .route-strip.visible{display:block;}
+
+    /* top bar */
+    .route-header{
+      display:flex;align-items:center;gap:8px;
+      padding:9px 14px;border-bottom:1px solid var(--border);
+    }
+    .route-geofence-dot{
+      width:7px;height:7px;border-radius:50%;
+      background:#30D158;flex-shrink:0;
+      box-shadow:0 0 5px #30D158;
+    }
+    .route-geofence-name{
+      font-size:10px;font-weight:700;letter-spacing:.12em;
+      text-transform:uppercase;color:#30D158;
+    }
+    .route-hdot{color:var(--muted2);font-size:9px;margin:0 2px;}
+    .route-dest-name{
+      font-size:10px;font-weight:500;color:var(--muted);letter-spacing:.04em;
+    }
+    .route-updated{margin-left:auto;font-size:9px;color:var(--muted2);}
+    .route-refresh-btn{
+      width:26px;height:26px;border-radius:6px;
+      border:1px solid var(--border-em);background:transparent;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      color:var(--muted);transition:background .15s,color .15s,transform .2s;
+      flex-shrink:0;
+    }
+    .route-refresh-btn:active{background:rgba(255,255,255,0.08);color:#fff;transform:rotate(180deg);}
+    .route-refresh-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+
+    /* main info row */
+    .route-body{
+      display:flex;align-items:center;gap:0;
+      padding:12px 14px 10px;
+      cursor:pointer;
+    }
+    .route-body:active{background:rgba(255,255,255,0.03);}
+    .route-eta-block{flex-shrink:0;min-width:90px;}
+    .route-eta-main{
+      font-size:22px;font-weight:600;color:#fff;
+      font-variant-numeric:tabular-nums;line-height:1;
+    }
+    .route-eta-label{font-size:10px;color:var(--muted);margin-top:2px;}
+    .route-traffic-badge{
+      display:inline-flex;align-items:center;gap:4px;
+      margin-top:5px;
+      padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600;
+    }
+    .route-traffic-badge.low   {background:#30D15822;color:#30D158;}
+    .route-traffic-badge.mid   {background:#fbbc0422;color:#fbbc04;}
+    .route-traffic-badge.high  {background:#FF453A22;color:#FF453A;}
+    .route-divider{width:1px;height:52px;background:var(--border);margin:0 14px;flex-shrink:0;}
+
+    /* mini route diagram */
+    .route-diagram{flex:1;display:flex;flex-direction:column;gap:5px;}
+    .route-diagram-svg{width:100%;height:18px;}
+    .route-meta{display:flex;justify-content:space-between;align-items:center;}
+    .route-meta-from,.route-meta-to{font-size:9px;color:var(--muted2);font-weight:500;}
+    .route-dist{font-size:10px;color:var(--muted);font-weight:500;}
+
+    /* tap hint */
+    .route-tap-hint{
+      display:flex;align-items:center;justify-content:center;gap:5px;
+      padding:7px 14px;border-top:1px solid var(--border);
+      font-size:10px;color:var(--muted2);
+    }
+    .route-tap-hint svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+
+    /* setup state */
+    .route-setup{padding:16px 14px;display:flex;align-items:center;gap:10px;}
+    .route-setup-text{flex:1;min-width:0;font-size:11px;color:var(--muted);line-height:1.5;}
+    .route-setup-btn{
+      flex-shrink:0;padding:8px 14px;border:none;border-radius:8px;
+      background:var(--accent);color:#fff;
+      font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;
+      cursor:pointer;white-space:nowrap;transition:opacity .2s;
+    }
+    .route-setup-btn:active{opacity:.8;}
+
+    /* loading / error states */
+    .route-loading{
+      display:flex;align-items:center;justify-content:center;
+      gap:8px;padding:18px;color:var(--muted);font-size:11px;
+    }
+    .route-spinner{
+      width:14px;height:14px;border-radius:50%;
+      border:2px solid var(--border-em);border-top-color:#30D158;
+      animation:spin .7s linear infinite;flex-shrink:0;
+    }
+
+    /* ── ROUTE POPUP MODAL ── */
+    .route-modal-overlay{
+      position:fixed;inset:0;z-index:500;
+      background:rgba(0,0,0,0.65);
+      display:none;align-items:center;justify-content:center;
+      backdrop-filter:blur(4px);
+    }
+    .route-modal-overlay.open{display:flex;}
+    .route-modal{
+      width:min(680px,90vw);
+      background:var(--bg-raised);
+      border:1px solid var(--border-em);
+      border-radius:18px;
+      overflow:hidden;
+      max-height:88vh;
+      display:flex;flex-direction:column;
+    }
+    .route-modal-header{
+      display:flex;align-items:center;gap:12px;
+      padding:16px 20px;border-bottom:1px solid var(--border);
+      flex-shrink:0;
+    }
+    .route-modal-icon{
+      width:38px;height:38px;border-radius:10px;
+      background:linear-gradient(135deg,#4285f4,#30D158);
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    }
+    .route-modal-icon svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;}
+    .route-modal-title{flex:1;}
+    .route-modal-title h3{font-size:15px;font-weight:600;color:#fff;margin:0;}
+    .route-modal-title p{font-size:11px;color:var(--muted);margin:2px 0 0;}
+    .route-modal-close{
+      width:36px;height:36px;border:none;background:transparent;cursor:pointer;
+      border-radius:8px;display:flex;align-items:center;justify-content:center;
+      color:var(--muted);transition:background .15s,color .15s;
+    }
+    .route-modal-close:active{background:rgba(255,255,255,0.08);color:#fff;}
+    .route-modal-close svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+
+    .route-modal-body{overflow-y:auto;padding:20px;}
+
+    /* stats row */
+    .route-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;}
+    .route-stat{
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:10px;padding:12px 14px;
+    }
+    .route-stat-val{font-size:18px;font-weight:600;color:#fff;font-variant-numeric:tabular-nums;}
+    .route-stat-lbl{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.08em;}
+
+    /* bell curve */
+    .route-curve-wrap{
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:10px;padding:14px 16px;margin-bottom:14px;
+    }
+    .route-curve-title{
+      font-size:11px;font-weight:600;color:var(--muted);
+      text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;
+    }
+    #routeCurveSvg{width:100%;height:120px;display:block;overflow:visible;}
+
+    /* best time */
+    .route-best-time{
+      background:rgba(48,209,88,0.08);border:1px solid rgba(48,209,88,0.2);
+      border-radius:10px;padding:12px 14px;
+      display:flex;align-items:center;gap:10px;
+    }
+    .route-best-time svg{width:18px;height:18px;stroke:#30D158;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0;}
+    .route-best-time p{font-size:12px;color:#EBEBEB;margin:0;line-height:1.5;}
+    .route-best-time strong{color:#30D158;}
+
+    /* setup modal inside popup */
+    .route-modal-setup{padding:0 0 16px;}
+    .route-modal-setup h4{font-size:13px;font-weight:600;color:#fff;margin:0 0 12px;}
+    .route-field-group{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+    .route-field-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:4px;}
+    .route-field{
+      display:flex;align-items:center;gap:8px;
+    }
+    .route-field input{
+      flex:1;padding:10px 12px;
+      background:rgba(255,255,255,0.06);
+      border:1px solid var(--border-em);border-radius:8px;
+      color:#fff;font-family:'Outfit',sans-serif;font-size:12px;
+      outline:none;transition:border-color .2s;min-width:0;
+    }
+    .route-field input:focus{border-color:#4285f4;}
+    .route-field input::placeholder{color:var(--muted2);}
+    .route-locate-btn{
+      flex-shrink:0;width:36px;height:36px;border-radius:8px;
+      border:1px solid var(--border-em);background:transparent;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      color:var(--muted);transition:background .15s,color .15s;
+    }
+    .route-locate-btn:active{background:#4285f420;color:#4285f4;border-color:#4285f4;}
+    .route-locate-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
+    .route-save-btn{
+      width:100%;padding:12px;border:none;border-radius:9px;
+      background:var(--accent);color:#fff;
+      font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;
+      cursor:pointer;transition:opacity .2s;
+    }
+    .route-save-btn:active{opacity:.8;}
+    .route-api-hint{font-size:10px;color:var(--muted2);line-height:1.5;margin-top:8px;}
     ::-webkit-scrollbar-track{background:transparent}
     ::-webkit-scrollbar-thumb{background:var(--border-em);border-radius:2px}
   </style>
@@ -695,6 +900,26 @@
 
   <!-- CONTENT -->
   <main>
+
+    <!-- ROUTE SUGGESTION STRIP -->
+    <div class="route-strip" id="routeStrip">
+      <div class="route-header">
+        <div class="route-geofence-dot" id="routeGeofenceDot"></div>
+        <span class="route-geofence-name" id="routeGeofenceName">—</span>
+        <span class="route-hdot">→</span>
+        <span class="route-dest-name" id="routeDestName">—</span>
+        <span class="route-updated" id="routeUpdated"></span>
+        <button class="route-refresh-btn" id="routeRefreshBtn" title="Refresh">
+          <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        </button>
+      </div>
+      <div id="routeContent">
+        <!-- populated by JS -->
+        <div class="route-loading" id="routeLoading" style="display:none">
+          <div class="route-spinner"></div><span>Getting route…</span>
+        </div>
+      </div>
+    </div>
 
     <!-- CALENDAR SECTION (hidden by default, toggled via header button) -->
     <div class="cal-section" id="calSection" style="display:none;margin-bottom:0;overflow:hidden;transition:none;">
@@ -786,6 +1011,48 @@
     <button class="np-stop" id="npStop" title="Stop">
       <svg viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" rx="1"/></svg>
     </button>
+  </div>
+
+  <!-- ROUTE DETAIL MODAL -->
+  <div class="route-modal-overlay" id="routeModalOverlay">
+    <div class="route-modal">
+      <div class="route-modal-header">
+        <div class="route-modal-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+        </div>
+        <div class="route-modal-title">
+          <h3 id="modalRouteName">Route Details</h3>
+          <p id="modalRouteSubtitle">Traffic forecast · Next 6 hours</p>
+        </div>
+        <button class="route-modal-close" id="routeModalClose">
+          <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="route-modal-body">
+        <div class="route-stats">
+          <div class="route-stat">
+            <div class="route-stat-val" id="modalEta">—</div>
+            <div class="route-stat-lbl">With traffic</div>
+          </div>
+          <div class="route-stat">
+            <div class="route-stat-val" id="modalBase">—</div>
+            <div class="route-stat-lbl">Baseline</div>
+          </div>
+          <div class="route-stat">
+            <div class="route-stat-val" id="modalDist">—</div>
+            <div class="route-stat-lbl">Distance</div>
+          </div>
+        </div>
+        <div class="route-curve-wrap">
+          <div class="route-curve-title">Traffic forecast — next 6 hours</div>
+          <svg id="routeCurveSvg" viewBox="0 0 600 120" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="route-best-time" id="routeBestTime">
+          <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <p id="routeBestTimeText">Analysing best departure time…</p>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- TWITCH CHAT PANEL -->
@@ -1561,7 +1828,325 @@ window.addEventListener('load',()=>{
   if(stored){ calClientIdEl.value=stored; initCalClient(stored,true); }
 });
 
-/* ── BOOT ── */
+/* ══════════════════════════════════════════
+/* ══════════════════════════════════════════
+   ROUTE SUGGESTION — 100% FREE
+   Routing: OSRM public API (no key needed)
+   Traffic: time-of-day mathematical model
+   ══════════════════════════════════════════ */
+const ROUTE_KEY      = 'troute_v2';
+const ROUTE_DEFAULTS = {
+  locations:[
+    {name:'Home', lat:'', lng:'', radius:400},
+    {name:'Work', lat:'', lng:'', radius:400},
+  ]
+};
+
+let routeConfig   = JSON.parse(localStorage.getItem(ROUTE_KEY)||'null') || {...ROUTE_DEFAULTS};
+let routeData     = null;
+let currentGeoPos = null;
+
+/* haversine distance in metres */
+function haversine(la1,lo1,la2,lo2){
+  const R=6371000,r=Math.PI/180,dLa=(la2-la1)*r,dLo=(lo2-lo1)*r;
+  const a=Math.sin(dLa/2)**2+Math.cos(la1*r)*Math.cos(la2*r)*Math.sin(dLo/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+function detectGeofence(lat,lng){
+  return routeConfig.locations.find(l=>l.lat&&l.lng&&
+    haversine(lat,lng,+l.lat,+l.lng)<=l.radius)||null;
+}
+function pickDest(fromName){
+  return routeConfig.locations.find(l=>l.name!==fromName&&l.lat&&l.lng)||null;
+}
+
+/* time-of-day traffic multiplier (1.0 = free flow) */
+function trafficMultiplier(hourF){
+  const morn = Math.exp(-0.5*((hourF-8.0)/0.9)**2)*0.55;
+  const eve  = Math.exp(-0.5*((hourF-17.5)/1.1)**2)*0.50;
+  return 1.0 + morn + eve;
+}
+/* 0..1 congestion level for curve display */
+function congestion(hourF){
+  return Math.min((trafficMultiplier(hourF)-1)/0.6,1);
+}
+
+function trafficLevel(mult){
+  if(mult<1.15) return {label:'Light',   cls:'low'};
+  if(mult<1.35) return {label:'Moderate',cls:'mid'};
+  return               {label:'Heavy',   cls:'high'};
+}
+
+/* OSRM public routing API — completely free, no key */
+async function fetchRoute(fromLat,fromLng,toLat,toLng){
+  const url=`https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&steps=true&annotations=duration`;
+  const res=await fetch(url,{signal:AbortSignal.timeout(12000)});
+  if(!res.ok) throw new Error('osrm fail');
+  const json=await res.json();
+  if(json.code!=='Ok') throw new Error(json.code);
+  const route=json.routes[0];
+  const leg=route.legs[0];
+  const now=new Date().getHours()+new Date().getMinutes()/60;
+  const mult=trafficMultiplier(now);
+  return{
+    baseSec:  route.duration,
+    trafficSec: Math.round(route.duration*mult),
+    distanceM:  route.distance,
+    mult,
+    steps:(leg.steps||[]).map(s=>({
+      distM:s.distance,
+      baseSec:s.duration,
+      trafficSec:Math.round(s.duration*mult),
+    })),
+  };
+}
+
+/* mini coloured route bar */
+function buildDiagramSvg(steps){
+  if(!steps?.length)return'';
+  const total=steps.reduce((a,s)=>a+s.distM,0)||1;
+  const W=300,H=6,r=3;let x=0;
+  const rects=steps.map(s=>{
+    const w=(s.distM/total)*W;
+    const ratio=s.trafficSec/s.baseSec;
+    const col=ratio<1.15?'#30D158':ratio<1.35?'#fbbc04':'#FF453A';
+    const out=`<rect x="${x.toFixed(1)}" y="0" width="${Math.max(w-1,1).toFixed(1)}" height="${H}" rx="${r}" fill="${col}"/>`;
+    x+=w;return out;
+  }).join('');
+  return`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;border-radius:${r}px;overflow:hidden">${rects}</svg>`;
+}
+
+/* bell curve SVG */
+function drawBellCurve(mult,fromHour){
+  const svg=document.getElementById('routeCurveSvg');
+  if(!svg)return;
+  const W=600,H=120,PL=34,PR=10,PT=10,PB=28;
+  const pw=W-PL-PR,ph=H-PT-PB,span=6;
+
+  const pts=[];
+  for(let i=0;i<=120;i++){
+    const h=fromHour+(i/120)*span;
+    const v=Math.min(congestion(h%24)*1.1+0.05,1);
+    pts.push([PL+(i/120)*pw, PT+ph*(1-v)]);
+  }
+
+  let d=`M ${pts[0][0]} ${pts[0][1]}`;
+  let fd=d;
+  for(let i=1;i<pts.length;i++){
+    const [px,py]=pts[i-1],[cx,cy]=pts[i],mx=(px+cx)/2;
+    d+=` C ${mx} ${py} ${mx} ${cy} ${cx} ${cy}`;
+    fd+=` C ${mx} ${py} ${mx} ${cy} ${cx} ${cy}`;
+  }
+  fd+=` L ${PL+pw} ${PT+ph} L ${PL} ${PT+ph} Z`;
+
+  const grid=[0.25,0.5,0.75,1].map(v=>{
+    const y=PT+ph*(1-v);
+    return`<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>`;
+  }).join('');
+
+  const labels=[];
+  for(let i=0;i<=span;i++){
+    const h=Math.round(fromHour+i)%24;
+    const lbl=h===0?'12am':h<12?`${h}am`:h===12?'12pm':`${h-12}pm`;
+    labels.push(`<text x="${PL+(i/span)*pw}" y="${H-6}" text-anchor="middle" fill="rgba(235,235,235,0.3)" font-size="10" font-family="Outfit,sans-serif">${lbl}</text>`);
+  }
+
+  /* current traffic dot colour */
+  const curY=pts[0][1];
+  const curCol=mult<1.15?'#30D158':mult<1.35?'#fbbc04':'#FF453A';
+
+  svg.innerHTML=`
+    <defs>
+      <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#4285f4" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#4285f4" stop-opacity="0.02"/>
+      </linearGradient>
+    </defs>
+    ${grid}
+    <path d="${fd}" fill="url(#cg)"/>
+    <path d="${d}" fill="none" stroke="#4285f4" stroke-width="2" stroke-linecap="round"/>
+    <line x1="${PL}" y1="${PT}" x2="${PL}" y2="${PT+ph}" stroke="${curCol}" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <circle cx="${PL}" cy="${curY}" r="4.5" fill="${curCol}"/>
+    <text x="${PL+6}" y="${PT+11}" fill="${curCol}" font-size="9" font-family="Outfit,sans-serif" font-weight="700">NOW</text>
+    ${labels.join('')}`;
+}
+
+/* best leave time */
+function bestLeaveText(fromHour){
+  let minV=Infinity,bestH=fromHour;
+  for(let i=0;i<=360;i++){const h=(fromHour+i/60)%24;const v=congestion(h);if(v<minV){minV=v;bestH=fromHour+i/60;}}
+  const diff=bestH-fromHour;
+  const fmt=hf=>{const h=Math.floor(hf)%24,m=Math.round((hf%1)*60),ap=h<12?'am':'pm',hr=h===0?12:h>12?h-12:h;return`${hr}:${m.toString().padStart(2,'0')} ${ap}`;};
+  if(diff<0.1)return'Leave <strong>now</strong> — this is the lightest traffic window.';
+  return`Best to leave in <strong>${Math.round(diff*60)} min</strong> at <strong>${fmt(bestH)}</strong>.`;
+}
+
+/* open detail modal */
+function openRouteModal(from,dest,data){
+  const baseMins=Math.round(data.baseSec/60);
+  const etaMins=Math.round(data.trafficSec/60);
+  const distKm=(data.distanceM/1000).toFixed(1);
+  document.getElementById('modalRouteName').textContent=`${from.name} → ${dest.name}`;
+  document.getElementById('modalRouteSubtitle').textContent='Traffic forecast · Next 6 hours';
+  document.getElementById('modalEta').textContent=`${etaMins} min`;
+  document.getElementById('modalBase').textContent=`${baseMins} min`;
+  document.getElementById('modalDist').textContent=`${distKm} km`;
+  document.querySelector('.route-stats').style.display='';
+  document.querySelector('.route-curve-wrap').style.display='';
+  document.getElementById('routeBestTime').style.display='';
+  /* remove any stale setup form */
+  document.getElementById('routeSetupForm')?.remove();
+  document.getElementById('routeModalOverlay').classList.add('open');
+  const nowH=new Date().getHours()+new Date().getMinutes()/60;
+  drawBellCurve(data.mult,nowH);
+  document.getElementById('routeBestTimeText').innerHTML=bestLeaveText(nowH);
+}
+
+/* open setup modal */
+function openRouteSetupModal(){
+  const h=routeConfig.locations[0],w=routeConfig.locations[1];
+  document.getElementById('modalRouteName').textContent='Route Setup';
+  document.getElementById('modalRouteSubtitle').textContent='Set your home & work coordinates';
+  document.querySelector('.route-stats').style.display='none';
+  document.querySelector('.route-curve-wrap').style.display='none';
+  document.getElementById('routeBestTime').style.display='none';
+  document.getElementById('routeSetupForm')?.remove();
+  document.getElementById('routeModalOverlay').classList.add('open');
+  document.querySelector('.route-modal-body').insertAdjacentHTML('afterbegin',`
+    <div class="route-modal-setup" id="routeSetupForm">
+      <div class="route-field-group">
+        <div class="route-field-label">Home</div>
+        <div class="route-field">
+          <input id="rHomeName" placeholder="Label" value="${h.name||'Home'}"/>
+          <input id="rHomeLat"  placeholder="Latitude"  value="${h.lat||''}"/>
+          <input id="rHomeLng"  placeholder="Longitude" value="${h.lng||''}"/>
+          <button class="route-locate-btn" data-idx="0" title="Use GPS">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="route-field-group">
+        <div class="route-field-label">Work</div>
+        <div class="route-field">
+          <input id="rWorkName" placeholder="Label" value="${w.name||'Work'}"/>
+          <input id="rWorkLat"  placeholder="Latitude"  value="${w.lat||''}"/>
+          <input id="rWorkLng"  placeholder="Longitude" value="${w.lng||''}"/>
+          <button class="route-locate-btn" data-idx="1" title="Use GPS">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          </button>
+        </div>
+      </div>
+      <p class="route-api-hint">ⓘ Tap the crosshair to capture your current GPS position for each location. 100% free — no API key needed.</p>
+      <button class="route-save-btn" id="routeSaveBtn">Save Locations</button>
+    </div>`);
+
+  document.querySelectorAll('.route-locate-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      navigator.geolocation.getCurrentPosition(p=>{
+        const idx=+btn.dataset.idx;
+        if(idx===0){document.getElementById('rHomeLat').value=p.coords.latitude.toFixed(6);document.getElementById('rHomeLng').value=p.coords.longitude.toFixed(6);}
+        else{document.getElementById('rWorkLat').value=p.coords.latitude.toFixed(6);document.getElementById('rWorkLng').value=p.coords.longitude.toFixed(6);}
+      },{timeout:8000});
+    });
+  });
+
+  document.getElementById('routeSaveBtn').addEventListener('click',()=>{
+    routeConfig.locations[0]={name:document.getElementById('rHomeName').value.trim()||'Home',lat:document.getElementById('rHomeLat').value.trim(),lng:document.getElementById('rHomeLng').value.trim(),radius:400};
+    routeConfig.locations[1]={name:document.getElementById('rWorkName').value.trim()||'Work',lat:document.getElementById('rWorkLat').value.trim(),lng:document.getElementById('rWorkLng').value.trim(),radius:400};
+    localStorage.setItem(ROUTE_KEY,JSON.stringify(routeConfig));
+    closeRouteModal();
+    initRoute();
+  });
+}
+
+function closeRouteModal(){
+  document.getElementById('routeModalOverlay').classList.remove('open');
+}
+document.getElementById('routeModalClose').addEventListener('click',closeRouteModal);
+document.getElementById('routeModalOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('routeModalOverlay'))closeRouteModal();});
+
+/* render route card */
+function renderRouteCard(from,dest,data){
+  const tl=trafficLevel(data.mult);
+  const mins=Math.round(data.trafficSec/60);
+  const distKm=(data.distanceM/1000).toFixed(1);
+  const now=new Date();
+  document.getElementById('routeUpdated').textContent=`${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+  document.getElementById('routeContent').innerHTML=`
+    <div class="route-body" id="routeBodyClick">
+      <div class="route-eta-block">
+        <div class="route-eta-main">${mins} min</div>
+        <div class="route-eta-label">est. with traffic</div>
+        <div class="route-traffic-badge ${tl.cls}">${tl.label} traffic</div>
+      </div>
+      <div class="route-divider"></div>
+      <div class="route-diagram">
+        ${buildDiagramSvg(data.steps)}
+        <div class="route-meta">
+          <span class="route-meta-from">${from.name}</span>
+          <span class="route-dist">${distKm} km</span>
+          <span class="route-meta-to">${dest.name}</span>
+        </div>
+      </div>
+    </div>
+    <div class="route-tap-hint">
+      <svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      Tap for traffic forecast
+    </div>`;
+  document.getElementById('routeBodyClick').addEventListener('click',()=>openRouteModal(from,dest,data));
+}
+
+/* render setup prompt */
+function renderRouteSetup(){
+  document.getElementById('routeLoading').style.display='none';
+  document.getElementById('routeContent').innerHTML=`
+    <div class="route-setup">
+      <span class="route-setup-text">Set your home &amp; work locations for smart route suggestions — free, no API key needed.</span>
+      <button class="route-setup-btn" id="routeSetupOpenBtn">Set Up</button>
+    </div>`;
+  document.getElementById('routeSetupOpenBtn').addEventListener('click',openRouteSetupModal);
+}
+
+/* main init */
+async function initRoute(){
+  const strip=document.getElementById('routeStrip');
+  strip.classList.add('visible');
+  const locs=routeConfig.locations.filter(l=>l.lat&&l.lng);
+  if(!locs.length){renderRouteSetup();return;}
+
+  document.getElementById('routeLoading').style.display='flex';
+  document.getElementById('routeContent').innerHTML='';
+  document.getElementById('routeContent').appendChild(document.getElementById('routeLoading'));
+
+  if(!navigator.geolocation){renderRouteSetup();return;}
+
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    currentGeoPos={lat:pos.coords.latitude,lng:pos.coords.longitude};
+    const matched=detectGeofence(currentGeoPos.lat,currentGeoPos.lng);
+    const from=matched||{name:'Here',lat:String(currentGeoPos.lat.toFixed(6)),lng:String(currentGeoPos.lng.toFixed(6))};
+    const dest=pickDest(from.name);
+    document.getElementById('routeGeofenceName').textContent=from.name;
+    if(!dest){document.getElementById('routeDestName').textContent='Add destination';renderRouteSetup();return;}
+    document.getElementById('routeDestName').textContent=dest.name;
+    try{
+      const data=await fetchRoute(+from.lat,+from.lng,+dest.lat,+dest.lng);
+      routeData=data;
+      document.getElementById('routeLoading').style.display='none';
+      renderRouteCard(from,dest,data);
+    }catch(e){
+      document.getElementById('routeLoading').style.display='none';
+      document.getElementById('routeContent').innerHTML=`<div class="route-setup"><span class="route-setup-text">Could not fetch route. Check your connection.</span><button class="route-setup-btn" id="routeRetryBtn">Retry</button></div>`;
+      document.getElementById('routeRetryBtn')?.addEventListener('click',initRoute);
+    }
+  },()=>{
+    document.getElementById('routeLoading').style.display='none';
+    document.getElementById('routeContent').innerHTML=`<div class="route-setup"><span class="route-setup-text">Location access denied. Please enable location permissions.</span></div>`;
+  },{timeout:8000,maximumAge:120000,enableHighAccuracy:false});
+}
+
+document.getElementById('routeRefreshBtn').addEventListener('click',()=>{routeData=null;initRoute();});
+initRoute();
 renderCards(STREAMING, 'streaming');
 renderCards(MUSIC,     'music');
 renderCards(TOOLS,     'tools');
