@@ -31,6 +31,9 @@
       --ease-fluid:cubic-bezier(.4,0,.2,1);
       --accent-glow:0 8px 28px -6px rgba(227,25,55,.45),0 0 0 1px rgba(227,25,55,.35);
       --tile-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 -1px 0 rgba(0,0,0,.3) inset;
+      /* Boot timeline — every entrance animation references this so the UI
+         reveals exactly as the boot curtain lifts. */
+      --boot-delay:1.7s;
     }
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
     html,body{
@@ -76,7 +79,7 @@
       overflow:hidden;
       height:44px;
       display:flex;align-items:center;
-      animation:slideDown .6s var(--ease-out) both;
+      animation:slideDown .6s var(--ease-out) var(--boot-delay) both;
     }
     .ticker-label{
       flex-shrink:0;
@@ -130,7 +133,7 @@
       display:flex;align-items:center;justify-content:space-between;
       padding:14px 24px;
       border-bottom:1px solid var(--border);
-      animation:slideDown .7s var(--ease-out) both;
+      animation:slideDown .7s var(--ease-out) var(--boot-delay) both;
     }
     @keyframes slideDown{
       from{opacity:0;transform:translateY(-8px);}
@@ -234,7 +237,7 @@
       margin:14px 20px;
       border:1px solid var(--border);border-radius:12px;
       overflow:hidden;background:var(--surface);
-      animation:cardReveal .7s var(--ease-out) .15s both;
+      animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .15s) both;
     }
     @keyframes cardReveal{
       from{opacity:0;transform:translateY(8px) scale(.99);}
@@ -300,10 +303,10 @@
       margin:18px 0;
       animation:sectionReveal .8s var(--ease-out) both;
     }
-    section:nth-of-type(1){animation-delay:.05s;}
-    section:nth-of-type(2){animation-delay:.12s;}
-    section:nth-of-type(3){animation-delay:.19s;}
-    section:nth-of-type(4){animation-delay:.26s;}
+    section:nth-of-type(1){animation-delay:calc(var(--boot-delay) + .05s);}
+    section:nth-of-type(2){animation-delay:calc(var(--boot-delay) + .12s);}
+    section:nth-of-type(3){animation-delay:calc(var(--boot-delay) + .19s);}
+    section:nth-of-type(4){animation-delay:calc(var(--boot-delay) + .26s);}
     @keyframes sectionReveal{
       from{opacity:0;transform:translateY(10px);}
       to  {opacity:1;transform:translateY(0);}
@@ -424,16 +427,16 @@
       100% {opacity:1;transform:translateY(0) scale(1);filter:blur(0);}
     }
     .row .card{transform:translateY(14px);}
-    .row .card:nth-child(1) {animation-delay:.04s;--sheen-delay:0s;}
-    .row .card:nth-child(2) {animation-delay:.09s;--sheen-delay:1.1s;}
-    .row .card:nth-child(3) {animation-delay:.14s;--sheen-delay:2.3s;}
-    .row .card:nth-child(4) {animation-delay:.19s;--sheen-delay:3.5s;}
-    .row .card:nth-child(5) {animation-delay:.24s;--sheen-delay:4.7s;}
-    .row .card:nth-child(6) {animation-delay:.29s;--sheen-delay:5.9s;}
-    .row .card:nth-child(7) {animation-delay:.34s;--sheen-delay:7.1s;}
-    .row .card:nth-child(8) {animation-delay:.39s;--sheen-delay:8.3s;}
-    .row .card:nth-child(9) {animation-delay:.44s;--sheen-delay:.5s;}
-    .row .card:nth-child(10){animation-delay:.49s;--sheen-delay:1.7s;}
+    .row .card:nth-child(1) {animation-delay:calc(var(--boot-delay) + .04s);--sheen-delay:0s;}
+    .row .card:nth-child(2) {animation-delay:calc(var(--boot-delay) + .09s);--sheen-delay:1.1s;}
+    .row .card:nth-child(3) {animation-delay:calc(var(--boot-delay) + .14s);--sheen-delay:2.3s;}
+    .row .card:nth-child(4) {animation-delay:calc(var(--boot-delay) + .19s);--sheen-delay:3.5s;}
+    .row .card:nth-child(5) {animation-delay:calc(var(--boot-delay) + .24s);--sheen-delay:4.7s;}
+    .row .card:nth-child(6) {animation-delay:calc(var(--boot-delay) + .29s);--sheen-delay:5.9s;}
+    .row .card:nth-child(7) {animation-delay:calc(var(--boot-delay) + .34s);--sheen-delay:7.1s;}
+    .row .card:nth-child(8) {animation-delay:calc(var(--boot-delay) + .39s);--sheen-delay:8.3s;}
+    .row .card:nth-child(9) {animation-delay:calc(var(--boot-delay) + .44s);--sheen-delay:.5s;}
+    .row .card:nth-child(10){animation-delay:calc(var(--boot-delay) + .49s);--sheen-delay:1.7s;}
 
     /* ── RADIO CARDS ── */
     .radio-card{
@@ -832,9 +835,105 @@
     ::-webkit-scrollbar{width:3px}
     ::-webkit-scrollbar-track{background:transparent}
     ::-webkit-scrollbar-thumb{background:var(--border-em);border-radius:2px}
+
+    /* ── BOOT OVERLAY ──
+       Tesla-style page boot. Pure-black curtain, the T mark scales in
+       with a soft glow halo, the wordmark types in below with letter
+       tracking that contracts, then a progress sliver fills L→R.
+       At t=1.7s the curtain lifts (slight scale-up + fade) — every UI
+       entrance animation references --boot-delay so they sweep in
+       beneath as the curtain rises. */
+    .boot-overlay{
+      position:fixed;inset:0;z-index:9999;
+      background:#000;
+      display:flex;align-items:center;justify-content:center;
+      animation:bootCurtainLift 1s var(--ease-fluid) 1.7s forwards;
+      pointer-events:auto;
+    }
+    @keyframes bootCurtainLift{
+      0%   {opacity:1;transform:scale(1);}
+      100% {opacity:0;transform:scale(1.06);visibility:hidden;}
+    }
+    .boot-mark{
+      display:flex;flex-direction:column;align-items:center;gap:24px;
+      /* Drift up gently as curtain lifts so the mark doesn't feel static */
+      animation:bootMarkDrift 1s var(--ease-fluid) 1.7s forwards;
+    }
+    @keyframes bootMarkDrift{
+      to{transform:translateY(-12px);opacity:.6;}
+    }
+    .boot-t{
+      width:84px;height:84px;
+      background:var(--accent);
+      border-radius:18px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:44px;font-weight:800;color:#fff;
+      letter-spacing:-.02em;
+      opacity:0;transform:scale(.55);filter:blur(10px);
+      animation:
+        bootTIn .8s var(--ease-spring) .15s forwards,
+        bootTGlow 2.4s var(--ease-smooth) .95s infinite;
+    }
+    @keyframes bootTIn{
+      to{opacity:1;transform:scale(1);filter:blur(0);}
+    }
+    @keyframes bootTGlow{
+      0%,100% {box-shadow:0 0 0 0 rgba(227,25,55,.4),0 6px 24px rgba(227,25,55,.32);}
+      50%     {box-shadow:0 0 0 14px rgba(227,25,55,0),0 10px 38px rgba(227,25,55,.6);}
+    }
+    .boot-name{
+      font-size:13px;font-weight:600;letter-spacing:.45em;
+      color:var(--text);text-transform:uppercase;
+      opacity:0;
+      animation:bootNameIn .65s var(--ease-out) .55s forwards;
+    }
+    .boot-name span{color:var(--muted);font-weight:300;margin-left:6px;letter-spacing:.4em;}
+    @keyframes bootNameIn{
+      from{opacity:0;letter-spacing:.7em;filter:blur(3px);}
+      to  {opacity:1;letter-spacing:.45em;filter:blur(0);}
+    }
+    .boot-progress{
+      width:120px;height:2px;
+      background:rgba(255,255,255,.07);
+      border-radius:1px;overflow:hidden;position:relative;
+      opacity:0;
+      animation:bootProgShow .35s var(--ease-out) .85s forwards;
+    }
+    .boot-progress::after{
+      content:'';position:absolute;left:0;top:0;bottom:0;width:100%;
+      background:linear-gradient(90deg,
+        rgba(227,25,55,.4) 0%,
+        var(--accent) 50%,
+        rgba(227,25,55,.6) 100%);
+      transform-origin:left center;
+      transform:scaleX(0);
+      box-shadow:0 0 8px rgba(227,25,55,.6);
+      animation:bootProgFill .95s var(--ease-smooth) .9s forwards;
+    }
+    @keyframes bootProgShow{to{opacity:1;}}
+    @keyframes bootProgFill{
+      0%   {transform:scaleX(0);}
+      100% {transform:scaleX(1);}
+    }
+    /* honor reduced motion: snap the boot away in 0.1s */
+    @media (prefers-reduced-motion:reduce){
+      .boot-overlay{animation:bootCurtainLift .1s linear .1s forwards;}
+      .boot-mark,.boot-t,.boot-name,.boot-progress,.boot-progress::after{
+        animation:none !important;opacity:1 !important;transform:none !important;filter:none !important;
+      }
+    }
   </style>
 </head>
 <body>
+
+  <!-- BOOT OVERLAY (Tesla-style page boot) -->
+  <div class="boot-overlay" id="bootOverlay" aria-hidden="true">
+    <div class="boot-mark">
+      <div class="boot-t">T</div>
+      <div class="boot-name">Cinema<span>· Drive</span></div>
+      <div class="boot-progress"></div>
+    </div>
+  </div>
 
   <!-- STOCK TICKER -->
   <div class="ticker-bar">
@@ -1578,7 +1677,8 @@ function renderRadio(){
   RADIO_STATIONS.forEach((s, i) => {
     const el = document.createElement('div');
     el.className = 'radio-card';
-    el.style.animationDelay = (0.04 + i * 0.05) + 's';
+    /* Sync to boot timeline: --boot-delay + per-card stagger */
+    el.style.animationDelay = `calc(var(--boot-delay) + ${(0.04 + i * 0.05).toFixed(2)}s)`;
     el.innerHTML = `
       <div class="radio-icon" style="background:${s.color};color:${s.text}">${s.initials}</div>
       <div class="radio-name">${s.name}</div>
