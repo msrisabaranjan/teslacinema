@@ -235,7 +235,7 @@
     }
     .news-strip{
       margin:14px 20px;
-      border:1px solid var(--border);border-radius:12px;
+      border:1px solid var(--border);border-radius:14px;
       overflow:hidden;background:var(--surface);
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .15s) both;
     }
@@ -245,7 +245,7 @@
     }
     .news-header{
       display:flex;align-items:center;gap:8px;
-      padding:8px 14px;border-bottom:1px solid var(--border);
+      padding:9px 12px 9px 14px;border-bottom:1px solid var(--border);
     }
     .news-label{
       font-size:10px;font-weight:700;letter-spacing:.14em;
@@ -254,41 +254,118 @@
     .news-source{font-size:10px;font-weight:500;letter-spacing:.06em;color:var(--muted);}
     .news-dot{color:var(--muted2);font-size:9px;margin:0 1px;}
     .news-updated{margin-left:auto;font-size:10px;color:var(--muted2);font-variant-numeric:tabular-nums;}
-    .news-items{overflow:hidden;position:relative;height:42px;}
+    .news-nav-group{display:flex;align-items:center;gap:6px;margin-left:10px;flex-shrink:0;}
+    .news-nav{
+      width:34px;height:34px;border-radius:8px;
+      border:1px solid var(--border-em);background:transparent;
+      color:var(--muted);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:
+        background .25s var(--ease-smooth),
+        border-color .25s var(--ease-smooth),
+        color .25s var(--ease-smooth),
+        transform .35s var(--ease-spring);
+    }
+    .news-nav:hover{
+      color:var(--text);
+      border-color:rgba(255,255,255,.28);
+      background:rgba(255,255,255,.03);
+    }
+    .news-nav:active{
+      background:var(--accent-dim);border-color:var(--accent);color:#fff;
+      transform:scale(.92);
+    }
+    .news-nav svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+    .news-items{overflow:hidden;position:relative;height:148px;touch-action:pan-y;}
     .news-slide{
       position:absolute;inset:0;
-      display:flex;align-items:center;
-      padding:0 16px;gap:12px;
-      opacity:0;transform:translateY(10px);
-      transition:opacity .55s var(--ease-out),transform .55s var(--ease-out);
+      display:flex;align-items:stretch;
+      opacity:0;transform:translateX(28px);
+      transition:opacity .5s var(--ease-out),transform .5s var(--ease-out);
       pointer-events:none;
     }
-    .news-slide.active{opacity:1;transform:translateY(0);pointer-events:auto;cursor:pointer;}
-    .news-slide.exit{opacity:0;transform:translateY(-10px);}
-    .news-idx{font-size:10px;font-weight:700;color:var(--accent);flex-shrink:0;font-variant-numeric:tabular-nums;}
+    .news-slide.active{opacity:1;transform:translateX(0);pointer-events:auto;cursor:pointer;}
+    .news-slide.exit-left{opacity:0;transform:translateX(-28px);}
+    .news-slide.exit-right{opacity:0;transform:translateX(28px);}
+    .news-slide.from-left{transform:translateX(-28px);}
+    .news-img-wrap{
+      flex:0 0 220px;
+      position:relative;overflow:hidden;
+      background:
+        linear-gradient(160deg,rgba(227,25,55,.28),rgba(0,0,0,.35)),
+        var(--surface-em);
+    }
+    .news-img-wrap img{
+      width:100%;height:100%;object-fit:cover;display:block;
+      transition:transform .7s var(--ease-smooth);
+    }
+    .news-slide.active .news-img-wrap img{transform:scale(1.04);}
+    .news-img-wrap::after{
+      content:'';position:absolute;inset:0;
+      background:linear-gradient(90deg,transparent 55%,var(--surface));
+      pointer-events:none;
+    }
+    .news-copy{
+      flex:1;min-width:0;
+      display:flex;flex-direction:column;justify-content:center;
+      padding:16px 18px 16px 14px;gap:8px;
+    }
+    .news-meta{
+      display:flex;align-items:center;gap:8px;
+      font-size:10px;font-weight:600;letter-spacing:.08em;
+      text-transform:uppercase;color:var(--muted);
+    }
+    .news-idx{color:var(--accent);font-variant-numeric:tabular-nums;letter-spacing:.04em;}
+    .news-time{font-variant-numeric:tabular-nums;color:var(--muted2);text-transform:none;letter-spacing:0;font-weight:500;}
     .news-title{
-      font-size:13px;font-weight:400;color:rgba(255,255,255,0.8);
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;
+      font-size:18px;font-weight:600;line-height:1.25;letter-spacing:-.02em;
+      color:var(--text);
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+      overflow:hidden;
     }
-    .news-time{flex-shrink:0;font-size:11px;color:var(--muted2);font-variant-numeric:tabular-nums;}
+    .news-desc{
+      font-size:13px;font-weight:400;line-height:1.4;
+      color:rgba(235,235,235,.55);
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+      overflow:hidden;
+    }
     .news-dots{
-      display:flex;gap:5px;padding:7px 14px;
+      display:flex;gap:5px;padding:8px 14px;
       border-top:1px solid var(--border);align-items:center;
+      overflow-x:auto;scrollbar-width:none;
     }
+    .news-dots::-webkit-scrollbar{display:none;}
     .news-pip{
-      width:16px;height:2px;border-radius:1px;
+      width:16px;height:3px;border-radius:2px;
+      border:none;padding:0;appearance:none;
       background:var(--border-em);
+      overflow:hidden;flex-shrink:0;
       transition:background .4s var(--ease-smooth),width .4s var(--ease-spring),box-shadow .4s var(--ease-smooth);
       cursor:pointer;
     }
     .news-pip.on{
-      background:var(--accent);
-      width:22px;
-      box-shadow:0 0 8px rgba(227,25,55,.5);
+      background:rgba(227,25,55,.28);
+      width:36px;
+      box-shadow:0 0 8px rgba(227,25,55,.35);
     }
+    .news-pip.on::after{
+      content:'';display:block;height:100%;width:0;
+      background:var(--accent);
+      border-radius:2px;
+      animation:newsPipFill 7s linear forwards;
+    }
+    @keyframes newsPipFill{to{width:100%;}}
     .news-skeleton{
-      height:42px;display:flex;align-items:center;
-      padding:0 16px;gap:10px;
+      height:148px;display:flex;align-items:stretch;
+    }
+    .news-skel-img{
+      flex:0 0 220px;
+      background:rgba(255,255,255,0.06);
+      animation:pulse .9s ease infinite;
+    }
+    .news-skel-copy{
+      flex:1;display:flex;flex-direction:column;justify-content:center;
+      padding:0 18px;gap:10px;
     }
     .news-skel-bar{
       height:10px;border-radius:4px;
@@ -296,6 +373,88 @@
       animation:pulse .9s ease infinite;
     }
     @keyframes pulse{0%,100%{opacity:.35}50%{opacity:.8}}
+    @media (max-width:720px){
+      .news-img-wrap,.news-skel-img{flex-basis:132px;}
+      .news-title{font-size:15px;}
+      .news-desc{display:none;}
+      .news-items,.news-skeleton{height:128px;}
+    }
+
+    /* ── NEWS POPUP ── */
+    .news-pop{
+      position:fixed;inset:0;z-index:420;
+      display:flex;align-items:center;justify-content:center;
+      padding:28px;
+      background:rgba(8,8,8,.62);
+      -webkit-backdrop-filter:blur(12px);
+      backdrop-filter:blur(12px);
+      opacity:0;visibility:hidden;pointer-events:none;
+      transition:opacity .32s var(--ease-smooth),visibility .32s var(--ease-smooth);
+    }
+    .news-pop.open{opacity:1;visibility:visible;pointer-events:auto;}
+    .news-pop-card{
+      width:min(680px,100%);
+      max-height:min(84vh,760px);
+      background:var(--bg-raised);
+      border:1px solid var(--border-em);
+      border-radius:18px;
+      overflow:hidden;
+      display:flex;flex-direction:column;
+      box-shadow:0 28px 70px rgba(0,0,0,.55),var(--tile-shadow);
+      transform:translateY(18px) scale(.96);
+      opacity:.7;
+      transition:transform .42s var(--ease-spring),opacity .32s var(--ease-out);
+    }
+    .news-pop.open .news-pop-card{transform:none;opacity:1;}
+    .news-pop-img{
+      position:relative;flex:0 0 240px;min-height:180px;
+      background:
+        linear-gradient(160deg,rgba(227,25,55,.28),rgba(0,0,0,.35)),
+        var(--surface-em);
+      overflow:hidden;
+    }
+    .news-pop-img img{
+      width:100%;height:100%;object-fit:cover;display:block;
+    }
+    .news-pop-img::after{
+      content:'';position:absolute;left:0;right:0;bottom:0;height:72px;
+      background:linear-gradient(to top,var(--bg-raised),transparent);
+      pointer-events:none;
+    }
+    .news-pop-body{
+      padding:8px 24px 22px;
+      display:flex;flex-direction:column;gap:12px;
+      overflow:auto;
+      min-height:0;
+    }
+    .news-pop-meta{
+      display:flex;align-items:center;gap:8px;
+      font-size:11px;font-weight:600;letter-spacing:.08em;
+      text-transform:uppercase;color:var(--muted);
+    }
+    .news-pop-meta .news-idx{color:var(--accent);}
+    .news-pop-title{
+      font-size:24px;font-weight:600;line-height:1.25;letter-spacing:-.03em;
+      color:var(--text);
+    }
+    .news-pop-desc{
+      font-size:15px;font-weight:400;line-height:1.5;
+      color:rgba(235,235,235,.68);
+    }
+    .news-pop-actions{display:flex;gap:10px;margin-top:6px;}
+    .news-pop-open{
+      appearance:none;border:none;cursor:pointer;
+      height:42px;padding:0 18px;border-radius:10px;
+      background:var(--accent);color:#fff;
+      font-family:inherit;font-size:13px;font-weight:600;letter-spacing:.02em;
+      box-shadow:var(--accent-glow);
+      transition:transform .3s var(--ease-spring),filter .2s var(--ease-smooth);
+    }
+    .news-pop-open:active{transform:scale(.96);}
+    .news-pop-hint{
+      margin-left:auto;align-self:center;
+      font-size:11px;color:var(--muted2);
+    }
 
     /* ── SECTIONS ── */
     main{padding:4px 0 48px;}
@@ -437,6 +596,7 @@
     .row .card:nth-child(8) {animation-delay:calc(var(--boot-delay) + .39s);--sheen-delay:8.3s;}
     .row .card:nth-child(9) {animation-delay:calc(var(--boot-delay) + .44s);--sheen-delay:.5s;}
     .row .card:nth-child(10){animation-delay:calc(var(--boot-delay) + .49s);--sheen-delay:1.7s;}
+    .row .card:nth-child(11){animation-delay:calc(var(--boot-delay) + .54s);--sheen-delay:2.9s;}
 
     /* ── RADIO CARDS ── */
     .radio-card{
@@ -1034,17 +1194,47 @@
       <div class="news-header">
         <span class="news-label">News</span>
         <span class="news-dot">·</span>
-        <span class="news-source">BBC Top Headlines</span>
+        <span class="news-source">Trending · BBC</span>
         <span class="news-updated" id="newsUpdated"></span>
+        <div class="news-nav-group">
+          <button class="news-nav" id="newsPrevBtn" title="Previous story" aria-label="Previous story">
+            <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <button class="news-nav" id="newsNextBtn" title="Next story" aria-label="Next story">
+            <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
       </div>
       <div class="news-items" id="newsItems">
         <div class="news-skeleton">
-          <div class="news-skel-bar" style="width:28px"></div>
-          <div class="news-skel-bar" style="width:68%;animation-delay:.15s"></div>
-          <div class="news-skel-bar" style="width:36px;margin-left:auto;animation-delay:.3s"></div>
+          <div class="news-skel-img"></div>
+          <div class="news-skel-copy">
+            <div class="news-skel-bar" style="width:28%"></div>
+            <div class="news-skel-bar" style="width:88%;height:16px;animation-delay:.15s"></div>
+            <div class="news-skel-bar" style="width:62%;animation-delay:.3s"></div>
+          </div>
         </div>
       </div>
       <div class="news-dots" id="newsDots"></div>
+    </div>
+
+    <div class="news-pop" id="newsPop" aria-hidden="true">
+      <article class="news-pop-card" id="newsPopCard" role="dialog" aria-modal="true" aria-labelledby="newsPopTitle">
+        <div class="news-pop-img" id="newsPopImg"></div>
+        <div class="news-pop-body">
+          <div class="news-pop-meta">
+            <span class="news-idx" id="newsPopIdx">01</span>
+            <span>BBC</span>
+            <span class="news-time" id="newsPopTime"></span>
+          </div>
+          <h2 class="news-pop-title" id="newsPopTitle"></h2>
+          <p class="news-pop-desc" id="newsPopDesc"></p>
+          <div class="news-pop-actions">
+            <button class="news-pop-open" id="newsPopOpen" type="button">Read full story</button>
+            <span class="news-pop-hint">Tap outside to close</span>
+          </div>
+        </div>
+      </article>
     </div>
 
     <section>
@@ -1114,14 +1304,15 @@
 const STREAMING = [
   {name:'Netflix',    url:'https://www.netflix.com',                    img:'https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg'},
   {name:'YouTube',    url:'https://www.youtube.com',                    img:'https://upload.wikimedia.org/wikipedia/commons/4/42/YouTube_icon_%282013-2017%29.png'},
+  {name:'Teslurk',    url:'https://teslurk.com',                        img:'https://teslurk.com/icons/icon.svg'},
   {name:'Hulu',       url:'https://www.hulu.com',                       img:'https://upload.wikimedia.org/wikipedia/commons/0/0f/Hulu_Japan_green_logo.svg'},
   {name:'Disney+',    url:'https://www.disneyplus.com',                 img:'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg'},
   {name:'Crunchyroll',url:'https://www.crunchyroll.com',                img:'https://upload.wikimedia.org/wikipedia/commons/d/d9/Crunchyroll_2024.svg'},
   {name:'Max',        url:'https://www.max.com',                        img:'https://upload.wikimedia.org/wikipedia/commons/1/17/HBO_Max_Logo.svg'},
   {name:'Plex',       url:'https://app.plex.tv',                        img:'https://upload.wikimedia.org/wikipedia/commons/3/34/Plex_logo_2022_full_color_on_black.png'},
   {name:'Prime Video',url:'https://www.amazon.com/gp/video/storefront', img:'https://upload.wikimedia.org/wikipedia/commons/4/43/Amazon_Prime_Video_logo_%282022%29.svg'},
-  {name:'Anime Kai',  url:'https://animekai.to/home',                   img:'https://upload.wikimedia.org/wikipedia/commons/1/12/ANIME%2B_logo.svg'},
-  {name:'Movhub',     url:'https://movhub.ws/home',                     img:'https://upload.wikimedia.org/wikipedia/commons/2/20/Movies_logo.png'}
+  {name:'Anime Kai',  url:'https://reanime.to/home',                    img:'https://upload.wikimedia.org/wikipedia/commons/1/12/ANIME%2B_logo.svg'},
+  {name:'Movhub',     url:'https://cinejoy.to',                         img:'https://upload.wikimedia.org/wikipedia/commons/2/20/Movies_logo.png'}
 ];
 const MUSIC = [
   {name:'Spotify',     url:'https://open.spotify.com',  img:'https://upload.wikimedia.org/wikipedia/commons/2/24/Spotify_New_Full_Logo_RGB_Green.png'},
@@ -1410,6 +1601,9 @@ setInterval(refreshStocks, 90000);
 let newsItems = [];
 let newsIdx   = 0;
 let newsTimer = null;
+let newsPopupOpen = false;
+let newsSwiped = false;
+const NEWS_INTERVAL = 7000;
 
 function timeAgo(dateStr){
   const diff = (Date.now() - new Date(dateStr).getTime()) / 60000;
@@ -1420,46 +1614,221 @@ function timeAgo(dateStr){
   return Math.round(diff / 1440) + 'd ago';
 }
 
+function decodeRssText(s){
+  return (s || '')
+    .replace(/<!\[CDATA\[|\]\]>/g, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}
+
+function shuffleNews(list){
+  const a = list.slice();
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function rssThumb(el){
+  const thumb =
+    el.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'thumbnail')[0] ||
+    el.getElementsByTagName('media:thumbnail')[0] ||
+    el.querySelector('thumbnail');
+  let url = thumb?.getAttribute('url') || '';
+  if(url.includes('/standard/240/')) url = url.replace('/standard/240/', '/standard/640/');
+  return url;
+}
+
+function restartNewsTimer(){
+  clearInterval(newsTimer);
+  if(newsPopupOpen) return;
+  newsTimer = setInterval(advanceNews, NEWS_INTERVAL);
+}
+
+function newsImageLarge(url){
+  return (url || '')
+    .replace('/standard/240/', '/standard/976/')
+    .replace('/standard/640/', '/standard/976/');
+}
+
+function openNewsPopup(item, index){
+  if(!item) return;
+  const pop  = document.getElementById('newsPop');
+  const card = document.getElementById('newsPopCard');
+  const imgW = document.getElementById('newsPopImg');
+  const title= document.getElementById('newsPopTitle');
+  const desc = document.getElementById('newsPopDesc');
+  const time = document.getElementById('newsPopTime');
+  const idx  = document.getElementById('newsPopIdx');
+  const open = document.getElementById('newsPopOpen');
+  if(!pop || !card) return;
+
+  newsPopupOpen = true;
+  clearInterval(newsTimer);
+
+  imgW.innerHTML = '';
+  if(item.image){
+    const img = document.createElement('img');
+    img.src = newsImageLarge(item.image);
+    img.alt = '';
+    img.addEventListener('error', () => { img.src = item.image; });
+    imgW.appendChild(img);
+  }
+  if(idx) idx.textContent = String((index ?? newsIdx) + 1).padStart(2, '0');
+  if(time) time.textContent = timeAgo(item.pubDate);
+  if(title) title.textContent = item.title || '';
+  if(desc) desc.textContent = item.description || 'No additional details in this feed. Open the full story for the complete article.';
+  if(open){
+    open.hidden = !item.link;
+    open.onclick = (e) => {
+      e.stopPropagation();
+      if(item.link) openUrl(item.link);
+    };
+  }
+
+  pop.classList.add('open');
+  pop.setAttribute('aria-hidden', 'false');
+}
+
+function closeNewsPopup(){
+  const pop = document.getElementById('newsPop');
+  if(!pop || !newsPopupOpen) return;
+  newsPopupOpen = false;
+  pop.classList.remove('open');
+  pop.setAttribute('aria-hidden', 'true');
+  if(newsItems.length) restartNewsTimer();
+}
+
 function renderNewsItems(){
   const container = document.getElementById('newsItems');
   const dots      = document.getElementById('newsDots');
   if(!container || !dots) return;
   container.innerHTML = '';
   dots.innerHTML      = '';
+  newsIdx = 0;
+
   newsItems.forEach((item, i) => {
-    const slide = document.createElement('div');
+    const slide = document.createElement('article');
     slide.className = 'news-slide' + (i === 0 ? ' active' : '');
-    const t = (item.title || '').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#39;/g,"'").replace(/&quot;/g,'"');
-    slide.innerHTML = `<span class="news-idx">${String(i+1).padStart(2,'0')}</span><span class="news-title">${t}</span><span class="news-time">${timeAgo(item.pubDate)}</span>`;
-    if(item.link) slide.addEventListener('click', () => window.open(item.link, '_blank'));
+    slide.setAttribute('role', 'group');
+    slide.setAttribute('aria-label', `Story ${i + 1} of ${newsItems.length}`);
+
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'news-img-wrap';
+    if(item.image){
+      const img = document.createElement('img');
+      img.src = item.image;
+      img.alt = '';
+      img.loading = i === 0 ? 'eager' : 'lazy';
+      img.addEventListener('error', () => { img.style.display = 'none'; });
+      imgWrap.appendChild(img);
+    }
+
+    const copy = document.createElement('div');
+    copy.className = 'news-copy';
+
+    const meta = document.createElement('div');
+    meta.className = 'news-meta';
+    const idx = document.createElement('span');
+    idx.className = 'news-idx';
+    idx.textContent = String(i + 1).padStart(2, '0');
+    const time = document.createElement('span');
+    time.className = 'news-time';
+    time.textContent = timeAgo(item.pubDate);
+    meta.append(idx, time);
+
+    const title = document.createElement('h3');
+    title.className = 'news-title';
+    title.textContent = item.title || '';
+
+    copy.append(meta, title);
+    if(item.description){
+      const desc = document.createElement('p');
+      desc.className = 'news-desc';
+      desc.textContent = item.description;
+      copy.appendChild(desc);
+    }
+
+    slide.append(imgWrap, copy);
+    slide.addEventListener('click', () => {
+      if(newsSwiped){ newsSwiped = false; return; }
+      openNewsPopup(item, i);
+    });
     container.appendChild(slide);
 
-    const pip = document.createElement('div');
+    const pip = document.createElement('button');
+    pip.type = 'button';
     pip.className = 'news-pip' + (i === 0 ? ' on' : '');
-    pip.addEventListener('click', () => goToNews(i));
+    pip.setAttribute('aria-label', `Go to story ${i + 1}`);
+    pip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      goToNews(i);
+    });
     dots.appendChild(pip);
   });
-  clearInterval(newsTimer);
-  newsTimer = setInterval(advanceNews, 6000);
+
+  restartNewsTimer();
+}
+
+function wrapNewsIdx(next){
+  const n = newsItems.length;
+  if(!n) return 0;
+  return ((next % n) + n) % n;
 }
 
 function goToNews(next){
   const slides = document.querySelectorAll('.news-slide');
   const pips   = document.querySelectorAll('.news-pip');
   if(!slides.length) return;
+  next = wrapNewsIdx(next);
+  if(next === newsIdx){
+    restartNewsTimer();
+    pips[newsIdx] && pips[newsIdx].classList.remove('on');
+    void (pips[newsIdx] && pips[newsIdx].offsetWidth);
+    pips[newsIdx] && pips[newsIdx].classList.add('on');
+    return;
+  }
+
   const prev = newsIdx;
+  const goingBack = (next < prev && !(prev === 0 && next === newsItems.length - 1)) ||
+                    (prev === 0 && next === newsItems.length - 1);
+
   newsIdx = next;
   slides[prev].classList.remove('active');
-  slides[prev].classList.add('exit');
-  setTimeout(()=>{ if(slides[prev]) slides[prev].classList.remove('exit'); }, 550);
+  slides[prev].classList.add(goingBack ? 'exit-right' : 'exit-left');
+  slides[next].classList.remove('exit-left', 'exit-right');
+  if(goingBack) slides[next].classList.add('from-left');
+  void slides[next].offsetWidth;
+  slides[next].classList.remove('from-left');
+  slides[next].classList.add('active');
+  setTimeout(() => {
+    if(slides[prev]) slides[prev].classList.remove('exit-left', 'exit-right');
+  }, 520);
+
   pips[prev] && pips[prev].classList.remove('on');
-  slides[newsIdx] && slides[newsIdx].classList.add('active');
-  pips[newsIdx]   && pips[newsIdx].classList.add('on');
+  if(pips[newsIdx]){
+    pips[newsIdx].classList.remove('on');
+    void pips[newsIdx].offsetWidth;
+    pips[newsIdx].classList.add('on');
+  }
+  restartNewsTimer();
 }
 
 function advanceNews(){
+  if(!newsItems.length || newsPopupOpen) return;
+  goToNews(newsIdx + 1);
+}
+
+function stepNews(delta){
   if(!newsItems.length) return;
-  goToNews((newsIdx + 1) % newsItems.length);
+  goToNews(newsIdx + delta);
 }
 
 /* Parse BBC RSS XML fetched via allorigins */
@@ -1471,20 +1840,20 @@ async function fetchNews(){
     const text   = await res.text();
     const parser = new DOMParser();
     const doc    = parser.parseFromString(text, 'text/xml');
-    const items  = Array.from(doc.querySelectorAll('item')).slice(0, 14);
+    const items  = Array.from(doc.querySelectorAll('item')).slice(0, 16);
     if(!items.length) throw new Error('no items');
-    newsItems = items.map(el => {
-      /* BBC RSS uses <link> as a text node AFTER the <title> node */
-      const title   = el.querySelector('title')?.textContent?.trim() || '';
+    const parsed = items.map(el => {
+      const title   = decodeRssText(el.querySelector('title')?.textContent);
       const pubDate = el.querySelector('pubDate')?.textContent?.trim() || '';
-      /* <link> in BBC RSS is a sibling text node, not an attribute */
+      const description = decodeRssText(el.querySelector('description')?.textContent);
       let link = '';
       el.childNodes.forEach(n => { if(n.nodeName === 'link') link = n.textContent?.trim() || ''; });
       if(!link) link = el.querySelector('guid')?.textContent?.trim() || '';
-      return {title, pubDate, link};
+      return {title, pubDate, link, description, image: rssThumb(el)};
     }).filter(i => i.title && !i.title.toLowerCase().includes('bbc'));
 
-    renderNewsItems();
+    newsItems = shuffleNews(parsed).slice(0, 12);
+    if(!newsPopupOpen) renderNewsItems();
     const el = document.getElementById('newsUpdated');
     if(el){
       const now = new Date();
@@ -1496,7 +1865,51 @@ async function fetchNews(){
   }
 }
 
+function bindNewsControls(){
+  const strip = document.getElementById('newsStrip');
+  const stage = document.getElementById('newsItems');
+  const prev  = document.getElementById('newsPrevBtn');
+  const next  = document.getElementById('newsNextBtn');
+  const pop   = document.getElementById('newsPop');
+  const card  = document.getElementById('newsPopCard');
+  if(prev) prev.addEventListener('click', (e) => { e.stopPropagation(); stepNews(-1); });
+  if(next) next.addEventListener('click', (e) => { e.stopPropagation(); stepNews(1); });
+
+  if(strip){
+    strip.addEventListener('mouseenter', () => clearInterval(newsTimer));
+    strip.addEventListener('mouseleave', () => { if(newsItems.length) restartNewsTimer(); });
+  }
+
+  if(pop){
+    pop.addEventListener('click', closeNewsPopup);
+  }
+  if(card){
+    card.addEventListener('click', (e) => e.stopPropagation());
+  }
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape') closeNewsPopup();
+  });
+
+  let touchX = null;
+  if(stage){
+    stage.addEventListener('touchstart', (e) => {
+      touchX = e.changedTouches[0].clientX;
+      newsSwiped = false;
+      clearInterval(newsTimer);
+    }, {passive: true});
+    stage.addEventListener('touchend', (e) => {
+      if(touchX == null) return;
+      const dx = e.changedTouches[0].clientX - touchX;
+      if(dx > 48){ newsSwiped = true; stepNews(-1); }
+      else if(dx < -48){ newsSwiped = true; stepNews(1); }
+      else if(newsItems.length) restartNewsTimer();
+      touchX = null;
+    }, {passive: true});
+  }
+}
+
 fetchNews();
+bindNewsControls();
 setInterval(fetchNews, 5 * 60 * 1000);
 
 /* ── RADIO ── */
