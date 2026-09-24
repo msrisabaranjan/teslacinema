@@ -3,6 +3,40 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  
+  <script>
+  /* ── TESLA 2026.26+ BROWSER-ZOOM COMPAT ──
+     Tesla software 2026.26 increased the in-car Chromium browser’s CSS zoom
+     (no manual zoom control), shrinking the CSS viewport from ~1180x919 to
+     ~773x601 on HW3 — everything renders oversized, as if zoomed in.
+     Physical display size is unchanged; only the CSS coordinate space shrank.
+
+     Fix: when the zoomed signature is detected (Tesla UA + small viewport),
+     rewrite the viewport meta to width=<physical px> (= innerWidth x DPR,
+     ≈1180). The browser then maps CSS px 1:1 to physical px again, restoring
+     the pre-update layout exactly. Runs synchronously in <head> so it applies
+     before first render. Narrowly scoped: does nothing on other browsers or
+     on older Tesla firmware (viewport already ~1180 there). */
+  (function(){
+    try{
+      var ua = navigator.userAgent || '';
+      if(!/Tesla/i.test(ua)) return;
+      var w = window.innerWidth, h = window.innerHeight;
+      var zoomed = w >= 680 && w <= 900 && h >= 520 && h <= 720;
+      if(!zoomed) return;
+      var physW = Math.round(w * (window.devicePixelRatio || 1));
+      var meta = document.querySelector('meta[name="viewport"]');
+      if(meta){
+        meta.setAttribute('content',
+          'width=' + physW +
+          ', initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0' +
+          ', user-scalable=no, viewport-fit=cover');
+      }
+      document.documentElement.setAttribute('data-tesla-zoomed','');
+    }catch(e){/* never break page boot on compat failure */}
+  })();
+  </script>
+
   <title>T / Cinema</title>
   <link rel="icon" href="images/miff4.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
