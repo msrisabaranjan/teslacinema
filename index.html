@@ -1109,6 +1109,31 @@
       0%   {transform:scaleX(0);}
       100% {transform:scaleX(1);}
     }
+    /* ── HALF-SCREEN (narrow car-browser window) ──
+       The in-car browser can show the page in a half-width window (~590px on
+       older firmware, ~386px on 2026.26+ with its CSS zoom). The fullscreen
+       layout overflows there and reads as "zoomed in", so below 640px the
+       header compacts and cards shrink to fit. Scoped well under the 773px
+       zoomed-fullscreen width, so the 2026.26 compat path (layout 1180) is
+       untouched. Also helps narrow desktop/phone windows. */
+    @media (max-width:640px){
+      header{padding:10px 12px;}
+      .logo{gap:8px;}
+      .logo-t{width:28px;height:28px;font-size:14px;border-radius:6px;}
+      .logo-name{font-size:15px;white-space:nowrap;}
+      .logo-name span{margin-left:3px;}
+      .header-right{gap:8px;}
+      #clock-wrap{gap:6px;}
+      #clock{font-size:19px;}
+      #date-display{display:none;}
+      .yr-widget{display:none;}
+      .fs-btn{width:32px;height:32px;}
+      .news-strip{margin:10px 12px;}
+      .sec-head{padding:0 12px 10px;}
+      .row{gap:10px;padding:0 12px 4px;scroll-padding-left:12px;}
+      .card{width:124px;height:116px;border-radius:12px;}
+    }
+
     /* honor reduced motion: snap the boot away in 0.1s */
     @media (prefers-reduced-motion:reduce){
       .boot-overlay{animation:bootCurtainLift .1s linear .1s forwards;}
