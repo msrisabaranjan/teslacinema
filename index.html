@@ -435,6 +435,28 @@
       .news-desc{display:none;}
       .news-items,.news-skeleton{height:160px;}
     }
+    .news-error{
+      height:100%;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      gap:12px;padding:20px;text-align:center;
+    }
+    .news-error p{font-size:12px;color:var(--muted);max-width:300px;line-height:1.6;margin:0;}
+    .news-retry-btn{
+      padding:9px 16px;border:1px solid var(--border-em);
+      border-radius:999px;background:rgba(255,255,255,.04);cursor:pointer;
+      font-family:'Inter',sans-serif;font-size:11px;font-weight:700;
+      color:var(--muted);transition:background .15s,color .15s,border-color .15s;
+    }
+    .news-retry-btn:active{background:var(--accent-soft);border-color:var(--accent);color:#fff;}
+    .news-ph{
+      width:100%;height:100%;
+      display:flex;align-items:center;justify-content:center;
+      font-size:34px;font-weight:800;letter-spacing:.06em;
+      color:rgba(255,255,255,.20);
+      background:
+        radial-gradient(140px 90px at 72% 28%,rgba(29,185,84,.28),transparent 70%),
+        linear-gradient(160deg,rgba(29,185,84,.10),rgba(0,0,0,.42));
+    }
 
     /* ── AVATAR PANEL ── */
     .avatar-panel{
@@ -1443,7 +1465,7 @@
     }
 
     .news-items{
-      height:238px;
+      height:262px;
     }
 
     .news-slide{
@@ -1451,7 +1473,7 @@
     }
 
     .news-img-wrap{
-      flex:0 0 58%;
+      flex:0 0 44%;
       background:#111;
     }
 
@@ -1473,8 +1495,8 @@
     }
 
     .news-thumb{
-      width:58px;
-      height:58px;
+      width:52px;
+      height:52px;
       border-radius:6px;
       overflow:hidden;
       background:#1a1a1a;
@@ -1487,6 +1509,19 @@
       height:100%;
       object-fit:cover;
       display:block;
+    }
+
+    .news-thumb-ph{
+      width:100%;
+      height:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:16px;
+      font-weight:800;
+      letter-spacing:.04em;
+      color:rgba(255,255,255,.30);
+      background:linear-gradient(160deg,rgba(29,185,84,.18),rgba(0,0,0,.35));
     }
 
     .news-eyebrow{
@@ -1515,9 +1550,9 @@
     }
 
     .news-title{
-      font-size:31px;
-      line-height:1.04;
-      letter-spacing:-.045em;
+      font-size:25px;
+      line-height:1.15;
+      letter-spacing:-.02em;
       max-width:100%;
       display:-webkit-box;
       -webkit-line-clamp:3;
@@ -1537,7 +1572,7 @@
     }
 
     .news-cta{
-      height:42px;
+      height:40px;
       padding:0 18px;
       border:none;
       border-radius:999px;
@@ -1561,8 +1596,8 @@
     }
 
     .news-more{
-      width:42px;
-      height:42px;
+      width:40px;
+      height:40px;
       border-radius:50%;
       border:1px solid var(--border);
       background:rgba(255,255,255,.04);
@@ -1612,8 +1647,12 @@
       background:var(--accent);
     }
 
+    .news-skeleton{
+      height:100%;
+    }
+
     .news-skel-img{
-      flex:0 0 58%;
+      flex:0 0 44%;
     }
 
     .news-skel-copy{
@@ -1630,8 +1669,8 @@
     }
 
     .news-skel-thumb{
-      width:58px;
-      height:58px;
+      width:52px;
+      height:52px;
       border-radius:6px;
       background:rgba(255,255,255,.07);
       animation:pulse .9s ease infinite;
@@ -1646,7 +1685,7 @@
 
     @media (max-width:720px){
       .news-items{
-        height:208px;
+        height:232px;
       }
 
       .news-copy{
@@ -1697,7 +1736,7 @@
       }
 
       .news-items{
-        height:190px;
+        height:216px;
       }
     }
   </style>
@@ -1808,7 +1847,7 @@
         <div class="news-header">
           <span class="news-label">Live</span>
           <span class="news-dot">·</span>
-          <span class="news-source">BBC</span>
+          <span class="news-source" id="newsSourceLabel">Tech + Top</span>
           <span class="news-updated" id="newsUpdated"></span>
           <div class="news-nav-group">
             <button class="news-nav" id="newsPrevBtn" title="Previous story" aria-label="Previous story">
@@ -1863,7 +1902,7 @@
         <div class="news-pop-body">
           <div class="news-pop-meta">
             <span class="news-idx" id="newsPopIdx">01</span>
-            <span>BBC</span>
+            <span id="newsPopSource">News</span>
             <span class="news-time" id="newsPopTime"></span>
           </div>
           <h2 class="news-pop-title" id="newsPopTitle"></h2>
@@ -2232,6 +2271,126 @@
   let newsSwiped = false;
   const NEWS_INTERVAL = 7000;
 
+  let newsLoading = false;
+  let newsFailCount = 0;
+  let newsRetryTimer = null;
+
+  // Sources split into two kinds:
+  //   type:'api'  -> direct, CORS-enabled JSON API, no proxy (reliable, fast)
+  //   type:'rss'  -> RSS fetched through the public proxy chain (best-effort)
+  // `limit` = how many items to pull per refresh; The Verge is weighted
+  // highest since it's the richest, most visual feed.
+  const NEWS_SOURCES = [
+    {id:'devto',    name:'Dev.to',      kind:'tech', type:'api', limit:15},
+    {id:'verge',    name:'The Verge',   kind:'tech', type:'rss', url:'https://www.theverge.com/rss/index.xml', limit:20, weight:2},
+    {id:'bbc-tech', name:'BBC Tech',    kind:'tech', type:'rss', url:'https://feeds.bbci.co.uk/news/technology/rss.xml', limit:10},
+    {id:'tc',       name:'TechCrunch',  kind:'tech', type:'rss', url:'https://techcrunch.com/feed/', limit:10},
+    {id:'bbc-top',  name:'BBC News',    kind:'top',  type:'rss', url:'https://feeds.bbci.co.uk/news/rss.xml', limit:10},
+  ];
+  // Per-source representation multiplier used when building the deck.
+  const NEWS_BOOST = Object.fromEntries(NEWS_SOURCES.filter(s => s.weight > 1).map(s => [s.name, s.weight]));
+
+  // Public CORS proxies tried in order when fetching RSS (no server of our own).
+  const NEWS_PROXIES = [
+    {name:'allorigins-raw', make:u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u)},
+    {name:'corsproxy',      make:u => 'https://corsproxy.io/?url=' + encodeURIComponent(u)},
+    {name:'codetabs',       make:u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u)},
+    {name:'allorigins-get', make:u => 'https://api.allorigins.win/get?url=' + encodeURIComponent(u),
+                            unwrap:async res => (await res.json()).contents},
+  ];
+  const NEWS_PROXY_KEY = 'tcinema.newsProxy';
+
+  function rememberNewsProxy(idx){
+    try{ localStorage.setItem(NEWS_PROXY_KEY, String(idx)); }catch(e){}
+  }
+  function newsProxyOrder(){
+    const order = NEWS_PROXIES.map((_, i) => i);
+    try{
+      const preferred = parseInt(localStorage.getItem(NEWS_PROXY_KEY) || '', 10);
+      if(!Number.isNaN(preferred) && NEWS_PROXIES[preferred]){
+        order.splice(order.indexOf(preferred), 1);
+        order.unshift(preferred);
+      }
+    }catch(e){}
+    return order;
+  }
+  async function fetchRssText(rssUrl){
+    let lastErr = null;
+    for(const idx of newsProxyOrder()){
+      const p = NEWS_PROXIES[idx];
+      try{
+        const res  = await fetch(p.make(rssUrl), {signal: AbortSignal.timeout(5000), cache:'no-store'});
+        if(!res.ok) throw new Error('HTTP ' + res.status);
+        const text = p.unwrap ? await p.unwrap(res) : await res.text();
+        if(!text || text.trim().length < 50) throw new Error('empty response');
+        rememberNewsProxy(idx);
+        return text;
+      }catch(err){ lastErr = err; }
+    }
+    throw lastErr || new Error('all proxies failed');
+  }
+
+  async function fetchDevto(){
+    // Direct API — our most reliable source. One quick retry on transient
+    // failures (it lands well inside the 25s phase-1 window).
+    let res = null;
+    for(let attempt = 0; attempt < 2; attempt++){
+      try {
+        res = await fetch('https://dev.to/api/articles?per_page=15', {signal: AbortSignal.timeout(8000), cache:'no-store'});
+        if(res.ok) break;
+        res = null;
+      } catch(e){ res = null; }
+      if(attempt === 0) await new Promise(r => setTimeout(r, 1000));
+    }
+    if(!res || !res.ok) throw new Error('dev.to unavailable');
+    const j = await res.json();
+    return (Array.isArray(j) ? j : []).map(a => ({
+      title: cleanNewsTitle(a.title),
+      pubDate: a.published_at || '',
+      link: a.canonical_url || a.url || '',
+      description: (a.description || '').slice(0, 220),
+      image: a.cover_image || '',
+      source: 'Dev.to',
+      feedId: 'devto',
+      kind: 'tech'
+    })).filter(i => i.title);
+  }
+
+  async function fetchSource(src){
+    if(src.type === 'api'){
+      return src.id === 'devto' ? fetchDevto() : [];
+    }
+    const text = await fetchRssText(src.url);
+    const doc  = new DOMParser().parseFromString(text, 'text/xml');
+    if(doc.querySelector('parsererror')) throw new Error('XML parse error (' + src.id + ')');
+    return parseFeedItems(doc, src, src.limit || 10);
+  }
+
+  // Race a batch of source promises against a deadline. Resolves with
+  // whatever has settled so far; late sources keep running in the background
+  // (their underlying promises are shared, so a later call sees them).
+  function settleBatch(tasks, ms){
+    return Promise.all(tasks.map(p =>
+      Promise.race([p, new Promise(res => setTimeout(() => res(null), ms))])
+    ));
+  }
+
+  function poolsFromResults(results){
+    const seen = new Set();
+    const techPool = [];
+    const topPool  = [];
+    results.forEach(res => {
+      if(!res || res.status !== 'ok' || !Array.isArray(res.items)) return;
+      res.items.forEach(item => {
+        const key = normTitleKey(item.title);
+        if(seen.has(key)) return;
+        seen.add(key);
+        (item.kind === 'top' ? topPool : techPool).push(item);
+      });
+    });
+    return {techPool, topPool};
+  }
+
   function timeAgo(dateStr){
     const diff = (Date.now() - new Date(dateStr).getTime()) / 60000;
     if(isNaN(diff) || diff < 0) return '';
@@ -2273,6 +2432,18 @@
     return url;
   }
 
+  function newsPhText(item){
+    return (item.source || 'NEWS').replace(/[^A-Za-z ]/g, '').trim()
+      .split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'N';
+  }
+
+  function addNewsPlaceholder(wrap, item, cls = 'news-ph'){
+    const ph = document.createElement('div');
+    ph.className = cls;
+    ph.textContent = newsPhText(item);
+    wrap.appendChild(ph);
+  }
+
   function restartNewsTimer(){
     clearInterval(newsTimer);
     if(newsPopupOpen) return;
@@ -2294,6 +2465,7 @@
     const desc = document.getElementById('newsPopDesc');
     const time = document.getElementById('newsPopTime');
     const idx  = document.getElementById('newsPopIdx');
+    const src  = document.getElementById('newsPopSource');
     const open = document.getElementById('newsPopOpen');
     if(!pop || !card) return;
 
@@ -2307,7 +2479,10 @@
       img.alt = '';
       img.addEventListener('error', () => { img.src = item.image; });
       imgW.appendChild(img);
+    } else {
+      addNewsPlaceholder(imgW, item);
     }
+    if(src) src.textContent = item.source || 'News';
     if(idx) idx.textContent = String((index ?? newsIdx) + 1).padStart(2, '0');
     if(time) time.textContent = timeAgo(item.pubDate);
     if(title) title.textContent = item.title || '';
@@ -2354,8 +2529,10 @@
         img.src = item.image;
         img.alt = '';
         img.loading = i === 0 ? 'eager' : 'lazy';
-        img.addEventListener('error', () => { img.style.display = 'none'; });
+        img.addEventListener('error', () => { img.remove(); addNewsPlaceholder(imgWrap, item); });
         imgWrap.appendChild(img);
+      } else {
+        addNewsPlaceholder(imgWrap, item);
       }
 
       const copy = document.createElement('div');
@@ -2371,8 +2548,10 @@
         thumbImg.src = item.image;
         thumbImg.alt = '';
         thumbImg.loading = i === 0 ? 'eager' : 'lazy';
-        thumbImg.addEventListener('error', () => { thumb.style.display = 'none'; });
+        thumbImg.addEventListener('error', () => { thumb.innerHTML = ''; addNewsPlaceholder(thumb, item, 'news-thumb-ph'); });
         thumb.appendChild(thumbImg);
+      } else {
+        addNewsPlaceholder(thumb, item, 'news-thumb-ph');
       }
 
       const eyebrow = document.createElement('div');
@@ -2380,7 +2559,7 @@
 
       const eyebrowTitle = document.createElement('span');
       eyebrowTitle.className = 'news-eyebrow-title';
-      eyebrowTitle.textContent = 'BBC News';
+      eyebrowTitle.textContent = item.source || 'News';
 
       const eyebrowSub = document.createElement('span');
       eyebrowSub.className = 'news-eyebrow-sub';
@@ -2439,6 +2618,7 @@
       dots.appendChild(pip);
     });
 
+    setNewsHeaderSource(newsItems[0]?.source);
     restartNewsTimer();
   }
 
@@ -2483,6 +2663,7 @@
       void pips[newsIdx].offsetWidth;
       pips[newsIdx].classList.add('on');
     }
+    setNewsHeaderSource(newsItems[newsIdx]?.source);
     restartNewsTimer();
   }
 
@@ -2496,35 +2677,195 @@
     goToNews(newsIdx + delta);
   }
 
-  async function fetchNews(){
-    const RSS = 'https://feeds.bbci.co.uk/news/rss.xml';
-    try {
-      const res  = await fetch(PROXY + encodeURIComponent(RSS), {signal: AbortSignal.timeout(10000)});
-      if(!res.ok) throw new Error('fetch fail');
-      const text   = await res.text();
-      const parser = new DOMParser();
-      const doc    = parser.parseFromString(text, 'text/xml');
-      const items  = Array.from(doc.querySelectorAll('item')).slice(0, 16);
-      if(!items.length) throw new Error('no items');
-      const parsed = items.map(el => {
-        const title   = decodeRssText(el.querySelector('title')?.textContent);
-        const pubDate = el.querySelector('pubDate')?.textContent?.trim() || '';
-        const description = decodeRssText(el.querySelector('description')?.textContent);
-        let link = '';
-        el.childNodes.forEach(n => { if(n.nodeName === 'link') link = n.textContent?.trim() || ''; });
-        if(!link) link = el.querySelector('guid')?.textContent?.trim() || '';
-        return {title, pubDate, link, description, image: rssThumb(el)};
-      }).filter(i => i.title && !i.title.toLowerCase().includes('bbc'));
+  // Some feeds stuff newlines / bare URLs into <title>; keep the first
+  // line and drop trailing links so the card never shows raw URLs.
+  function cleanNewsTitle(t){
+    let s = (t || '').split(/\r?\n/)[0].trim();
+    s = s.replace(/\s+https?:\/\/\S+.*$/i, '').trim();
+    return s;
+  }
 
-      newsItems = shuffleNews(parsed).slice(0, 12);
+  function parseRssItems(doc, feed, limit = 10){
+    return Array.from(doc.querySelectorAll('item')).slice(0, limit).map(el => {
+      const title   = cleanNewsTitle(decodeRssText(el.querySelector('title')?.textContent));
+      const pubDate = el.querySelector('pubDate')?.textContent?.trim() || '';
+      let description = decodeRssText(el.querySelector('description')?.textContent);
+      let link = '';
+      el.childNodes.forEach(n => { if(n.nodeName === 'link') link = n.textContent?.trim() || ''; });
+      if(!link) link = el.querySelector('guid')?.textContent?.trim() || '';
+      return {title, pubDate, link, description, image: rssThumb(el), source: feed.name, feedId: feed.id, kind: feed.kind};
+    }).filter(i => i.title && i.title.length > 8);
+  }
+
+  // Atom (e.g. The Verge): <entry> elements, <link href="…">, ISO dates,
+  // and the article image embedded in the HTML <content>.
+  function parseAtomItems(doc, feed, limit = 10){
+    return Array.from(doc.querySelectorAll('entry')).slice(0, limit).map(el => {
+      const title   = cleanNewsTitle(decodeRssText(el.querySelector('title')?.textContent));
+      const pubDate = el.querySelector('published')?.textContent?.trim()
+        || el.querySelector('updated')?.textContent?.trim() || '';
+      let link = '';
+      el.querySelectorAll('link').forEach(l => { if(!link) link = l.getAttribute('href') || ''; });
+      if(!link) link = el.querySelector('id')?.textContent?.trim() || '';
+      const description = decodeRssText(el.querySelector('summary')?.textContent || '');
+      let image = '';
+      const mthumb = el.getElementsByTagName('media:thumbnail')[0];
+      if(mthumb?.getAttribute('url')) image = mthumb.getAttribute('url');
+      else {
+        const m = (el.querySelector('content')?.textContent || '').match(/src=["']([^"']+)["']/i);
+        if(m) image = decodeRssText(m[1]);
+      }
+      return {title, pubDate, link, description, image, source: feed.name, feedId: feed.id, kind: feed.kind};
+    }).filter(i => i.title && i.title.length > 8);
+  }
+
+  function parseFeedItems(doc, feed, limit = 10){
+    return doc.querySelector('item') ? parseRssItems(doc, feed, limit) : parseAtomItems(doc, feed, limit);
+  }
+
+  function normTitleKey(t){
+    return t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 60);
+  }
+
+  // ~80% tech/trending, ~20% top stories, interleaved for variety.
+  // Sources with a NEWS_BOOST weight appear multiple times in the weighted
+  // draw, so their stories are picked more often — but never twice.
+  function buildNewsDeck(techPool, topPool){
+    const pick = (pool, count) => {
+      const seen = new Set();
+      const picked = [];
+      const rest   = [];
+      const weighted = shuffleNews(pool.flatMap(i =>
+        Array.from({length: Math.max(1, NEWS_BOOST[i.source] || 1)}, () => i)
+      ));
+      for(const i of weighted){
+        const key = normTitleKey(i.title);
+        if(seen.has(key)) continue;
+        seen.add(key);
+        (picked.length < count ? picked : rest).push(i);
+      }
+      return {picked, rest};
+    };
+    const t = pick(techPool, 10);
+    const g = pick(topPool, 2);
+    const deck = [];
+    let ti = 0, gi = 0;
+    const pattern = ['t','t','t','t','g','t','t','t','t','g','t','t'];
+    for(const kind of pattern){
+      if(kind === 't'){ if(ti < t.picked.length) deck.push(t.picked[ti++]); }
+      else { if(gi < g.picked.length) deck.push(g.picked[gi++]); }
+    }
+    // If a pool was thin, fill the empty slots with leftover stories.
+    for(const i of [...g.rest, ...t.rest]){
+      if(deck.length >= 12) break;
+      deck.push(i);
+    }
+    return deck;
+  }
+
+  function setNewsUpdated(d){
+    const el = document.getElementById('newsUpdated');
+    if(el){
+      el.textContent = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+  }
+
+  function setNewsHeaderSource(name){
+    const el = document.getElementById('newsSourceLabel');
+    if(el && name) el.textContent = name;
+  }
+
+  function clearNewsRetry(){
+    if(newsRetryTimer){ clearTimeout(newsRetryTimer); newsRetryTimer = null; }
+  }
+
+  function scheduleNewsRetry(){
+    clearNewsRetry();
+    // Backoff: 1 min, 2 min, 3 min... capped at 5 min between attempts.
+    const delay = Math.min(60000 * Math.max(newsFailCount, 1), 300000);
+    newsRetryTimer = setTimeout(fetchNews, delay);
+  }
+
+  function renderNewsError(){
+    const container = document.getElementById('newsItems');
+    const dots      = document.getElementById('newsDots');
+    if(!container || !dots) return;
+    container.innerHTML = '';
+    dots.innerHTML      = '';
+    const box = document.createElement('div');
+    box.className = 'news-error';
+    const p = document.createElement('p');
+    p.textContent = newsFailCount > 1
+      ? `News is unavailable after ${newsFailCount} attempts. Retrying automatically…`
+      : 'News is unavailable. Retrying automatically…';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'news-retry-btn';
+    btn.textContent = 'Retry now';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      newsFailCount = 0;
+      clearNewsRetry();
+      fetchNews();
+    });
+    box.append(p, btn);
+    container.appendChild(box);
+  }
+
+  async function fetchNews(){
+    if(newsLoading) return;
+    newsLoading = true;
+    // One fetch per source; the wrapped promises are shared between phases so
+    // nothing is fetched twice.
+    const tasks = NEWS_SOURCES.map(src =>
+      fetchSource(src)
+        .then(items => ({status: 'ok', items}))
+        .catch(err => ({status: 'err', err}))
+    );
+    try {
+      // Phase 1 — render as soon as any source has items (fast path is the
+      // direct APIs, ~1-3s). If nothing arrives quickly, keep waiting for the
+      // proxy-based RSS feeds up to ~25s total.
+      let results = [];
+      for(const ms of [4500, 9000, 15000, 25000]){
+        results = await settleBatch(tasks, ms);
+        const {techPool, topPool} = poolsFromResults(results);
+        if(techPool.length || topPool.length) break;
+      }
+      const {techPool, topPool} = poolsFromResults(results);
+      if(!techPool.length && !topPool.length) throw new Error('no items');
+
+      newsItems = buildNewsDeck(techPool, topPool);
+      const firstSources = new Set(newsItems.map(i => i.source));
+      newsFailCount = 0;
+      clearNewsRetry();
       if(!newsPopupOpen) renderNewsItems();
-      const el = document.getElementById('newsUpdated');
-      if(el){
-        const now = new Date();
-        el.textContent = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+      setNewsUpdated(new Date());
+
+      // Phase 2 — if the deck is single-sourced, top up the mix when the
+      // slower RSS sources land (never more than ~40s after page load).
+      if(firstSources.size < 3){
+        setTimeout(async () => {
+          if(newsLoading || newsPopupOpen) return;
+          const late = await settleBatch(tasks, 15000);
+          const {techPool: t2, topPool: g2} = poolsFromResults(late);
+          if(!t2.length && !g2.length) return;
+          const deck2 = buildNewsDeck(t2, g2);
+          const srcs2 = new Set(deck2.map(i => i.source));
+          if(srcs2.size > firstSources.size || deck2.length > newsItems.length + 1){
+            newsItems = deck2;
+            if(!newsPopupOpen) renderNewsItems();
+          }
+        }, 18000);
       }
     } catch(err){
+      newsFailCount++;
       console.warn('News fetch failed:', err);
+      // If we have a previously loaded deck, keep showing it (stale is better than blank).
+      if(!newsItems.length && !newsPopupOpen) renderNewsError();
+      scheduleNewsRetry();
+    } finally{
+      newsLoading = false;
     }
   }
 
