@@ -1,0 +1,31 @@
+All custom graphics not originating from official PMD games are licensed under Attribution-NonCommercial 4.0 International http://creativecommons.org/licenses/by-nc/4.0/.
+All graphics referred to in this file can be found in http://sprites.pmdcollab.org/
+
+0palite	Discord:<@!327927398941196289>	Contact:https://zeropalart.tumblr.com/
+	Portrait:
+		Charmeleon: Angry,Crying,Determined,Dizzy,Happy,Inspired,Joyous,Normal,Pain,Sad,Shouting,Sigh,Stunned,Surprised,Teary-Eyed,Worried
+		Charizard: Sad,Joyous,Crying,Inspired,Sigh,Shouting,Stunned,Angry,Dizzy,Worried,Determined
+baronessfaron	Discord:<@!544245909639397378>
+	Portrait:
+		Charmander: Special1,Special0
+bwappi	Discord:<@!193530896211509248>	Contact:https://bsky.app/profile/bwappi.bsky.social
+	Sprite:
+		Charmeleon: Eat,Pose,Pull,Pain,DeepBreath,Nod,Sink,Trip,Head,LostBalance,HitGround,Faint
+CHUNSOFT	Discord:<@!CHUNSOFT>	Contact:https://www.spike-chunsoft.com/
+	Portrait:
+		Charmander: Angry,Crying,Determined,Dizzy,Happy,Inspired,Joyous,Normal,Pain,Sad,Shouting,Sigh,Stunned,Surprised,Teary-Eyed,Worried,Special2,Special3
+		Charmeleon: Normal
+		Charizard: Normal,Happy,Pain,Surprised,Teary-Eyed,Special0
+	Sprite:
+		Charmander: Walk,Attack,Kick,Shoot,Strike,Sleep,Hurt,Idle,Swing,Double,Hop,Charge,Rotate,EventSleep,Wake,Eat,Tumble,Pose,Pull,Pain,Float,DeepBreath,Nod,Sit,LookUp,Sink,Trip,Laying,LeapForth,Head,Cringe,LostBalance,TumbleBack,Faint,HitGround
+		Charmeleon: Attack,Charge,Double,Hop,Hurt,Idle,Rotate,Shoot,Sleep,Strike,Swing,Walk
+		Charizard: Attack,Charge,Double,Hop,Hurt,Idle,Rotate,Shoot,Sleep,Strike,Swing,Walk
+Discord:<@!199989579682414592>
+	Sprite:
+		Charmeleon: Cringe,DeepBreath,Double,Eat,EventSleep,Faint,Float,Head,HitGround,Laying,LeapForth,LookUp,LostBalance,Nod,Pain,Pose,Pull,Sink,Sit,Trip,Tumble,TumbleBack,Wake
+Emboarger	Discord:<@!237286997645983744>
+	Sprite:
+		Charizard: Charge,Double,Faint,Hop,Hurt,Rotate,Shoot,Sleep,Strike,Swing
+Grimlin	Discord:<@!217653022094786560>	Contact:https://twitter.com/Griimlin
+	Sprite:
+		Charmeleon: EventSleep,Wake,Eat,Tumble,Pose,Float,Nod,Sit,LookUp,Laying,LeapForth,Cringe,TumbleBack,Trip,HitGround,Faint

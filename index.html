@@ -577,6 +577,20 @@
       filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.25));
     }
 
+    .avatar-panel[data-weather="evolve"] #avatarCanvas {
+      filter: drop-shadow(0 0 14px rgba(29, 185, 84, 0.65));
+    }
+
+    .avatar-stage.evolving {
+      animation:evolveFlash .55s ease-out 3;
+    }
+
+    @keyframes evolveFlash {
+      0%   { box-shadow: inset 0 0 0 0 rgba(29, 185, 84, 0); }
+      35%  { box-shadow: inset 0 0 34px 8px rgba(29, 185, 84, 0.45); }
+      100% { box-shadow: inset 0 0 0 0 rgba(29, 185, 84, 0); }
+    }
+
     @media (max-width:1100px){
       .avatar-panel{flex-basis:170px;min-height:210px;}
       .avatar-sprite,#avatarCanvas{width:130px;height:130px;}
@@ -1879,9 +1893,14 @@
         <div class="news-dots" id="newsDots"></div>
       </div>
 
+      <!--
+        Avatar sprite art: PMDCollab — https://sprites.pmdcollab.org
+        License: CC BY-NC 4.0 (https://creativecommons.org/licenses/by-nc/4.0/)
+        Credit file: credits_red.txt
+      -->
       <aside class="avatar-panel" id="avatarPanel" data-mood="cute" data-speed="parked">
         <div class="avatar-panel-head">
-          <span>Companion</span>
+          <span>Companion · <span id="avatarFormLabel">Form 1</span></span>
           <span class="avatar-head-dot" id="avatarGpsDot"></span>
         </div>
 
@@ -3277,7 +3296,14 @@
   </script>
 
   <script>
-  /* ── AVATAR COMPANION — SPRITE REPLACEMENT — REAL FILENAMES ── */
+  /* ── AVATAR COMPANION — MULTI-FORM SPRITE ENGINE ──
+     Sprite art: PMDCollab (sprites.pmdcollab.org), CC BY-NC 4.0 — credits_red.txt
+
+     The avatar evolves with the distance driven this page session:
+       Form 1 (red1): 0–10 mi    Form 2 (red2): 10–20 mi    Form 3 (red3): 20+ mi
+     Each form folder keeps its own sprites + AnimData XML. The metadata below
+     mirrors those XML files so the page animates without fetching them.
+  */
   (function(){
     const avatarPanel = document.getElementById('avatarPanel');
     const canvas = document.getElementById('avatarCanvas');
@@ -3287,140 +3313,147 @@
     const moodLabel = document.getElementById('avatarMoodLabel');
     const infoLabel = document.getElementById('avatarInfo');
     const gpsDot = document.getElementById('avatarGpsDot');
+    const stage = document.getElementById('avatarStage');
+    const formLabel = document.getElementById('avatarFormLabel');
 
-    /* ── ASSET FOLDER ──
-       If your PNGs are in the same folder as ffff.html, keep:
-         const ASSET_BASE = '';
-       If they are inside /images, use:
-         const ASSET_BASE = 'images/';
-    */
-    const ASSET_BASE = 'images/';
+    /* ── FORMS ── */
+    const FORMS = [
+      { id:'red1', label:'Form 1', dir:'images/red1/', suffix:'' },
+      { id:'red2', label:'Form 2', dir:'images/red2/', suffix:'_red2' },
+      { id:'red3', label:'Form 3', dir:'images/red3/', suffix:'_red3' }
+    ];
+    const FORM_AT_MILES     = [0, 10, 20]; // form i starts at this many miles
+    const KM_PER_MILE       = 1.609344;
+    const PREFETCH_AHEAD_MI = 2;           // start loading the next form this close
 
-    const ANIM_META = [
-      { name:'Walk',         index:0,  w:32, h:32, d:[6,8,6,8] },
-      { name:'Attack',       index:1,  w:64, h:64, d:[2,2,4,2,2,2,2,2,2,2,2] },
-      { name:'Kick',         index:2,  w:56, h:56, d:[2,6,2,4,2,2,2,2,2,2,2] },
-      { name:'Shoot',        index:3,  w:32, h:40, d:[2,2,2,2,2,2,2,2,2,2], copyOf:'Charge' },
-      { name:'Strike',       index:4,  w:56, h:56, d:[2,6,2,4,2,2,2,2,2,2] },
-      { name:'Sleep',        index:5,  w:32, h:24, d:[30,35] },
-      { name:'Hurt',         index:6,  w:48, h:56, d:[2,8] },
-      { name:'Idle',         index:7,  w:32, h:40, d:[12,8,8,8] },
-      { name:'Swing',        index:8,  w:72, h:80, d:[2,1,2,2,3,2,2,1,1] },
-      { name:'Double',       index:9,  w:56, h:56, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
-      { name:'Hop',          index:10, w:32, h:88, d:[2,1,2,3,4,4,3,2,1,2] },
-      { name:'Charge',       index:11, w:32, h:40, d:[2,2,2,2,2,2,2,2,2,2] },
-      { name:'Rotate',       index:12, w:24, h:32, d:[2,2,2,2,2,2,2,2,2] },
-      { name:'EventSleep',   index:13, w:24, h:24, d:[30,35] },
-      { name:'Wake',         index:14, w:40, h:32, d:[8,6,14,4,10] },
-      { name:'Eat',          index:15, w:24, h:32, d:[6,8,6,8] },
-      { name:'Tumble',       index:16, w:24, h:32, d:[3,3,3,3,3,3,3,3] },
-      { name:'Pose',         index:17, w:32, h:40, d:[12,2,8] },
-      { name:'Pull',         index:18, w:40, h:40, d:[10,12,10,12,10,12,10] },
-      { name:'Pain',         index:19, w:40, h:40, d:[4,1,1,1,2,1,4,2,2,2,2,2] },
-      { name:'Float',        index:20, w:24, h:32, d:[9,18,9,14] },
-      { name:'DeepBreath',   index:21, w:24, h:32, d:[12,6,6,6,6,6,6,10,4] },
-      { name:'Nod',          index:22, w:24, h:40, d:[6,8,6] },
-      { name:'Sit',          index:23, w:24, h:32, d:[8,8,8] },
-      { name:'LookUp',       index:24, w:24, h:32, d:[6,6] },
-      { name:'Sink',         index:25, w:24, h:32, d:[6,6,6,6,6,6,6,6,6,6,6] },
-      { name:'Trip',         index:26, w:40, h:32, d:[4,6,4,4,4] },
-      { name:'Laying',       index:27, w:24, h:24, d:[12] },
-      { name:'LeapForth',    index:28, w:24, h:80, d:[6,1,1,2,2,2] },
-      { name:'Head',         index:29, w:24, h:40, d:[4] },
-      { name:'Cringe',       index:30, w:32, h:56, d:[2,8] },
-      { name:'LostBalance',  index:31, w:24, h:32, d:[8,8] },
-      { name:'TumbleBack',   index:32, w:24, h:32, d:[3,3,3,3,3,3,3,3,3,3] },
-      { name:'Faint',        index:33, w:32, h:32, d:[8,12,4,10] },
-      { name:'HitGround',    index:34, w:40, h:32, d:[4,4,4,4,4,6,4,4] }
+    /* Animation metadata per form (mirrors each folder's AnimData*.xml). */
+    const FORM_META = [
+      [ /* red1 */
+        { name:'Walk',         index:0,  w:32, h:32, d:[6,8,6,8] },
+        { name:'Attack',       index:1,  w:64, h:64, d:[2,2,4,2,2,2,2,2,2,2,2] },
+        { name:'Kick',         index:2,  w:56, h:56, d:[2,6,2,4,2,2,2,2,2,2,2] },
+        { name:'Shoot',        index:3,  w:32, h:40, d:[2,2,2,2,2,2,2,2,2,2], copyOf:'Charge' },
+        { name:'Strike',       index:4,  w:56, h:56, d:[2,6,2,4,2,2,2,2,2,2] },
+        { name:'Sleep',        index:5,  w:32, h:24, d:[30,35] },
+        { name:'Hurt',         index:6,  w:48, h:56, d:[2,8] },
+        { name:'Idle',         index:7,  w:32, h:40, d:[12,8,8,8] },
+        { name:'Swing',        index:8,  w:72, h:80, d:[2,1,2,2,3,2,2,1,1] },
+        { name:'Double',       index:9,  w:56, h:56, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
+        { name:'Hop',          index:10, w:32, h:88, d:[2,1,2,3,4,4,3,2,1,2] },
+        { name:'Charge',       index:11, w:32, h:40, d:[2,2,2,2,2,2,2,2,2,2] },
+        { name:'Rotate',       index:12, w:24, h:32, d:[2,2,2,2,2,2,2,2,2] },
+        { name:'EventSleep',   index:13, w:24, h:24, d:[30,35] },
+        { name:'Wake',         index:14, w:40, h:32, d:[8,6,14,4,10] },
+        { name:'Eat',          index:15, w:24, h:32, d:[6,8,6,8] },
+        { name:'Tumble',       index:16, w:24, h:32, d:[3,3,3,3,3,3,3,3] },
+        { name:'Pose',         index:17, w:32, h:40, d:[12,2,8] },
+        { name:'Pull',         index:18, w:40, h:40, d:[10,12,10,12,10,12,10] },
+        { name:'Pain',         index:19, w:40, h:40, d:[4,1,1,1,2,1,4,2,2,2,2,2] },
+        { name:'Float',        index:20, w:24, h:32, d:[9,18,9,14] },
+        { name:'DeepBreath',   index:21, w:24, h:32, d:[12,6,6,6,6,6,6,10,4] },
+        { name:'Nod',          index:22, w:24, h:40, d:[6,8,6] },
+        { name:'Sit',          index:23, w:24, h:32, d:[8,8,8] },
+        { name:'LookUp',       index:24, w:24, h:32, d:[6,6] },
+        { name:'Sink',         index:25, w:24, h:32, d:[6,6,6,6,6,6,6,6,6,6,6] },
+        { name:'Trip',         index:26, w:40, h:32, d:[4,6,4,4,4] },
+        { name:'Laying',       index:27, w:24, h:24, d:[12] },
+        { name:'LeapForth',    index:28, w:24, h:80, d:[6,1,1,2,2,2] },
+        { name:'Head',         index:29, w:24, h:40, d:[4] },
+        { name:'Cringe',       index:30, w:32, h:56, d:[2,8] },
+        { name:'LostBalance',  index:31, w:24, h:32, d:[8,8] },
+        { name:'TumbleBack',   index:32, w:24, h:32, d:[3,3,3,3,3,3,3,3,3,3] },
+        { name:'Faint',        index:33, w:32, h:32, d:[8,12,4,10] },
+        { name:'HitGround',    index:34, w:40, h:32, d:[4,4,4,4,4,6,4,4] }
+      ],
+      [ /* red2 */
+        { name:'Walk',         index:0,  w:24, h:32, d:[8,10,8,10] },
+        { name:'Attack',       index:1,  w:72, h:80, d:[2,2,2,2,4,1,1,2,2,2,2,2,2,2] },
+        { name:'Strike',       index:2,  w:64, h:72, d:[2,2,6,1,2,2,2,2,2,2,2,2,2,2] },
+        { name:'Shoot',        index:3,  w:48, h:48, d:[2,2,4,1,1,2,2,2,2,2,2,2] },
+        { name:'SpAttack',     index:4,  w:48, h:48, d:[2,2,4,1,1,2,2,2,2,2,2,2], copyOf:'Shoot' },
+        { name:'Sleep',        index:5,  w:24, h:32, d:[30,35] },
+        { name:'Hurt',         index:6,  w:48, h:64, d:[2,8] },
+        { name:'Idle',         index:7,  w:32, h:56, d:[40,2,3,3,3,2] },
+        { name:'Swing',        index:8,  w:80, h:88, d:[2,1,2,2,3,2,2,1,1] },
+        { name:'Double',       index:9,  w:64, h:64, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
+        { name:'Hop',          index:10, w:40, h:88, d:[2,1,2,3,4,4,3,2,1,2] },
+        { name:'Charge',       index:11, w:32, h:48, d:[2,2,2,2,2,2,2,2,2,2] },
+        { name:'Rotate',       index:12, w:24, h:32, d:[2,2,2,2,2,2,2,2,2] },
+        { name:'EventSleep',   index:13, w:32, h:24, d:[30,35] },
+        { name:'Wake',         index:14, w:40, h:32, d:[8,6,8,8,10] },
+        { name:'Eat',          index:15, w:24, h:32, d:[6,8,6,8] },
+        { name:'Tumble',       index:16, w:24, h:32, d:[3,3,3,3,3,3,3,3] },
+        { name:'Pose',         index:17, w:24, h:40, d:[12,2,8] },
+        { name:'Pull',         index:18, w:40, h:48, d:[10,12,10,12,10,12,10] },
+        { name:'Pain',         index:19, w:40, h:48, d:[4,1,1,1,2,1,4,2,2,2,2,2] },
+        { name:'Float',        index:20, w:32, h:24, d:[9,18,9,14] },
+        { name:'DeepBreath',   index:21, w:24, h:40, d:[12,6,6,6,6,6,6,10,4] },
+        { name:'Nod',          index:22, w:32, h:40, d:[6,8,6] },
+        { name:'Sit',          index:23, w:32, h:32, d:[8,8,8] },
+        { name:'LookUp',       index:24, w:24, h:32, d:[6,6] },
+        { name:'Sink',         index:25, w:24, h:40, d:[6,6,6,6,6,6,6,6,6,6,6] },
+        { name:'Trip',         index:26, w:48, h:32, d:[4,6,4,4,4] },
+        { name:'Laying',       index:27, w:32, h:16, d:[12] },
+        { name:'LeapForth',    index:28, w:24, h:96, d:[6,1,1,2,2,2] },
+        { name:'Head',         index:29, w:24, h:40, d:[4] },
+        { name:'Cringe',       index:30, w:24, h:64, d:[2,8] },
+        { name:'LostBalance',  index:31, w:24, h:40, d:[8,8] },
+        { name:'TumbleBack',   index:32, w:24, h:32, d:[3,3,3,3,3,3,3,3,3,3] },
+        { name:'Faint',        index:33, w:40, h:32, d:[8,12,4,10] },
+        { name:'HitGround',    index:34, w:48, h:40, d:[4,4,4,4,4,6,4,4] }
+      ],
+      [ /* red3 */
+        { name:'Walk',         index:0,  w:40, h:48, d:[8,10,8,10] },
+        { name:'Attack',       index:1,  w:80, h:88, d:[2,2,2,2,4,1,1,2,2,2,2,2,2,2] },
+        { name:'Strike',       index:2,  w:72, h:80, d:[2,2,6,1,2,2,2,2,2,2,2,2,2,2] },
+        { name:'Shoot',        index:3,  w:56, h:56, d:[4,6,2,2,2,2,2,2,2,2,2] },
+        { name:'SpAttack',     index:4,  w:56, h:56, d:[4,6,2,2,2,2,2,2,2,2,2], copyOf:'Shoot' },
+        { name:'Sleep',        index:5,  w:32, h:48, d:[30,35] },
+        { name:'Hurt',         index:6,  w:64, h:64, d:[2,8] },
+        { name:'Idle',         index:7,  w:40, h:48, d:[15,15,15,15] },
+        { name:'Swing',        index:8,  w:88, h:96, d:[2,1,2,2,3,2,2,1,1] },
+        { name:'Double',       index:9,  w:64, h:72, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
+        { name:'Hop',          index:10, w:48, h:96, d:[2,1,2,3,4,4,3,2,1,2] },
+        { name:'Charge',       index:11, w:48, h:48, d:[2,2,2,2,2,2,2,2,2,2] },
+        { name:'Rotate',       index:12, w:40, h:48, d:[2,2,2,2,2,2,2,2,2] },
+        { name:'Faint',        index:33, w:48, h:48, d:[8,12,4,10] }
+      ]
     ];
 
-    const ANIM_FILES = {
-      Attack: { anim:'Attack-Anim.png', shadow:'Attack-Shadow.png', offsets:'Attack-Offsets.png' },
-      Charge: { anim:'Charge-Anim.png', shadow:'Charge-Shadow.png', offsets:'Charge-Offsets.png' },
-      Cringe: { anim:'Cringe-Anim.png', shadow:'Cringe-Shadow.png', offsets:'Cringe-Offsets.png' },
-      DeepBreath: { anim:'DeepBreath-Anim.png', shadow:'DeepBreath-Shadow.png', offsets:'DeepBreath-Offsets.png' },
-      Double: { anim:'Double-Anim.png', shadow:'Double-Shadow.png', offsets:'Double-Offsets.png' },
-      Eat: { anim:'Eat-Anim.png', shadow:'Eat-Shadow.png', offsets:'Eat-Offsets.png' },
-      EventSleep: { anim:'EventSleep-Anim.png', shadow:'EventSleep-Shadow.png', offsets:'EventSleep-Offsets.png' },
-      Faint: { anim:'Faint-Anim.png', shadow:'Faint-Shadow.png', offsets:'Faint-Offsets.png' },
-      Float: { anim:'Float-Anim.png', shadow:'Float-Shadow.png', offsets:'Float-Offsets.png' },
-      Head: { anim:'Head-Anim.png', shadow:'Head-Shadow.png', offsets:'Head-Offsets.png' },
-      HitGround: { anim:'HitGround-Anim.png', shadow:'HitGround-Shadow.png', offsets:'HitGround-Offsets.png' },
-      Hop: { anim:'Hop-Anim.png', shadow:'Hop-Shadow.png', offsets:'Hop-Offsets.png' },
-      Hurt: { anim:'Hurt-Anim.png', shadow:'Hurt-Shadow.png', offsets:'Hurt-Offsets.png' },
-      Idle: { anim:'Idle-Anim.png', shadow:'Idle-Shadow.png', offsets:'Idle-Offsets.png' },
-      Kick: { anim:'Kick-Anim.png', shadow:'Kick-Shadow.png', offsets:'Kick-Offsets.png' },
-      Laying: { anim:'Laying-Anim.png', shadow:'Laying-Shadow.png', offsets:'Laying-Offsets.png' },
-      LeapForth: { anim:'LeapForth-Anim.png', shadow:'LeapForth-Shadow.png', offsets:'LeapForth-Offsets.png' },
-      LookUp: { anim:'LookUp-Anim.png', shadow:'LookUp-Shadow.png', offsets:'LookUp-Offsets.png' },
-      LostBalance: { anim:'LostBalance-Anim.png', shadow:'LostBalance-Shadow.png', offsets:'LostBalance-Offsets.png' },
-      Nod: { anim:'Nod-Anim.png', shadow:'Nod-Shadow.png', offsets:'Nod-Offsets.png' },
-      Pain: { anim:'Pain-Anim.png', shadow:'Pain-Shadow.png', offsets:'Pain-Offsets.png' },
-      Pose: { anim:'Pose-Anim.png', shadow:'Pose-Shadow.png', offsets:'Pose-Offsets.png' },
-      Pull: { anim:'Pull-Anim.png', shadow:'Pull-Shadow.png', offsets:'Pull-Offsets.png' },
-      Rotate: { anim:'Rotate-Anim.png', shadow:'Rotate-Shadow.png', offsets:'Rotate-Offsets.png' },
-      Sink: { anim:'Sink-Anim.png', shadow:'Sink-Shadow.png', offsets:'Sink-Offsets.png' },
-      Sit: { anim:'Sit-Anim.png', shadow:'Sit-Shadow.png', offsets:'Sit-Offsets.png' },
-      Sleep: { anim:'Sleep-Anim.png', shadow:'Sleep-Shadow.png', offsets:'Sleep-Offsets.png' },
-      Strike: { anim:'Strike-Anim.png', shadow:'Strike-Shadow.png', offsets:'Strike-Offsets.png' },
-      Swing: { anim:'Swing-Anim.png', shadow:'Swing-Shadow.png', offsets:'Swing-Offsets.png' },
-      Trip: { anim:'Trip-Anim.png', shadow:'Trip-Shadow.png', offsets:'Trip-Offsets.png' },
-      Tumble: { anim:'Tumble-Anim.png', shadow:'Tumble-Shadow.png', offsets:'Tumble-Offsets.png' },
-      TumbleBack: { anim:'TumbleBack-Anim.png', shadow:'TumbleBack-Shadow.png', offsets:'TumbleBack-Offsets.png' },
-      Wake: { anim:'Wake-Anim.png', shadow:'Wake-Shadow.png', offsets:'Wake-Offsets.png' },
-      Walk: { anim:'Walk-Anim.png', shadow:'Walk-Shadow.png', offsets:'Walk-Offsets.png' }
+    /* Anim names a form may lack → what to play instead. */
+    const ANIM_FALLBACKS = {
+      Kick:'Attack', SpAttack:'Shoot',
+      Trip:'Idle', Sit:'Idle', DeepBreath:'Idle', EventSleep:'Sleep',
+      Laying:'Sleep', Wake:'Idle', Tumble:'Idle', TumbleBack:'Idle',
+      HitGround:'Idle', Head:'Idle', Nod:'Idle', Pose:'Idle', Pull:'Idle',
+      Pain:'Hurt', Float:'Idle', Cringe:'Idle', LostBalance:'Idle',
+      LookUp:'Idle', Sink:'Idle', LeapForth:'Idle', Eat:'Idle'
     };
 
-    const META_BY_NAME = Object.fromEntries(ANIM_META.map(m => [m.name, m]));
+    /* Speed smoothing + GPS gating */
+    const MAX_KMH          = 220;   // faster than this ⇒ GPS spike, discard
+    const MIN_MOVE_KM      = 0.006; // under ~6 m ⇒ jitter, don't count distance
+    const TAU_UP           = 3;     // s — how fast smoothed speed chases rises
+    const TAU_DOWN         = 5;     // s — how fast it chases falls
+    const ANIM_DEBOUNCE_MS = 1200;  // a mood change must hold this long before it plays
 
-    const images = { anim:{}, shadow:{}, offsets:{} };
-    const pending = { anim:new Map(), shadow:new Map(), offsets:new Map() };
-    const offsetCache = new Map();
+    /* Hidden test hooks: ?test_miles=12 & test_speed=120 */
+    const urlParams  = new URLSearchParams(location.search);
+    const TEST_MILES = parseFloat(urlParams.get('test_miles'));
+    const TEST_SPEED = parseFloat(urlParams.get('test_speed'));
+    const TEST_MODE  = !Number.isNaN(TEST_SPEED);
 
-    const OFFSET_MODE = 'anchor';
-
-    function filesFor(meta){
-      const key = meta.copyOf || meta.name;
-      return ANIM_FILES[key] || {
-        anim: `${key}-Anim.png`,
-        shadow: `${key}-Shadow.png`,
-        offsets: `${key}-Offsets.png`
-      };
-    }
-
-    function loadImage(kind, key, url){
-      const store = images[kind];
-      const queue = pending[kind];
-
-      if (Object.prototype.hasOwnProperty.call(store, key)) {
-        return Promise.resolve(store[key]);
-      }
-
-      if (queue.has(key)) {
-        return queue.get(key);
-      }
-
-      const promise = new Promise(resolve => {
-        const img = new Image();
-
-        img.onload = () => {
-          store[key] = img;
-          queue.delete(key);
-          resolve(img);
-        };
-
-        img.onerror = () => {
-          store[key] = null;
-          queue.delete(key);
-          resolve(null);
-        };
-
-        img.src = url;
-      });
-
-      queue.set(key, promise);
-      return promise;
-    }
+    /* Per-form runtime state */
+    const forms = FORMS.map((f, i) => ({
+      ...f,
+      metaList: FORM_META[i],
+      metaBy: Object.fromEntries(FORM_META[i].map(m => [m.name, m])),
+      images: { anim:{}, shadow:{}, offsets:{} },
+      pending: { anim:new Map(), shadow:new Map(), offsets:new Map() },
+      offsetCache: new Map(),
+      ready: false,
+      loadPromise: null
+    }));
 
     const state = {
       hasFix: false,
@@ -3428,13 +3461,22 @@
       last: null,
       smoothSpeed: 0,
       lastMove: 0,
-      weather: null
+      weather: null,
+      totalMiles: Number.isFinite(TEST_MILES) ? TEST_MILES : 0
     };
 
+    let formIdx = formIndexForMiles(state.totalMiles);
+    let evolveTarget = -1;      // form we're loading/transitioning into
+    let evolveAnimName = 'Idle';
+    let evolveUntil = 0;        // until this timestamp the evolve animation plays
+    let speedClassState = 'parked';
+    let pendingAnim = null;     // {name, since} — animation-change debounce
     let current = { name: 'Idle', loop: true };
     let frame = 0;
     let frameTime = 0;
     let lastTs = 0;
+
+    const OFFSET_MODE = 'anchor';
 
     function clamp(n, min, max){
       return Math.min(Math.max(Number(n) || 0, min), max);
@@ -3452,6 +3494,13 @@
       return 2 * R * Math.asin(Math.sqrt(a));
     }
 
+    function formIndexForMiles(mi){
+      for(let i = forms.length - 1; i >= 0; i--){
+        if (mi >= FORM_AT_MILES[i]) return i;
+      }
+      return 0;
+    }
+
     function weatherCategory(code){
       code = Number(code) || 0;
       if ([0, 1].includes(code)) return 'clear';
@@ -3465,10 +3514,17 @@
       return 'unknown';
     }
 
-    function speedClass(speed){
-      if (speed < 5) return 'parked';
-      if (speed >= 100) return 'fast';
-      return 'moving';
+    /* Hysteresis so GPS jitter at a boundary can't flip the class back and forth. */
+    function updateSpeedClass(speed){
+      if (speedClassState === 'parked') {
+        if (speed > 6) speedClassState = 'moving';
+      } else if (speedClassState === 'moving') {
+        if (speed >= 100) speedClassState = 'fast';
+        else if (speed < 3) speedClassState = 'parked';
+      } else if (speed < 92) {
+        speedClassState = 'moving';
+      }
+      return speedClassState;
     }
 
     function speedGlowAmount(speed){
@@ -3481,14 +3537,12 @@
       if (state.weather && Number.isFinite(state.weather.isDay)) {
         return Number(state.weather.isDay) === 0;
       }
-
       const hour = new Date().getHours();
       return hour >= 19 || hour < 6;
     }
 
     function weatherText(){
       if (!state.weather) return 'waiting for GPS weather';
-
       const labels = {
         clear: 'clear',
         partly: 'partly cloudy',
@@ -3500,44 +3554,67 @@
         storm: 'storm',
         unknown: 'unknown'
       };
-
       const cat = weatherCategory(state.weather.code);
       const night = Number(state.weather.isDay) === 0 ? ' night' : '';
       return `${Math.round(state.weather.tempC || 0)}°C ${labels[cat] || 'unknown'}${night}`;
     }
 
-    function metaFor(name){
-      let base = META_BY_NAME[name] || META_BY_NAME['Idle'] || ANIM_META[0];
+    function milesInfo(){
+      const mi = state.totalMiles;
+      const lastIdx = forms.length - 1;
+      if (formIdx >= lastIdx) return mi.toFixed(1) + ' mi total';
+      const rem = Math.max(0, FORM_AT_MILES[formIdx + 1] - mi);
+      return rem.toFixed(1) + ' mi to ' + FORMS[formIdx + 1].label;
+    }
 
-      if (base.copyOf) {
-        const copy = META_BY_NAME[base.copyOf];
-        if (copy) return { ...copy, name: base.name, copyOf: base.copyOf };
+    /* ── ANIMATION LOOKUP ── */
+    function animNameInForm(f, name){
+      if (f.metaBy[name]) return name;
+      const fb = ANIM_FALLBACKS[name];
+      if (fb && f.metaBy[fb]) return fb;
+      if (f.metaBy['Idle']) return 'Idle';
+      return f.metaList[0].name;
+    }
+
+    function resolveAnim(f, name){
+      const m = f.metaBy[animNameInForm(f, name)];
+      if (m && m.copyOf) {
+        const c = f.metaBy[m.copyOf];
+        if (c) return { ...c, name: m.name, copyOf: m.copyOf };
       }
-
-      return base;
+      return m;
     }
 
     function playAnim(name, loop = true){
-      if (!META_BY_NAME[name]) name = 'Idle';
-
-      if (current.name === name && current.loop === loop) return;
-
-      current = { name, loop };
+      const real = animNameInForm(forms[formIdx], name);
+      if (current.name === real && current.loop === loop) return;
+      current = { name: real, loop };
       frame = 0;
       frameTime = 0;
+      avatarPanel.dataset.anim = real.toLowerCase();
+      avatarPanel.dataset.mood = real.toLowerCase();
+    }
 
-      avatarPanel.dataset.anim = name.toLowerCase();
-      avatarPanel.dataset.mood = name.toLowerCase();
+    /* Debounced mood switching — brief state flaps never reach the canvas. */
+    function requestAnim(name){
+      const real = animNameInForm(forms[formIdx], name);
+      if (current.name === real) return;
+      const now = Date.now();
+      if (pendingAnim && pendingAnim.name === real) return;
+      pendingAnim = { name: real, since: now };
+      setTimeout(() => {
+        if (!pendingAnim || pendingAnim.name !== real) return;
+        pendingAnim = null;
+        playAnim(real);
+      }, ANIM_DEBOUNCE_MS);
     }
 
     function chooseAnimation(){
-      const speed = Math.max(0, state.smoothSpeed);
       const cat = state.weather ? weatherCategory(state.weather.code) : 'unknown';
       const night = isNightNow();
 
-      const parked = speed < 5;
-      const moving = !parked && speed < 100;
-      const fast = speed >= 100;
+      const parked = speedClassState === 'parked';
+      const fast = speedClassState === 'fast';
 
       if (night) {
         if (parked) {
@@ -3589,29 +3666,74 @@
         return { name: 'Charge', label: 'Fast Charge', cat, night };
       }
 
-      if (moving) {
+      if (!parked) {
         return { name: 'Walk', label: 'Walking', cat, night };
       }
 
       return { name: 'Idle', label: 'Idle', cat, night };
     }
 
-    function updateAvatar(){
-      const chosen = chooseAnimation();
+    function checkPrefetch(){
+      if (formIdx + 1 < forms.length &&
+          state.totalMiles >= FORM_AT_MILES[formIdx + 1] - PREFETCH_AHEAD_MI &&
+          !forms[formIdx + 1].loadPromise) {
+        loadForm(formIdx + 1);
+      }
+    }
 
-      playAnim(chosen.name);
+    /* Evolution: cross a distance threshold → flash + brief transition anim. */
+    function startEvolution(target){
+      if (evolveTarget !== -1) return;
+      evolveTarget = target;
+      if (moodLabel) moodLabel.textContent = 'Evolving…';
+      loadForm(target).then(() => {
+        formIdx = target;
+        evolveAnimName = ['Wake','Tumble','Hop','Idle'].find(n => forms[target].metaBy[n]) || 'Idle';
+        evolveUntil = Date.now() + 1600;
+        playAnim(evolveAnimName, true);
+        if (stage) {
+          stage.classList.remove('evolving');
+          void stage.offsetWidth;
+          stage.classList.add('evolving');
+        }
+        setTimeout(() => {
+          evolveTarget = -1;
+          pendingAnim = null;
+          const again = formIndexForMiles(state.totalMiles);
+          if (again !== formIdx) startEvolution(again);
+          else updateAvatar();
+        }, 1700);
+        updateAvatar();
+      });
+    }
+
+    function updateAvatar(){
+      const target = formIndexForMiles(state.totalMiles);
+      if (target !== formIdx) startEvolution(target);
+
+      speedClassState = updateSpeedClass(state.smoothSpeed);
+      checkPrefetch();
+
+      const evolving = Date.now() < evolveUntil;
+      let chosen;
+      if (evolving) {
+        chosen = { name: evolveAnimName, label: 'Evolving → ' + FORMS[formIdx].label, cat: 'unknown', night: isNightNow() };
+      } else {
+        chosen = chooseAnimation();
+        requestAnim(chosen.name);
+      }
 
       if (moodLabel) moodLabel.textContent = chosen.label;
       if (infoLabel) {
         infoLabel.textContent =
-          `${Math.round(Math.max(0, state.smoothSpeed))} km/h · ${weatherText()}`;
+          Math.round(Math.max(0, state.smoothSpeed)) + ' km/h · ' + weatherText() + ' · ' + milesInfo();
       }
-
       if (gpsDot) gpsDot.classList.toggle('ok', state.gpsOk);
 
-      avatarPanel.dataset.speed = speedClass(state.smoothSpeed);
-      avatarPanel.dataset.weather = chosen.cat || 'unknown';
+      avatarPanel.dataset.speed = speedClassState;
+      avatarPanel.dataset.weather = evolving ? 'evolve' : (chosen.cat || 'unknown');
       avatarPanel.dataset.time = chosen.night ? 'night' : 'day';
+      if (formLabel) formLabel.textContent = FORMS[formIdx].label;
 
       document.body.style.setProperty(
         '--speed-glow',
@@ -3663,22 +3785,35 @@
       state.gpsOk = true;
 
       if (state.last) {
-        const dt = Math.max((now - state.last.t) / 1000, 0.75);
+        const dtSec  = (now - state.last.t) / 1000;
         const distKm = haversineKm(state.last.lat, state.last.lon, c.latitude, c.longitude);
 
-        let raw = (distKm / dt) * 3600;
-
-        if (Number.isFinite(c.speed) && c.speed >= 0) {
-          raw = Math.max(raw, c.speed * 3.6);
+        // Accumulate session distance (jitter + spike gated).
+        if (dtSec >= 0.25 && distKm >= MIN_MOVE_KM) {
+          const implied = (distKm / dtSec) * 3600;
+          if (implied <= MAX_KMH) state.totalMiles += distKm / KM_PER_MILE;
         }
 
-        if (distKm > 3 && dt < 10) raw = 0;
-        if (raw < 1) raw = 0;
+        // Smoothed speed: time-constant EMA over a gated raw speed.
+        if (dtSec >= 0.5) {
+          const distSpeed = (distKm / dtSec) * 3600;
+          const devSpeed  = (Number.isFinite(c.speed) && c.speed >= 0) ? c.speed * 3.6 : null;
 
-        const alpha = 0.3;
-        state.smoothSpeed = state.smoothSpeed * (1 - alpha) + raw * alpha;
+          let raw;
+          if (devSpeed !== null && devSpeed <= MAX_KMH) raw = devSpeed;
+          else if (distSpeed <= MAX_KMH) raw = distSpeed;
+          else raw = 0;
 
-        if (raw > 0) state.lastMove = now;
+          // Tiny displacement while (nearly) stopped ⇒ treat as parked, kills jitter spikes.
+          if (distKm < 0.005 && (devSpeed === null || devSpeed < 7.2)) raw = 0;
+          if (raw < 1) raw = 0;
+
+          if (raw > 0) state.lastMove = now;
+
+          const tau   = raw > state.smoothSpeed ? TAU_UP : TAU_DOWN;
+          const alpha = 1 - Math.exp(-dtSec / tau);
+          state.smoothSpeed = state.smoothSpeed * (1 - alpha) + raw * alpha;
+        }
       } else {
         state.last = { lat: c.latitude, lon: c.longitude, t: now };
         fetchAvatarWeather(c.latitude, c.longitude);
@@ -3697,9 +3832,9 @@
       setInterval(() => {
         const now = Date.now();
 
-        if (state.lastMove && now - state.lastMove > 4000) {
+        if (state.lastMove && now - state.lastMove > 5000) {
           const elapsed = (now - state.lastMove) / 1000;
-          state.smoothSpeed = Math.max(0, state.smoothSpeed - elapsed * 8);
+          state.smoothSpeed = Math.max(0, state.smoothSpeed - elapsed * 4);
 
           if (state.smoothSpeed < 0.5) state.smoothSpeed = 0;
 
@@ -3716,9 +3851,90 @@
       }, 15 * 60 * 1000);
     }
 
+    /* ── IMAGE LOADING (per form) ── */
+    function filesForForm(f, name){
+      const s = f.suffix;
+      return {
+        anim:    name + '-Anim' + s + '.png',
+        shadow:  name + '-Shadow' + s + '.png',
+        offsets: name + '-Offsets' + s + '.png'
+      };
+    }
+
+    function loadImage(kind, f, key, url){
+      const store = f.images[kind];
+      const queue = f.pending[kind];
+
+      if (Object.prototype.hasOwnProperty.call(store, key)) {
+        return Promise.resolve(store[key]);
+      }
+
+      if (queue.has(key)) {
+        return queue.get(key);
+      }
+
+      const promise = new Promise(resolve => {
+        const img = new Image();
+
+        img.onload = () => {
+          store[key] = img;
+          queue.delete(key);
+          resolve(img);
+        };
+
+        img.onerror = () => {
+          store[key] = null;
+          queue.delete(key);
+          resolve(null);
+        };
+
+        img.src = url;
+      });
+
+      queue.set(key, promise);
+      return promise;
+    }
+
+    function loadForm(i){
+      const f = forms[i];
+      if (f.loadPromise) return f.loadPromise;
+
+      f.loadPromise = new Promise(resolve => {
+        const ps = [];
+
+        f.metaList.forEach(meta => {
+          const key = meta.copyOf || meta.name;
+          const files = filesForForm(f, key);
+
+          ps.push(loadImage('anim', f, key, f.dir + files.anim));
+          ps.push(loadImage('shadow', f, key, f.dir + files.shadow));
+          ps.push(loadImage('offsets', f, key, f.dir + files.offsets));
+        });
+
+        Promise.all(ps).then(() => {
+          f.metaList.forEach(meta => {
+            const key = meta.copyOf || meta.name;
+            if (f.offsetCache.has(key)) return;
+            const offImg = f.images.offsets[key];
+            if (offImg && offImg.naturalWidth) {
+              f.offsetCache.set(key, computeOffsets(meta, offImg));
+            }
+          });
+          f.ready = true;
+          resolve(f);
+        });
+      });
+
+      return f.loadPromise;
+    }
+
     function computeOffsets(meta, img){
-      const count = (meta.d || []).length;
+      // PMDCollab sheets export a full animation grid (often an 8-row
+      // canvas), which can hold more cells than the XML duration list.
+      // Compute an anchor for every cell so any played frame resolves.
       const cols = Math.max(1, Math.round(img.naturalWidth / meta.w));
+      const rows = Math.max(1, Math.round(img.naturalHeight / meta.h));
+      const count = cols * rows;
 
       const offCanvas = document.createElement('canvas');
       offCanvas.width = meta.w;
@@ -3786,7 +4002,7 @@
 
     function getOffset(meta, frameIndex){
       const key = meta.copyOf || meta.name;
-      const offsets = offsetCache.get(key);
+      const offsets = forms[formIdx].offsetCache.get(key);
 
       if (offsets && offsets.length) {
         return offsets[frameIndex % offsets.length] || { x: meta.w / 2, y: meta.h / 2 };
@@ -3801,9 +4017,24 @@
       const dt = Math.min(50, ts - lastTs);
       lastTs = ts;
 
-      const meta = metaFor(current.name);
+      const f = forms[formIdx];
+      const meta = resolveAnim(f, current.name);
       const key = meta.copyOf || meta.name;
       const durations = meta.d || [8];
+
+      // PMDCollab sheets export a full animation grid (often an 8-row
+      // canvas) that can hold more cells than the XML duration list, so
+      // play every cell row-major and cycle the durations across them —
+      // the same playback the official sprites.pmdcollab.org viewer uses.
+      // Sheets whose first row repeats a single cell (e.g. red3 Charge)
+      // would otherwise appear frozen.
+      const animImg = f.images.anim[key];
+      let frameCount = durations.length;
+      if (animImg && animImg.naturalWidth) {
+        const aCols = Math.max(1, Math.round(animImg.naturalWidth / meta.w));
+        const aRows = Math.max(1, Math.round(animImg.naturalHeight / meta.h));
+        frameCount = Math.max(1, aCols * aRows);
+      }
 
       frameTime += dt;
 
@@ -3813,9 +4044,9 @@
         frameTime -= duration;
         frame++;
 
-        if (frame >= durations.length) {
+        if (frame >= frameCount) {
           if (!current.loop) {
-            frame = durations.length - 1;
+            frame = frameCount - 1;
           } else {
             frame = 0;
           }
@@ -3844,11 +4075,13 @@
         drawY = canvas.height / 2 - offset.y * scale;
       }
 
-      const shadowImg = images.shadow[key];
+      const shadowImg = f.images.shadow[key];
       if (shadowImg && shadowImg.naturalWidth) {
         const sCols = Math.max(1, Math.round(shadowImg.naturalWidth / meta.w));
-        const sx = (frame % sCols) * meta.w;
-        const sy = Math.floor(frame / sCols) * meta.h;
+        const sRows = Math.max(1, Math.round(shadowImg.naturalHeight / meta.h));
+        const sFrame = frame % (sCols * sRows);
+        const sx = (sFrame % sCols) * meta.w;
+        const sy = Math.floor(sFrame / sCols) * meta.h;
 
         ctx.globalAlpha = 0.65;
         ctx.drawImage(
@@ -3865,7 +4098,6 @@
         ctx.globalAlpha = 1;
       }
 
-      const animImg = images.anim[key];
       if (animImg && animImg.naturalWidth) {
         const aCols = Math.max(1, Math.round(animImg.naturalWidth / meta.w));
         const ax = (frame % aCols) * meta.w;
@@ -3913,39 +4145,38 @@
     async function init(){
       updateAvatar();
 
-      const loadPromises = [];
+      await loadForm(formIdx);
 
-      ANIM_META.forEach(meta => {
-        const key = meta.copyOf || meta.name;
-        const files = filesFor(meta);
+      updateAvatar();
 
-        loadPromises.push(loadImage('anim', key, ASSET_BASE + files.anim));
-        loadPromises.push(loadImage('shadow', key, ASSET_BASE + files.shadow));
-        loadPromises.push(loadImage('offsets', key, ASSET_BASE + files.offsets));
-      });
+      if (TEST_MODE) {
+        // Synthetic speed source — preview forms/speeds without GPS.
+        state.hasFix = true;
+        state.gpsOk = true;
+        setInterval(() => {
+          const t = Date.now() / 1000;
+          state.smoothSpeed = Math.max(0, TEST_SPEED + Math.sin(t * 0.6) * 2.5);
+          state.lastMove = Date.now();
+          updateAvatar();
+        }, 500);
+      } else {
+        startDecay();
+        startWeatherRefresh();
 
-      await Promise.all(loadPromises);
-
-      ANIM_META.forEach(meta => {
-        const key = meta.copyOf || meta.name;
-
-        if (offsetCache.has(key)) return;
-
-        const offImg = images.offsets[key];
-        if (offImg && offImg.naturalWidth) {
-          offsetCache.set(key, computeOffsets(meta, offImg));
+        if ('geolocation' in navigator) {
+          navigator.geolocation.watchPosition(onGeo, onGeoError, {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 20000
+          });
         }
-      });
 
-      startDecay();
-      startWeatherRefresh();
-
-      if ('geolocation' in navigator) {
-        navigator.geolocation.watchPosition(onGeo, onGeoError, {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 20000
-        });
+        // Warm the next form's cache in case the drive runs long.
+        setTimeout(() => {
+          if (formIdx + 1 < forms.length && !forms[formIdx + 1].loadPromise) {
+            loadForm(formIdx + 1);
+          }
+        }, 120000);
       }
 
       requestAnimationFrame(drawFrame);
