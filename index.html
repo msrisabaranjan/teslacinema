@@ -3299,7 +3299,8 @@
   /* ── AVATAR COMPANION — MULTI-FORM SPRITE ENGINE ──
      Sprite art: PMDCollab (sprites.pmdcollab.org), CC BY-NC 4.0 — credits_red.txt
 
-     The avatar evolves with the distance driven this page session:
+     The avatar evolves with the distance driven today (persisted across
+     page reloads; resets at local midnight):
        Form 1 (red1): 0–10 mi    Form 2 (red2): 10–20 mi    Form 3 (red3): 20+ mi
      Each form folder keeps its own sprites + AnimData XML. The metadata below
      mirrors those XML files so the page animates without fetching them.
@@ -3435,6 +3436,8 @@
     const MIN_MOVE_KM      = 0.006; // under ~6 m ⇒ jitter, don't count distance
     const TAU_UP           = 3;     // s — how fast smoothed speed chases rises
     const TAU_DOWN         = 5;     // s — how fast it chases falls
+    const SPEED_HOLD_MS    = 4000;  // ms of no real movement before decay begins
+    const SPEED_DECAY_TAU  = 2;     // s — how fast the speed eases to 0 once decaying
     const ANIM_DEBOUNCE_MS = 1200;  // a mood change must hold this long before it plays
 
     /* Hidden test hooks: ?test_miles=12 & test_speed=120 */
@@ -3455,17 +3458,69 @@
       loadPromise: null
     }));
 
+    /* ── "Driven today" session — persists across page reloads (the in-car
+       browser can reload/kill the page). Storage is best-effort: if it's
+       unavailable the session simply stays in memory. */
+    const AVATAR_SESSION_KEY = 'tcinema.avatarSession.v1';
+
+    function todayKey(){
+      const d = new Date();
+      return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    }
+
+    function loadAvatarSession(){
+      try {
+        const raw = localStorage.getItem(AVATAR_SESSION_KEY);
+        if (!raw) return { miles: 0, last: null };
+        const p = JSON.parse(raw);
+        if (!p || p.date !== todayKey()) return { miles: 0, last: null };
+        const miles = Number(p.miles);
+        if (!Number.isFinite(miles) || miles < 0) return { miles: 0, last: null };
+        let last = null;
+        if (Number.isFinite(p.lat) && Number.isFinite(p.lon) && Number.isFinite(p.t)) {
+          last = { lat: p.lat, lon: p.lon, t: p.t };
+        }
+        return { miles, last };
+      } catch(_) {
+        return { miles: 0, last: null };
+      }
+    }
+
+    let lastSaveAt = 0;
+
+    function saveAvatarSession(force){
+      if (TEST_MODE) return;
+      const now = Date.now();
+      if (!force && now - lastSaveAt < 1000) return;
+      lastSaveAt = now;
+      try {
+        localStorage.setItem(AVATAR_SESSION_KEY, JSON.stringify({
+          miles: state.totalMiles,
+          lat: state.last ? state.last.lat : null,
+          lon: state.last ? state.last.lon : null,
+          t: state.last ? state.last.t : null,
+          date: todayKey()
+        }));
+      } catch(_) { /* storage unavailable — session stays in memory */ }
+    }
+
+    const restored = TEST_MODE ? null : loadAvatarSession();
+
     const state = {
       hasFix: false,
       gpsOk: false,
-      last: null,
+      last: restored && restored.last ? restored.last : null,
       smoothSpeed: 0,
       lastMove: 0,
       weather: null,
-      totalMiles: Number.isFinite(TEST_MILES) ? TEST_MILES : 0
+      totalMiles: Number.isFinite(TEST_MILES) ? TEST_MILES : (restored ? restored.miles : 0)
     };
 
     let formIdx = formIndexForMiles(state.totalMiles);
+    let sessionDate = todayKey();
+    let watchId = null;
+    let lastFixArrivedAt = 0;
+    let watchArmedAt = 0;
     let evolveTarget = -1;      // form we're loading/transitioning into
     let evolveAnimName = 'Idle';
     let evolveUntil = 0;        // until this timestamp the evolve animation plays
@@ -3726,7 +3781,7 @@
       if (moodLabel) moodLabel.textContent = chosen.label;
       if (infoLabel) {
         infoLabel.textContent =
-          Math.round(Math.max(0, state.smoothSpeed)) + ' km/h · ' + weatherText() + ' · ' + milesInfo();
+          Math.round(Math.max(0, state.smoothSpeed) / KM_PER_MILE) + ' mph · ' + weatherText() + ' · ' + milesInfo();
       }
       if (gpsDot) gpsDot.classList.toggle('ok', state.gpsOk);
 
@@ -3781,6 +3836,7 @@
 
       if (!Number.isFinite(c.latitude) || !Number.isFinite(c.longitude)) return;
 
+      lastFixArrivedAt = Date.now();
       state.hasFix = true;
       state.gpsOk = true;
 
@@ -3808,11 +3864,15 @@
           if (distKm < 0.005 && (devSpeed === null || devSpeed < 7.2)) raw = 0;
           if (raw < 1) raw = 0;
 
-          if (raw > 0) state.lastMove = now;
-
-          const tau   = raw > state.smoothSpeed ? TAU_UP : TAU_DOWN;
-          const alpha = 1 - Math.exp(-dtSec / tau);
-          state.smoothSpeed = state.smoothSpeed * (1 - alpha) + raw * alpha;
+          // raw === 0 means "no reliable displacement this fix" (jitter or spike),
+          // not "the car is stopped". Hold the last smoothed speed instead of
+          // dragging it to zero — genuine stops are handled by the decay timer.
+          if (raw > 0) {
+            state.lastMove = now;
+            const tau   = raw > state.smoothSpeed ? TAU_UP : TAU_DOWN;
+            const alpha = 1 - Math.exp(-dtSec / tau);
+            state.smoothSpeed = state.smoothSpeed * (1 - alpha) + raw * alpha;
+          }
         }
       } else {
         state.last = { lat: c.latitude, lon: c.longitude, t: now };
@@ -3820,6 +3880,7 @@
       }
 
       state.last = { lat: c.latitude, lon: c.longitude, t: now };
+      saveAvatarSession(false);
       updateAvatar();
     }
 
@@ -3828,13 +3889,63 @@
       updateAvatar();
     }
 
+    const GEO_OPTIONS = { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 };
+
+    /* Re-arm the location provider. The in-car browser's geolocation watch can
+       stall while the page sits open, so clearWatch + watchPosition re-primes
+       it (the same effect minimizing/reopening the page used to have). */
+    function registerWatch(){
+      if (TEST_MODE || !('geolocation' in navigator)) return;
+      if (watchId !== null) {
+        try { navigator.geolocation.clearWatch(watchId); } catch(_) {}
+      }
+      watchId = navigator.geolocation.watchPosition(onGeo, onGeoError, GEO_OPTIONS);
+      watchArmedAt = Date.now();
+    }
+
+    /* Stall watchdog: no fix for ~90s (since the last fix or the last arm,
+       whichever is newer) while the page is visible ⇒ re-arm. */
+    function startWatchdog(){
+      setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
+        const ref = Math.max(lastFixArrivedAt, watchArmedAt);
+        if (ref && Date.now() - ref > 90000) registerWatch();
+      }, 10000);
+    }
+
+    /* Re-arm on return (if the watch went stale while hidden) and persist
+       the session when leaving the page or it gets hidden/killed. */
+    function startVisibilityWatch(){
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          const ref = Math.max(lastFixArrivedAt, watchArmedAt);
+          if (ref && Date.now() - ref > 20000) registerWatch();
+        } else {
+          saveAvatarSession(true);
+        }
+      });
+      window.addEventListener('pagehide', () => saveAvatarSession(true));
+    }
+
     function startDecay(){
       setInterval(() => {
         const now = Date.now();
 
-        if (state.lastMove && now - state.lastMove > 5000) {
-          const elapsed = (now - state.lastMove) / 1000;
-          state.smoothSpeed = Math.max(0, state.smoothSpeed - elapsed * 4);
+        if (todayKey() !== sessionDate) {
+          // Local date rolled over ⇒ new "driven today" session.
+          sessionDate = todayKey();
+          state.totalMiles = 0;
+          state.last = null;
+          formIdx = 0;
+          saveAvatarSession(true);
+          updateAvatar();
+          return;
+        }
+
+        if (state.lastMove && now - state.lastMove > SPEED_HOLD_MS) {
+          // Exponential ease toward 0 (smooth, no snap) after a short hold.
+          const alpha = 1 - Math.exp(-0.8 / SPEED_DECAY_TAU);
+          state.smoothSpeed = state.smoothSpeed * (1 - alpha);
 
           if (state.smoothSpeed < 0.5) state.smoothSpeed = 0;
 
@@ -4162,14 +4273,10 @@
       } else {
         startDecay();
         startWeatherRefresh();
+        startWatchdog();
+        startVisibilityWatch();
 
-        if ('geolocation' in navigator) {
-          navigator.geolocation.watchPosition(onGeo, onGeoError, {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 20000
-          });
-        }
+        registerWatch();
 
         // Warm the next form's cache in case the drive runs long.
         setTimeout(() => {
