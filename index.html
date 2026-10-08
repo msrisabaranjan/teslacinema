@@ -1390,7 +1390,7 @@
     .page-rail{
       position:fixed;left:14px;top:50%;transform:translateY(-50%);
       z-index:600;display:flex;flex-direction:column;gap:10px;
-      padding:10px;user-select:none;
+      padding:10px;user-select:none;touch-action:none;
       background:rgba(20,20,26,.55);
       backdrop-filter:blur(22px) saturate(1.5);
       -webkit-backdrop-filter:blur(22px) saturate(1.5);
@@ -1414,7 +1414,7 @@
     .rail-btn{
       position:relative;width:46px;height:46px;border-radius:14px;
       border:1px solid transparent;background:transparent;
-      color:var(--muted);cursor:pointer;
+      color:var(--muted);cursor:pointer;touch-action:none;
       display:flex;align-items:center;justify-content:center;
       transition:
         color .25s var(--ease-smooth),
@@ -1424,6 +1424,7 @@
     .rail-btn:hover{color:#fff;background:rgba(255,255,255,.07);}
     .rail-btn:active{transform:scale(.9);}
     .rail-btn.active{color:var(--accent);}
+    .rail-btn.drag-target{color:#fff;background:rgba(255,255,255,.08);}
     .rail-btn svg{width:20px;height:20px;pointer-events:none;}
     .rail-btn::after{
       content:attr(data-label);
@@ -3485,6 +3486,7 @@
   const glassSweep  = document.getElementById('glassSweep');
   const railBtns    = Array.prototype.slice.call(document.querySelectorAll('.rail-btn'));
   const railIndicator = document.getElementById('railIndicator');
+  const pageRail      = document.getElementById('pageRail');
   const canHover    = window.matchMedia('(hover:hover)').matches;
   let curPage       = 0;
   let pageAnimating = false;
@@ -3564,7 +3566,153 @@
     });
     btn.addEventListener('mouseleave', () => { if(!pageAnimating) clearPagePreview(); });
     btn.addEventListener('click', () => goToPage(i));
+    btn.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); goToPage(i); }
+    });
   });
+
+  /* ── Rail input: tap commits, finger-drag scrubs the pages ──
+     Press a rail icon and slide the finger along the rail: the pages
+     follow the finger (one page per icon spacing, like detents) and
+     the indicator tracks it 1:1. On release they spring-settle to the
+     nearest icon — or back to the current page. A plain tap still
+     commits instantly. Works with mouse and touch alike. */
+  let railPointer = null; /* {id, startY, btnIdx, dragging} */
+
+  function railSpacing(){
+    return railBtns[1].offsetTop - railBtns[0].offsetTop;
+  }
+
+  function applyRailProgress(p){
+    pageEls.forEach((el, i) => {
+      el.style.transform = 'translateY(' + ((i - p) * 101.5).toFixed(3) + '%)';
+    });
+    const top0 = railBtns[0].offsetTop;
+    const top2 = railBtns[2].offsetTop;
+    railIndicator.style.top = (top0 + (top2 - top0) * (p / 2)).toFixed(1) + 'px';
+    const near = Math.round(p);
+    railBtns.forEach((b, i) => b.classList.toggle('drag-target', i === near && i !== curPage));
+  }
+
+  /* Re-enable transitions, then drop the inline scrub styles so the
+     pages animate from wherever the finger left them to their rest
+     position. Clears the inline transition again once settled. */
+  function settlePages(ms, ease, done){
+    pageEls.forEach(el => {
+      el.style.transition = 'transform ' + ms + ' ' + ease + ', filter ' + ms + ' ' + ease;
+    });
+    void pageViewport.offsetWidth;
+    pageEls.forEach(el => { el.style.transform = ''; el.style.filter = ''; });
+    setTimeout(() => {
+      pageEls.forEach(el => { el.style.transition = ''; });
+      if(done) done();
+    }, parseInt(ms, 10) + 50);
+  }
+
+  function snapBackFromDrag(done){
+    railBtns.forEach(b => b.classList.remove('drag-target'));
+    railIndicator.style.transition = '';
+    setRailIndicator();
+    settlePages('380ms', 'var(--ease-spring)', () => {
+      pageAnimating = false;
+      if(done) done();
+    });
+  }
+
+  function commitDrag(target){
+    const from = curPage;
+    curPage = target;
+    const inn = pageEls[target];
+    const out = pageEls[from];
+    inn.style.zIndex = 2;
+    out.style.zIndex = 1;
+
+    /* Stage a light frost on the outgoing page and a soft blur on the
+       incoming one (no transition), so they melt away while the pages
+       settle into place — a quieter cousin of the tap transition. */
+    inn.style.transition = 'none';
+    out.style.transition = 'none';
+    inn.style.filter = 'blur(10px)';
+    out.style.filter = 'blur(14px) brightness(.6)';
+    void pageViewport.offsetWidth;
+
+    pageEls.forEach((el, i) => {
+      el.classList.remove('pos-above','pos-active','pos-below');
+      el.classList.add(i === curPage ? 'pos-active' : (i < curPage ? 'pos-above' : 'pos-below'));
+    });
+    settlePages('520ms', 'var(--ease-spring)', () => {
+      inn.style.zIndex = '';
+      out.style.zIndex = '';
+      pageAnimating = false;
+    });
+
+    railBtns.forEach((b, i) => {
+      b.classList.remove('drag-target');
+      b.classList.toggle('active', i === curPage);
+    });
+    railIndicator.style.transition = '';
+    setRailIndicator();
+    closeNewsPopup();
+    pageReveal(inn);
+    try{ localStorage.setItem(PAGE_KEY, String(curPage)); }catch(e){}
+  }
+
+  pageRail.addEventListener('pointerdown', (e) => {
+    if(railPointer || pageAnimating) return;
+    if(e.pointerType === 'mouse' && e.button !== 0) return;
+    const btn = e.target.closest('.rail-btn');
+    railPointer = {
+      id: e.pointerId,
+      startY: e.clientY,
+      btnIdx: btn ? railBtns.indexOf(btn) : -1,
+      dragging: false
+    };
+    try{ pageRail.setPointerCapture(e.pointerId); }catch(err){}
+  });
+
+  pageRail.addEventListener('pointermove', (e) => {
+    if(!railPointer || e.pointerId !== railPointer.id) return;
+    const dy = e.clientY - railPointer.startY;
+    if(!railPointer.dragging && Math.abs(dy) > 10){
+      railPointer.dragging = true;
+      pageAnimating = true;
+      clearPagePreview();
+      pageEls.forEach(el => { el.style.transition = 'none'; });
+      railIndicator.style.transition = 'none';
+    }
+    if(railPointer.dragging){
+      e.preventDefault();
+      applyRailProgress(Math.min(2, Math.max(0, curPage + dy / railSpacing())));
+    }
+  });
+
+  function finishRailPointer(e, cancelled){
+    if(!railPointer || e.pointerId !== railPointer.id) return;
+    const ptr = railPointer;
+    railPointer = null;
+    if(!ptr.dragging){
+      /* Plain tap on an icon → commit (existing behavior). */
+      if(ptr.btnIdx >= 0) goToPage(ptr.btnIdx);
+      return;
+    }
+    if(cancelled){
+      snapBackFromDrag();
+      return;
+    }
+    const dy = e.clientY - ptr.startY;
+    const p = Math.min(2, Math.max(0, curPage + dy / railSpacing()));
+    const target = Math.round(p);
+    if(target === curPage){
+      /* The slide stayed within the current page's half — spring back,
+         then treat the gesture as a tap on the pressed icon. */
+      if(ptr.btnIdx >= 0) snapBackFromDrag(() => goToPage(ptr.btnIdx));
+      else snapBackFromDrag();
+    } else {
+      commitDrag(target);
+    }
+  }
+  pageRail.addEventListener('pointerup', (e) => finishRailPointer(e, false));
+  pageRail.addEventListener('pointercancel', (e) => finishRailPointer(e, true));
 
   window.addEventListener('resize', setRailIndicator);
   window.addEventListener('load', setRailIndicator);
