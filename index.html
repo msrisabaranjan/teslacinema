@@ -56,6 +56,7 @@
       --ease-spring:cubic-bezier(.34,1.4,.64,1);
       --ease-smooth:cubic-bezier(.22,.61,.36,1);
       --ease-fluid:cubic-bezier(.4,0,.2,1);
+      --ease-duo:cubic-bezier(.32,.72,0,1);
       --accent-glow:0 10px 30px -8px rgba(29,185,84,.42),0 0 0 1px rgba(29,185,84,.28);
       --tile-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 -1px 0 rgba(0,0,0,.32) inset;
       --boot-delay:1.7s;
@@ -113,7 +114,7 @@
 
     /* ── TICKER ── */
     .ticker-bar{
-      position:sticky;top:0;z-index:200;
+      position:fixed;top:0;left:0;right:0;z-index:200;
       background:rgba(10,10,12,.92);
       backdrop-filter:blur(14px);
       -webkit-backdrop-filter:blur(14px);
@@ -171,10 +172,13 @@
 
     /* ── HEADER ── */
     header{
+      position:fixed;top:44px;left:0;right:0;z-index:200;
       display:flex;align-items:center;justify-content:space-between;
-      padding:11px 20px;
+      padding:0 20px;height:56px;
       border-bottom:1px solid var(--border);
-      background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);
+      background:rgba(11,11,14,.86);
+      backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);
       animation:slideDown .7s var(--ease-out) var(--boot-delay) both;
     }
     @keyframes slideDown{
@@ -275,19 +279,90 @@
       font-family:'Inter',sans-serif;
     }
 
-    /* ── NEWS + AVATAR LAYOUT ── */
+    /* ── HOME TILES (hold a tile to rearrange) ── */
     @keyframes cardReveal{
       from{opacity:0;transform:translateY(8px) scale(.99);}
       to  {opacity:1;transform:translateY(0) scale(1);}
     }
 
-    .news-layout{
-      display:flex;
-      gap:14px;
-      margin:18px 24px 0;
-      align-items:stretch;
-      animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .15s) both;
+    /* Free placement: tiles are absolutely positioned inside the content
+       area (origin --hx/--hy, right margin --hxr). JS sets left/top/
+       width; positions survive resizes (clamped, never reflowed). */
+    #pageHome{
+      /* position:relative would override .page's absolute;inset:0 and
+         collapse the page to its padding height — keep .page's box. */
+      padding:0 0 140px 0;
+      --hx:116px;--hy:16px;--hxr:24px;
     }
+    .home-tile{
+      position:absolute;
+      transition:left .18s var(--ease-out),top .18s var(--ease-out),width .18s var(--ease-out);
+    }
+    /* .news-strip / .avatar-panel declare position:relative later in
+       this sheet (for their absolutely-positioned inner chrome); the
+       id rules win the cascade so the tiles stay out of the flow. */
+    #newsStrip,#avatarPanel,#calSection{position:absolute;}
+    #newsStrip.dragging,#avatarPanel.dragging,#calSection.dragging{position:fixed;}
+    #pageHome.home-no-trans .home-tile{transition:none;}
+    /* Tiles keep their set size — they move, they never stretch to fill. */
+    #newsStrip{min-width:0;
+      animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .15s) backwards;}
+    #avatarPanel{
+      animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .22s) backwards;}
+    #calSection{margin:0;}
+
+    /* arrange mode: jiggle + drag */
+    #pageHome.arranging{overflow:hidden;}
+    #pageHome.arranging .home-tile{
+      touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;
+      outline:1px dashed rgba(255,255,255,.22);outline-offset:4px;
+    }
+    #pageHome.arranging .home-tile>*{pointer-events:none;}
+    body.home-arranging{cursor:grabbing;}
+    body.home-arranging *{user-select:none;-webkit-user-select:none;}
+    .home-tile.jiggling{animation:tileJiggle .3s ease-in-out infinite alternate;}
+    @keyframes tileJiggle{from{rotate:-.35deg;}to{rotate:.35deg;}}
+    .home-tile.dragging{
+      position:fixed;z-index:500;margin:0;
+      pointer-events:none;will-change:transform;cursor:grabbing;
+      box-shadow:0 24px 48px rgba(0,0,0,.5),var(--tile-shadow);
+      outline:1px dashed rgba(255,255,255,.55);outline-offset:6px;
+    }
+    /* Light placement grid — visible only while arranging. Covers the
+       content area (lines start at the content origin so tile edges
+       sit on grid lines). */
+    #pageHome::after{
+      content:'';position:absolute;
+      top:var(--hy);left:var(--hx);right:var(--hxr);bottom:0;
+      pointer-events:none;z-index:5;
+      background-image:
+        linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+      background-size:48px 48px;
+      opacity:0;transition:opacity .25s var(--ease-out);
+    }
+    #pageHome.arranging::after{opacity:1;}
+    /* Drop ghost — the slot the dragged tile will snap to */
+    .drop-ghost{
+      position:absolute;z-index:6;
+      border:2px dashed rgba(29,185,84,.6);
+      background:rgba(29,185,84,.06);
+      border-radius:18px;
+      pointer-events:none;
+      opacity:0;transition:opacity .12s var(--ease-out);
+    }
+    .drop-ghost.show{opacity:1;}
+    .arrange-done{
+      position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+      z-index:510;pointer-events:none;opacity:0;
+      border:1px solid var(--border);border-radius:999px;
+      padding:9px 18px;background:rgba(255,255,255,.08);
+      color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;
+      text-transform:uppercase;cursor:pointer;
+      transition:opacity .18s var(--ease-out),background .18s;
+    }
+    .arrange-done:hover{background:rgba(255,255,255,.14);}
+    .arrange-done.show{opacity:1;pointer-events:auto;}
 
     .news-strip{
       flex:1;
@@ -522,6 +597,7 @@
     .avatar-sprite{
       width:150px;
       height:150px;
+      max-width:100%;
       overflow:visible;
       display:block;
     }
@@ -618,17 +694,16 @@
     }
 
     @media (max-width:1100px){
-      .avatar-panel{flex-basis:170px;min-height:210px;}
+      .avatar-panel{min-height:210px;}
       .avatar-sprite,#avatarCanvas{width:130px;height:130px;}
     }
     @media (max-width:720px){
-      .news-layout{gap:12px;margin:14px 16px 0;}
-      .avatar-panel{flex-basis:150px;min-height:190px;}
+      #pageHome{--hx:108px;--hy:14px;--hxr:16px;}
+      .avatar-panel{min-height:190px;}
       .avatar-sprite,#avatarCanvas{width:110px;height:110px;}
     }
     @media (max-width:520px){
-      .news-layout{flex-wrap:wrap;}
-      .avatar-panel{flex:1 1 100%;min-height:160px;}
+      .avatar-panel{min-height:160px;}
     }
 
     /* ── NEWS POPUP ── */
@@ -709,7 +784,36 @@
     }
 
     /* ── SECTIONS ── */
-    main{padding:16px 0 120px;}
+    /* Page viewport: three stacked full-screen pages (home / streams / filler) */
+    main.page-viewport{
+      position:fixed;top:100px;left:0;right:0;bottom:0;
+      padding:0;z-index:1;overflow:hidden;
+    }
+    .page{
+      position:absolute;inset:0;
+      overflow-y:auto;overscroll-behavior:contain;
+      padding:16px 0 140px 92px;
+      scrollbar-width:none;
+      will-change:transform,filter;
+      transition:transform .62s var(--ease-duo),filter .62s var(--ease-duo);
+    }
+    .page::-webkit-scrollbar{display:none;}
+    .page.pos-above{transform:translateY(-101.5%);}
+    .page.pos-active{transform:translateY(0);}
+    .page.pos-below{transform:translateY(101.5%);}
+    /* leaving page on tap: fog builds in fast (~90ms) then melts with
+       the slide — one animation, so no whole-screen flash frame */
+    .page.fog-out{animation:fogOut .62s both;}
+    @keyframes fogOut{
+      0%  {filter:none;animation-timing-function:linear;}
+      14% {filter:blur(8px) brightness(.7);animation-timing-function:var(--ease-duo);}
+      100%{filter:none;}
+    }
+    /* hover previews: current page nudges + frosts, target peeks in */
+    .page-viewport.preview-down .page.pos-active{transform:translateY(-5%);filter:blur(3px) brightness(.8);transition-duration:.38s;}
+    .page-viewport.preview-down .page.pos-below{transform:translateY(94.5%);transition-duration:.38s;}
+    .page-viewport.preview-up .page.pos-active{transform:translateY(5%);filter:blur(3px) brightness(.8);transition-duration:.38s;}
+    .page-viewport.preview-up .page.pos-above{transform:translateY(-94.5%);transition-duration:.38s;}
     section{
       margin:24px 24px;
       animation:sectionReveal .8s var(--ease-out) both;
@@ -1116,8 +1220,8 @@
     .chat-pill{
       position:fixed;
       left:0;
-      top:50%;
-      transform:translateY(-50%) translateX(-100%);
+      bottom:74px;
+      transform:translateX(-100%);
       z-index:401;
       background:#8B5CF6;
       border-radius:0 14px 14px 0;
@@ -1135,7 +1239,7 @@
       user-select:none;
       box-shadow:4px 0 18px rgba(139,92,246,.28);
     }
-    .chat-pill.visible{transform:translateY(-50%) translateX(0);}
+    .chat-pill.visible{transform:translateX(0);}
     .chat-pill:active{background:#7C3AED;}
     .chat-pill svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
     .chat-pill-label{
@@ -1361,9 +1465,72 @@
       100% {transform:scaleX(1);}
     }
 
+    /* ── LEFT PAGE RAIL ── */
+    .page-rail{
+      position:fixed;left:14px;top:50%;transform:translateY(-50%);
+      z-index:600;display:flex;flex-direction:column;gap:10px;
+      padding:10px;user-select:none;touch-action:none;
+      background:rgba(20,20,26,.55);
+      backdrop-filter:blur(22px) saturate(1.5);
+      -webkit-backdrop-filter:blur(22px) saturate(1.5);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:22px;
+      box-shadow:0 18px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08);
+      animation:railIn .6s var(--ease-out) calc(var(--boot-delay) + .3s) both;
+    }
+    @keyframes railIn{
+      from{opacity:0;transform:translateY(-50%) translateX(-12px);}
+      to  {opacity:1;transform:translateY(-50%) translateX(0);}
+    }
+    .rail-indicator{
+      position:absolute;left:6px;right:6px;height:46px;top:10px;
+      border-radius:14px;pointer-events:none;
+      background:var(--accent-soft);
+      border:1px solid rgba(29,185,84,.5);
+      box-shadow:0 0 18px rgba(29,185,84,.35),inset 0 1px 0 rgba(255,255,255,.12);
+      transition:top .5s var(--ease-spring);
+    }
+    .rail-btn{
+      position:relative;width:46px;height:46px;border-radius:14px;
+      border:1px solid transparent;background:transparent;
+      color:var(--muted);cursor:pointer;touch-action:none;
+      display:flex;align-items:center;justify-content:center;
+      transition:
+        color .25s var(--ease-smooth),
+        background .25s var(--ease-smooth),
+        transform .3s var(--ease-spring);
+    }
+    .rail-btn:hover{color:#fff;background:rgba(255,255,255,.07);}
+    .rail-btn:active{transform:scale(.9);}
+    .rail-btn.active{color:var(--accent);}
+    .rail-btn.drag-target{color:#fff;background:rgba(255,255,255,.08);}
+    .rail-btn svg{width:20px;height:20px;pointer-events:none;}
+    .rail-btn::after{
+      content:attr(data-label);
+      position:absolute;left:calc(100% + 12px);top:50%;
+      transform:translateY(-50%) translateX(-5px);
+      font-size:10px;font-weight:700;letter-spacing:.12em;
+      text-transform:uppercase;color:#fff;
+      background:rgba(15,15,19,.92);border:1px solid var(--border);
+      padding:5px 10px;border-radius:8px;white-space:nowrap;
+      opacity:0;pointer-events:none;
+      transition:opacity .25s var(--ease-smooth),transform .25s var(--ease-smooth);
+    }
+    .rail-btn:hover::after{opacity:1;transform:translateY(-50%) translateX(0);}
+
+    /* ── STREAMS PAGE GRID ── */
+    .streams-grid{
+      display:grid;gap:14px;
+      grid-template-columns:repeat(auto-fill,minmax(172px,1fr));
+      max-width:1080px;
+    }
+    .streams-grid .card{width:100%;}
+
     /* ── NARROW / HALF SCREEN ── */
     @media (max-width:640px){
       header{padding:9px 12px;}
+      .page{padding-left:84px;}
+      .page-rail{left:8px;}
       .logo{gap:7px;}
       .logo-t{width:26px;height:26px;font-size:12px;border-radius:7px;}
       .logo-name{font-size:14px;white-space:nowrap;}
@@ -1374,7 +1541,7 @@
       #date-display{display:none;}
       .yr-widget{display:none;}
       .fs-btn{width:28px;height:28px;}
-      .news-layout{margin:12px 14px 0;}
+      #pageHome{--hx:98px;--hy:12px;--hxr:14px;}
       .sec-head{padding:0 2px 10px;}
       .row{gap:10px;padding:0 2px 4px;}
       .card{width:134px;height:162px;border-radius:14px;padding:10px;}
@@ -1837,11 +2004,14 @@
     </div>
   </header>
 
-  <!-- CONTENT -->
-  <main>
+  <!-- CONTENT: three stacked pages — home / streams / filler -->
+  <main class="page-viewport" id="pageViewport">
 
-    <!-- CALENDAR SECTION -->
-    <div class="cal-section" id="calSection" style="display:none;margin-bottom:0;overflow:hidden;transition:none;">
+    <!-- ── PAGE · HOME ── -->
+    <div class="page pos-active" id="pageHome">
+
+    <!-- CALENDAR SECTION (home tile — hold to rearrange) -->
+    <div class="cal-section home-tile" id="calSection" style="display:none;margin-bottom:0;overflow:hidden;transition:none;">
       <div class="cal-topbar">
         <span class="cal-sec-label">Calendar</span>
         <span class="cal-week-label" id="calWeekLabel"></span>
@@ -1881,9 +2051,8 @@
       </div>
     </div>
 
-    <!-- NEWS + AVATAR -->
-    <div class="news-layout" id="newsLayout">
-      <div class="news-strip" id="newsStrip">
+    <!-- NEWS (home tile — hold to rearrange) -->
+    <div class="news-strip home-tile" id="newsStrip">
         <div class="news-header">
           <span class="news-label">Live</span>
           <span class="news-dot">·</span>
@@ -1924,7 +2093,7 @@
         License: CC BY-NC 4.0 (https://creativecommons.org/licenses/by-nc/4.0/)
         Credit files: credits_red.txt, credits_starters.txt
       -->
-      <aside class="avatar-panel" id="avatarPanel" data-mood="cute" data-speed="parked">
+      <aside class="avatar-panel home-tile" id="avatarPanel" data-mood="cute" data-speed="parked">
         <div class="avatar-panel-head">
           <span>Companion · <span id="avatarFormLabel">Egg</span></span>
           <span class="avatar-head-dot" id="avatarGpsDot"></span>
@@ -1939,31 +2108,23 @@
           <span class="avatar-info" id="avatarInfo">Waiting for GPS…</span>
         </div>
       </aside>
+
+    <!-- ARRANGE MODE — exit pill -->
+    <button class="arrange-done" id="arrangeDone" aria-hidden="true">Done</button>
     </div>
 
-    <div class="news-pop" id="newsPop" aria-hidden="true">
-      <article class="news-pop-card" id="newsPopCard" role="dialog" aria-modal="true" aria-labelledby="newsPopTitle">
-        <div class="news-pop-img" id="newsPopImg"></div>
-        <div class="news-pop-body">
-          <div class="news-pop-meta">
-            <span class="news-idx" id="newsPopIdx">01</span>
-            <span id="newsPopSource">News</span>
-            <span class="news-time" id="newsPopTime"></span>
-          </div>
-          <h2 class="news-pop-title" id="newsPopTitle"></h2>
-          <p class="news-pop-desc" id="newsPopDesc"></p>
-          <div class="news-pop-actions">
-            <button class="news-pop-open" id="newsPopOpen" type="button">Read full story</button>
-            <span class="news-pop-hint">Tap outside to close</span>
-          </div>
-        </div>
-      </article>
-    </div>
+    <!-- ── PAGE · STREAMS ── -->
+    <div class="page pos-below" id="pageStreams">
 
     <section>
       <div class="sec-head"><span>Streaming</span></div>
-      <div class="row" id="streaming"></div>
+      <div class="streams-grid" id="streaming"></div>
     </section>
+
+    </div>
+
+    <!-- ── PAGE · FILLER ── -->
+    <div class="page pos-below" id="pageFiller">
 
     <section>
       <div class="sec-head"><span>Music</span></div>
@@ -1975,11 +2136,49 @@
       <div class="row" id="tools"></div>
     </section>
 
-    <section style="margin-bottom:80px">
+    <section>
       <div class="sec-head"><span>Radio</span></div>
       <div class="row" id="radio"></div>
     </section>
+
+    </div>
   </main>
+
+  <!-- FROSTED GLASS SWEEP (page transition layer) -->
+
+  <!-- LEFT PAGE RAIL -->
+  <nav class="page-rail" id="pageRail" aria-label="Pages">
+    <div class="rail-indicator" id="railIndicator"></div>
+    <button class="rail-btn active" type="button" data-page="home" data-label="Home" title="Home" aria-label="Home page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/><path d="M10 21v-6h4v6"/></svg>
+    </button>
+    <button class="rail-btn" type="button" data-page="streams" data-label="Streams" title="Streams" aria-label="Streams page">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.5 4.8c0-.8.9-1.3 1.6-.9l11 6.4c.7.4.7 1.4 0 1.8l-11 6.4c-.7.4-1.6-.1-1.6-.9V4.8z"/></svg>
+    </button>
+    <button class="rail-btn" type="button" data-page="filler" data-label="Filler" title="Filler" aria-label="Filler page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
+    </button>
+  </nav>
+
+  <!-- NEWS POPUP (global overlay, lives outside the pages) -->
+  <div class="news-pop" id="newsPop" aria-hidden="true">
+    <article class="news-pop-card" id="newsPopCard" role="dialog" aria-modal="true" aria-labelledby="newsPopTitle">
+      <div class="news-pop-img" id="newsPopImg"></div>
+      <div class="news-pop-body">
+        <div class="news-pop-meta">
+          <span class="news-idx" id="newsPopIdx">01</span>
+          <span id="newsPopSource">News</span>
+          <span class="news-time" id="newsPopTime"></span>
+        </div>
+        <h2 class="news-pop-title" id="newsPopTitle"></h2>
+        <p class="news-pop-desc" id="newsPopDesc"></p>
+        <div class="news-pop-actions">
+          <button class="news-pop-open" id="newsPopOpen" type="button">Read full story</button>
+          <span class="news-pop-hint">Tap outside to close</span>
+        </div>
+      </div>
+    </article>
+  </div>
 
   <!-- NOW PLAYING -->
   <div class="now-playing" id="nowPlaying">
@@ -3319,6 +3518,738 @@
   renderCards(MUSIC,     'music', 'Play');
   renderCards(TOOLS,     'tools', 'Open');
   renderRadio();
+
+  /* ══════════════════════════════════════════
+     PAGES — vertical navigation with
+     frosted-glass transitions (home/streams/filler)
+     ══════════════════════════════════════════ */
+  const PAGE_KEY   = 'tcal.page';
+  const pageEls    = [
+    document.getElementById('pageHome'),
+    document.getElementById('pageStreams'),
+    document.getElementById('pageFiller')
+  ];
+  const pageViewport= document.getElementById('pageViewport');
+  const railBtns    = Array.prototype.slice.call(document.querySelectorAll('.rail-btn'));
+  const railIndicator = document.getElementById('railIndicator');
+  const pageRail      = document.getElementById('pageRail');
+  const canHover    = window.matchMedia('(hover:hover)').matches;
+  let curPage       = 0;
+  let pageAnimating = false;
+
+  function setRailIndicator(){
+    const btn = railBtns[curPage];
+    if(btn && railIndicator) railIndicator.style.top = btn.offsetTop + 'px';
+  }
+
+  function pageReveal(pageEl){
+    // Re-run entrance animations the first time a page is shown, so cards
+    // don't pop in static after having animated off-screen.
+    if(!pageEl || pageEl.dataset.revealed) return;
+    pageEl.dataset.revealed = '1';
+    pageEl.style.setProperty('--boot-delay', '0s');
+    const els = pageEl.querySelectorAll('.card, .radio-card, section');
+    els.forEach(el => { el.style.animation = 'none'; });
+    void pageEl.offsetWidth;
+    els.forEach(el => { el.style.animation = ''; });
+  }
+
+  function clearPagePreview(){
+    pageViewport.classList.remove('preview-up','preview-down');
+  }
+
+  function goToPage(next){
+    if(next === curPage || pageAnimating) return;
+    if(homeArranging) exitHomeArrange();
+    pageAnimating = true;
+    clearPagePreview();
+    closeNewsPopup();
+
+    const from = curPage;
+    curPage = next;
+    const down = next > from;
+    railBtns.forEach((b, i) => b.classList.toggle('active', i === curPage));
+    setRailIndicator();
+
+    const out = pageEls[from];
+    const inn = pageEls[next];
+    inn.style.zIndex = 2;
+    out.style.zIndex = 1;
+
+    /* Leaving page: fog builds in over ~90ms then melts with the slide
+       (the .fog-out animation — an instant whole-screen frost would
+       flash the screen in a single frame). Incoming page: fully
+       frosted while off-screen, clears as it slides in. */
+    out.classList.add('fog-out');
+    inn.style.transition = 'none';
+    inn.style.filter = 'blur(18px) brightness(.5)';
+    void inn.offsetWidth;
+    inn.style.transition = '';
+    void pageViewport.offsetWidth;
+    inn.style.filter = '';
+    inn.classList.remove('pos-above','pos-below');
+    inn.classList.add('pos-active');
+    out.classList.remove('pos-active');
+    out.classList.add(down ? 'pos-above' : 'pos-below');
+
+    pageReveal(inn);
+    try{ localStorage.setItem(PAGE_KEY, String(curPage)); }catch(e){}
+
+    setTimeout(() => {
+      out.classList.remove('fog-out');
+      out.style.zIndex = '';
+      inn.style.zIndex = '';
+      pageAnimating = false;
+    }, 700);
+  }
+
+  railBtns.forEach((btn, i) => {
+    btn.addEventListener('mouseenter', () => {
+      if(i === curPage || pageAnimating || !canHover) return;
+      pageViewport.classList.add(i > curPage ? 'preview-down' : 'preview-up');
+    });
+    btn.addEventListener('mouseleave', () => { if(!pageAnimating) clearPagePreview(); });
+    btn.addEventListener('click', () => goToPage(i));
+    btn.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); goToPage(i); }
+    });
+  });
+
+  /* ── Rail input: tap commits, finger-drag scrubs the pages ──
+     Press a rail icon and slide the finger along the rail: the pages
+     follow the finger (one page per icon spacing, like detents), frost
+     in proportion to how far they are pushed, and the indicator tracks
+     it 1:1. On release the pages settle to the nearest icon — or, if
+     the slide stayed in the current page's half, to the icon that was
+     pressed, continuing the slide from where the finger left it. A
+     plain tap frosts the glass instantly and commits. Works with mouse
+     and touch alike. */
+  let railPointer = null; /* {id, startY, btnIdx, dragging} */
+
+  function railSpacing(){
+    return railBtns[1].offsetTop - railBtns[0].offsetTop;
+  }
+
+  function applyRailProgress(p){
+    pageEls.forEach((el, i) => {
+      el.style.transform = 'translateY(' + ((i - p) * 101.5).toFixed(3) + '%)';
+      /* Frosted-glass feel while the finger is held: the farther a
+         page is from its rest position, the more it frosts — full
+         frost (blur 18 / dim .5) once it is a whole page away. */
+      const d = Math.min(1, Math.abs(i - p));
+      el.style.filter = d < 0.02
+        ? ''
+        : 'blur(' + (18 * d).toFixed(1) + 'px) brightness(' + (1 - 0.5 * d).toFixed(3) + ')';
+    });
+    const top0 = railBtns[0].offsetTop;
+    const top2 = railBtns[2].offsetTop;
+    railIndicator.style.top = (top0 + (top2 - top0) * (p / 2)).toFixed(1) + 'px';
+    const near = Math.round(p);
+    railBtns.forEach((b, i) => b.classList.toggle('drag-target', i === near && i !== curPage));
+  }
+
+  /* Re-enable transitions, then drop the inline scrub styles so the
+     pages animate from wherever the finger left them to their rest
+     position. Clears the inline transition again once settled. */
+  function settlePages(ms, ease, done){
+    pageEls.forEach(el => {
+      el.style.transition = 'transform ' + ms + ' ' + ease + ', filter ' + ms + ' ' + ease;
+    });
+    void pageViewport.offsetWidth;
+    pageEls.forEach(el => { el.style.transform = ''; el.style.filter = ''; });
+    setTimeout(() => {
+      pageEls.forEach(el => { el.style.transition = ''; });
+      if(done) done();
+    }, parseInt(ms, 10) + 50);
+  }
+
+  function snapBackFromDrag(done){
+    railBtns.forEach(b => b.classList.remove('drag-target'));
+    railIndicator.style.transition = '';
+    setRailIndicator();
+    settlePages('380ms', 'var(--ease-spring)', () => {
+      pageAnimating = false;
+      if(done) done();
+    });
+  }
+
+  function commitDrag(target){
+    if(homeArranging) exitHomeArrange();
+    const from = curPage;
+    curPage = target;
+    const inn = pageEls[target];
+    const out = pageEls[from];
+    inn.style.zIndex = 2;
+    out.style.zIndex = 1;
+
+    /* The scrub frost already on the pages melts away as they settle
+       into place. */
+    pageEls.forEach((el, i) => {
+      el.classList.remove('pos-above','pos-active','pos-below');
+      el.classList.add(i === curPage ? 'pos-active' : (i < curPage ? 'pos-above' : 'pos-below'));
+    });
+    settlePages('520ms', 'var(--ease-spring)', () => {
+      inn.style.zIndex = '';
+      out.style.zIndex = '';
+      pageAnimating = false;
+    });
+
+    railBtns.forEach((b, i) => {
+      b.classList.remove('drag-target');
+      b.classList.toggle('active', i === curPage);
+    });
+    railIndicator.style.transition = '';
+    setRailIndicator();
+    closeNewsPopup();
+    pageReveal(inn);
+    try{ localStorage.setItem(PAGE_KEY, String(curPage)); }catch(e){}
+  }
+
+  pageRail.addEventListener('pointerdown', (e) => {
+    if(railPointer || pageAnimating) return;
+    if(e.pointerType === 'mouse' && e.button !== 0) return;
+    const btn = e.target.closest('.rail-btn');
+    railPointer = {
+      id: e.pointerId,
+      startY: e.clientY,
+      btnIdx: btn ? railBtns.indexOf(btn) : -1,
+      dragging: false
+    };
+    try{ pageRail.setPointerCapture(e.pointerId); }catch(err){}
+  });
+
+  pageRail.addEventListener('pointermove', (e) => {
+    if(!railPointer || e.pointerId !== railPointer.id) return;
+    const dy = e.clientY - railPointer.startY;
+    if(!railPointer.dragging && Math.abs(dy) > 10){
+      railPointer.dragging = true;
+      pageAnimating = true;
+      clearPagePreview();
+      pageEls.forEach(el => { el.style.transition = 'none'; });
+      railIndicator.style.transition = 'none';
+    }
+    if(railPointer.dragging){
+      e.preventDefault();
+      applyRailProgress(Math.min(2, Math.max(0, curPage + dy / railSpacing())));
+    }
+  });
+
+  function finishRailPointer(e, cancelled){
+    if(!railPointer || e.pointerId !== railPointer.id) return;
+    const ptr = railPointer;
+    railPointer = null;
+    if(!ptr.dragging){
+      /* Plain tap on an icon → commit (existing behavior). */
+      if(ptr.btnIdx >= 0) goToPage(ptr.btnIdx);
+      return;
+    }
+    if(cancelled){
+      snapBackFromDrag();
+      return;
+    }
+    const dy = e.clientY - ptr.startY;
+    const p = Math.min(2, Math.max(0, curPage + dy / railSpacing()));
+    const target = Math.round(p);
+    if(target === curPage && (ptr.btnIdx < 0 || ptr.btnIdx === curPage)){
+      /* No icon pressed, or jitter on the current icon → spring back. */
+      snapBackFromDrag();
+    } else if(target === curPage){
+      /* The slide stayed in the current page's half but a different
+         icon was pressed → commit to that icon, continuing the slide
+         from wherever the finger left it (no wobble back first). */
+      commitDrag(ptr.btnIdx);
+    } else {
+      commitDrag(target);
+    }
+  }
+  pageRail.addEventListener('pointerup', (e) => finishRailPointer(e, false));
+  pageRail.addEventListener('pointercancel', (e) => finishRailPointer(e, true));
+
+  window.addEventListener('resize', setRailIndicator);
+  window.addEventListener('load', setRailIndicator);
+
+  /* Restore the last page instantly (no transition on boot). */
+  (function(){
+    let saved = 0;
+    try{ saved = parseInt(localStorage.getItem(PAGE_KEY) || '0', 10) || 0; }catch(e){}
+    if(saved >= 1 && saved < pageEls.length) curPage = saved;
+    pageEls.forEach((el, i) => {
+      el.style.transition = 'none';
+      el.classList.remove('pos-above','pos-active','pos-below');
+      el.classList.add(i === curPage ? 'pos-active' : (i < curPage ? 'pos-above' : 'pos-below'));
+      void el.offsetWidth;
+      el.style.transition = '';
+      el.dataset.revealed = '1';
+    });
+    railBtns.forEach((b, i) => b.classList.toggle('active', i === curPage));
+    setRailIndicator();
+  })();
+
+  /* ══════════════════════════════════════════
+     HOME TILES — free placement.
+     Tiles sit at absolute positions in the
+     home content area. Hold a tile to enter
+     arrange mode (jiggle + placement grid),
+     then drag it anywhere: it snaps to the
+     other tiles' edges (18px gutter) or to
+     the 48px grid. Placements persist; on
+     resize tiles keep their offsets and are
+     clamped into the new area — no reflow,
+     no gaps. Unplaced tiles keep the tight
+     default stack.
+     Tap outside a tile, Done or Esc to exit.
+     ══════════════════════════════════════════ */
+  const homePageEl = pageEls[0];
+  const arrangeDoneBtn = document.getElementById('arrangeDone');
+  const HOME_POS_KEY = 'tcal.homePos';
+  const HOME_GUTTER  = 18;   // gap when snapping a tile against another
+  const HOME_GRID    = 48;   // placement grid cell (matches the overlay)
+  const homeTiles = [
+    document.getElementById('newsStrip'),
+    document.getElementById('avatarPanel'),
+    document.getElementById('calSection')
+  ];
+  const homeTileIds = homeTiles.map(t => t.id);
+  const homePosById = {};    // id -> {x,y} user placement, content px
+  const tileState   = {};    // id -> {x,y,w,h} last laid-out state
+  let homeArranging = false;
+  let homeDrag = null;
+  let holdTimer = null, holdInfo = null, holdPos = null;
+  let layoutRaf = 0;
+
+  /* Content area: origin (ox,oy) + usable box (W×H). The CSS custom
+     properties per breakpoint keep this in sync with the grid overlay. */
+  function homeMetrics(){
+    const cs = getComputedStyle(homePageEl);
+    const ox = parseFloat(cs.getPropertyValue('--hx')) || 116;
+    const oy = parseFloat(cs.getPropertyValue('--hy')) || 16;
+    const or = parseFloat(cs.getPropertyValue('--hxr')) || 24;
+    /* The page's viewport offset (the fixed header). The dragged tile is
+       fixed to the viewport, so snap math must convert to page coords. */
+    const pr = homePageEl.getBoundingClientRect();
+    return {
+      ox, oy, pageX: pr.left, pageY: pr.top,
+      W: Math.max(60, homePageEl.clientWidth  - ox - or),
+      H: Math.max(120, homePageEl.clientHeight - oy - 140)
+    };
+  }
+
+  /* Restore saved placements (silently ignore bad data). */
+  (function(){
+    try{
+      const saved = JSON.parse(localStorage.getItem(HOME_POS_KEY));
+      if(saved && typeof saved === 'object'){
+        homeTileIds.forEach(id => {
+          const p = saved[id];
+          if(p && isFinite(p.x) && isFinite(p.y)){
+            homePosById[id] = { x: p.x, y: p.y };
+          }
+        });
+      }
+    }catch(e){}
+  })();
+
+  function homeVisibleTiles(){
+    return homeTiles.filter(t => t.style.display !== 'none' && t.offsetParent !== null);
+  }
+
+  /* Set size of a tile at the current area width. News keeps 760px (or
+     the full width); in the fully-default stack it yields just enough
+     to keep the avatar on its row instead of wrapping with a gap. */
+  function tileWidths(m, allAuto){
+    const news = (allAuto && m.W - HOME_GUTTER - 200 >= 480)
+      ? Math.min(760, m.W - HOME_GUTTER - 200)
+      : Math.min(760, m.W);
+    return {
+      newsStrip:   news,
+      avatarPanel: Math.min(200, m.W),
+      calSection:  m.W
+    };
+  }
+
+  /* Compute the laid-out {x,y,w} of every tile. Placed tiles honor the
+     saved position (clamped into the area); the rest take the tight
+     default stack, pushed clear of any tile already laid out. */
+  function computeLayout(m){
+    const els = {};
+    homeTiles.forEach(t => { els[t.id] = t; });
+    const hOf  = id => els[id].offsetHeight || 0;
+    const allAuto = !homeTileIds.some(id => homePosById[id]);
+    const Wd = tileWidths(m, allAuto);
+
+    const out = {};
+    const rectOf = id => { const o = out[id]; return { x: o.x, y: o.y, w: o.w, h: hOf(id) }; };
+    const overlaps = (a, b) =>
+      a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+    /* 1) placed tiles, clamped into the content area */
+    homeTileIds.forEach(id => {
+      const p = homePosById[id];
+      if(!p) return;
+      out[id] = {
+        x: Math.max(0, Math.min(p.x, Math.max(0, m.W - Wd[id]))),
+        y: Math.max(0, Math.min(p.y, Math.max(0, m.H - hOf(id)))),
+        w: Wd[id]
+      };
+    });
+
+    /* 2) auto tiles: tight default stack, pushed below any overlap */
+    const defaultPos = {
+      newsStrip:   { x: 0, y: 0 },
+      avatarPanel: (Wd.newsStrip + HOME_GUTTER + 200 <= m.W)
+                      ? { x: Wd.newsStrip + HOME_GUTTER, y: 0 }
+                      : { x: 0, y: hOf('newsStrip') + HOME_GUTTER },
+      calSection:  { x: 0, y: 0 }
+    };
+    homeTileIds.forEach(id => {
+      if(out[id]) return;
+      const p = { x: defaultPos[id].x, y: defaultPos[id].y };
+      let guard = 0;
+      for(;;){
+        const r = { x: p.x, y: p.y, w: Wd[id], h: hOf(id) };
+        let pushed = false;
+        for(const k in out){
+          if(overlaps(r, rectOf(k))){
+            p.y = Math.max(p.y, out[k].y + hOf(k) + HOME_GUTTER);
+            pushed = true;
+          }
+        }
+        if(!pushed || guard++ > 8) break;
+      }
+      out[id] = { x: p.x, y: p.y, w: Wd[id] };
+    });
+
+    /* 3) final clamp; the clamp can create an overlap, so push once more */
+    homeTileIds.forEach(id => {
+      const o = out[id];
+      o.x = Math.max(0, Math.min(o.x, Math.max(0, m.W - o.w)));
+      o.y = Math.max(0, Math.min(o.y, Math.max(0, m.H - hOf(id))));
+      const r = { x: o.x, y: o.y, w: o.w, h: hOf(id) };
+      for(const k in out){
+        if(k === id) continue;
+        if(overlaps(r, rectOf(k))) o.y = out[k].y + hOf(k) + HOME_GUTTER;
+      }
+    });
+    return out;
+  }
+
+  /* Apply the current layout to the DOM. */
+  function applyLayout(){
+    const m = homeMetrics();
+    const pos = computeLayout(m);
+    homeTiles.forEach(t => {
+      const p = pos[t.id];
+      if(!p) return;
+      /* h is needed by the snap candidates ("one gutter below this tile"). */
+      tileState[t.id] = { x: p.x, y: p.y, w: p.w, h: t.offsetHeight || 0 };
+      t.style.left  = (m.ox + p.x) + 'px';
+      t.style.top   = (m.oy + p.y) + 'px';
+      t.style.width = p.w + 'px';
+    });
+  }
+
+  /* Debounced re-layout (window resize, news content growing,
+     calendar toggling). Absolute tiles never reflow each other. */
+  function relayout(){
+    if(layoutRaf || homeDrag) return;
+    layoutRaf = requestAnimationFrame(() => {
+      layoutRaf = 0;
+      applyLayout();
+    });
+  }
+
+  /* Drop ghost — dashed outline of where the dragged tile will land. */
+  const dropGhost = document.createElement('div');
+  dropGhost.className = 'drop-ghost';
+  dropGhost.setAttribute('aria-hidden','true');
+  homePageEl.appendChild(dropGhost);
+
+  function positionDropGhost(d){
+    const m = homeMetrics();
+    dropGhost.style.left   = (m.ox + d.snapped.x) + 'px';
+    dropGhost.style.top    = (m.oy + d.snapped.y) + 'px';
+    dropGhost.style.width  = d.w + 'px';
+    dropGhost.style.height = d.h + 'px';
+    dropGhost.classList.add('show');
+  }
+
+  function hideDropGhost(){ dropGhost.classList.remove('show'); }
+
+  function enterHomeArrange(tile){
+    homeArranging = true;
+    document.body.classList.add('home-arranging');
+    homePageEl.classList.add('arranging');
+    homeVisibleTiles().forEach(t => { if(t !== tile) t.classList.add('jiggling'); });
+    arrangeDoneBtn.classList.add('show');
+    arrangeDoneBtn.setAttribute('aria-hidden', 'false');
+    try{ if(navigator.vibrate) navigator.vibrate(15); }catch(e){}
+  }
+
+  function exitHomeArrange(){
+    if(!homeArranging) return;
+    cancelHomeDrag();
+    homeArranging = false;
+    document.body.classList.remove('home-arranging');
+    homePageEl.classList.remove('arranging');
+    homeTiles.forEach(t => t.classList.remove('jiggling'));
+    arrangeDoneBtn.classList.remove('show');
+    arrangeDoneBtn.setAttribute('aria-hidden', 'true');
+  }
+
+  /* Put a tile back at its laid-out slot and animate the drop from its
+     floating position (FLIP). fromX/fromY are viewport coords. The slot
+     left/top/width must already be applied (applyLayout ran first). */
+  function settleHomeTile(tile, fromX, fromY){
+    tile.style.transition = 'none';
+    homePageEl.appendChild(tile);
+    tile.classList.remove('dragging');
+    tile.style.height = '';
+    const slot = tile.getBoundingClientRect();
+    const dx = fromX - slot.left;
+    const dy = fromY - slot.top;
+    if(Math.abs(dx) < 1 && Math.abs(dy) < 1){
+      /* In place — still clear the lifted transform (it carries the
+         1.03 scale-up and would linger on the tile). */
+      tile.style.transition = '';
+      tile.style.transform  = '';
+      return;
+    }
+    tile.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(1.03)';
+    void tile.offsetWidth;
+    tile.style.transition = 'transform .26s var(--ease-smooth)';
+    tile.style.transform  = '';
+    setTimeout(() => { tile.style.transition = ''; tile.style.transform = ''; }, 320);
+  }
+
+  function beginHomeDrag(tile, x, y, pid){
+    const rect = tile.getBoundingClientRect();
+    const st = tileState[tile.id] || { x: 0, y: 0, w: rect.width, h: rect.height };
+    homeDrag = {
+      tile, id: tile.id,
+      baseX: rect.left, baseY: rect.top,
+      offX: x - rect.left, offY: y - rect.top,
+      lastX: x, lastY: y,
+      w: rect.width, h: rect.height,
+      snapped: { x: st.x, y: st.y },
+      pid: pid,
+      raf: 0, moved: false
+    };
+    tile.classList.remove('jiggling');
+    tile.classList.add('dragging');
+    tile.style.left = rect.left + 'px';
+    tile.style.top  = rect.top + 'px';
+    tile.style.width  = rect.width + 'px';
+    tile.style.height = rect.height + 'px';
+    tile.style.transform = 'translate(0px,0px) scale(1.03)';
+    /* Re-inserting a node restarts its CSS animations — kill the one-shot
+       boot reveal now or the lifted tile would flash invisible (opacity:0
+       during the reveal delay) while it follows the pointer. */
+    tile.style.animation = 'none';
+    /* Move to <body>: fixed to the viewport (the page's will-change
+       transform would make it a containing block). The other tiles are
+       absolutely positioned, so they stay exactly where they are. */
+    document.body.appendChild(tile);
+    document.addEventListener('pointermove', onHomeDragMove);
+    document.addEventListener('pointerup', onHomeDragEnd);
+    document.addEventListener('pointercancel', onHomeDragCancel);
+    positionDropGhost(homeDrag);
+  }
+
+  function detachHomeDragListeners(){
+    document.removeEventListener('pointermove', onHomeDragMove);
+    document.removeEventListener('pointerup', onHomeDragEnd);
+    document.removeEventListener('pointercancel', onHomeDragCancel);
+  }
+
+  function cancelHomeDrag(){
+    const d = homeDrag;
+    if(!d) return;
+    homeDrag = null;
+    detachHomeDragListeners();
+    if(d.raf) cancelAnimationFrame(d.raf);
+    hideDropGhost();
+    /* Settle from where the tile actually is (its floating position),
+       not from the lift point — a cancelled drag may have moved the
+       tile far away, and the FLIP must fly it back from there. */
+    const floating = d.tile.getBoundingClientRect();
+    applyLayout();
+    settleHomeTile(d.tile, floating.left, floating.top);
+  }
+
+  function onHomeDragMove(e){
+    const d = homeDrag;
+    /* Only the pointer that lifted the tile drives the drag. */
+    if(!d || e.pointerId !== d.pid) return;
+    e.preventDefault();
+    d.lastX = e.clientX;
+    d.lastY = e.clientY;
+    d.moved = true;
+    if(d.raf) return;
+    d.raf = requestAnimationFrame(() => {
+      const dd = homeDrag;
+      if(!dd) return;
+      dd.raf = 0;
+      dd.tile.style.transform =
+        'translate(' + (dd.lastX - dd.offX - dd.baseX) + 'px,' +
+                      (dd.lastY - dd.offY - dd.baseY) + 'px) scale(1.03)';
+      const m = homeMetrics();
+      dd.snapped = snapHomePos(
+        dd.lastX - dd.offX - m.pageX - m.ox,
+        dd.lastY - dd.offY - m.pageY - m.oy,
+        dd.w, dd.h, m, dd.id);
+      positionDropGhost(dd);
+    });
+  }
+
+  function onHomeDragEnd(e){
+    const d = homeDrag;
+    if(!d || e.pointerId !== d.pid) return;
+    homeDrag = null;
+    detachHomeDragListeners();
+    if(d.raf) cancelAnimationFrame(d.raf);
+    const floating = d.tile.getBoundingClientRect();
+    if(d.moved){
+      homePosById[d.id] = { x: d.snapped.x, y: d.snapped.y };
+      try{ localStorage.setItem(HOME_POS_KEY, JSON.stringify(homePosById)); }catch(err){}
+    }
+    applyLayout();
+    settleHomeTile(d.tile, floating.left, floating.top);
+    /* Let the ghost stay until the tile has flown into place. */
+    setTimeout(hideDropGhost, 280);
+    if(homeArranging) d.tile.classList.add('jiggling');
+  }
+
+  function onHomeDragCancel(e){
+    if(!homeDrag || e.pointerId !== homeDrag.pid) return;
+    cancelHomeDrag();
+  }
+
+  /* Snap a raw top-left (content px) for a w×h tile: prefer the
+     content edges and the other tiles' edges (aligned, or one gutter
+     apart — that's how tiles end up close together), else fall back to
+     the 48px placement grid. */
+  function snapHomePos(x, y, w, h, m, dragId){
+    const xs = [0, Math.max(0, m.W - w)];
+    const ys = [0, Math.max(0, m.H - h)];
+    homeTiles.forEach(t => {
+      if(t.id === dragId || t.style.display === 'none') return;
+      const s = tileState[t.id];
+      if(!s) return;
+      xs.push(s.x, s.x + s.w + HOME_GUTTER, s.x - w - HOME_GUTTER);
+      ys.push(s.y, s.y + s.h + HOME_GUTTER, s.y - h - HOME_GUTTER);
+    });
+    const pick = (raw, cands) => {
+      let best = null, bd = 14;
+      for(const c of cands){
+        const d = Math.abs(c - raw);
+        if(d < bd){ bd = d; best = c; }
+      }
+      return best === null ? Math.round(raw / HOME_GRID) * HOME_GRID : Math.round(best);
+    };
+    const sx = pick(x, xs);
+    const sy = pick(y, ys);
+    return {
+      x: Math.max(0, Math.min(sx, Math.max(0, m.W - w))),
+      y: Math.max(0, Math.min(sy, Math.max(0, m.H - h)))
+    };
+  }
+
+  /* Hold detection: press still for 420ms to enter arrange mode.
+     Any movement (>12px) or release cancels, so scrolling, the news
+     swipe and plain taps all keep working. */
+  function clearHold(){
+    if(holdTimer){ clearTimeout(holdTimer); holdTimer = null; }
+    holdInfo = null;
+    holdPos = null;
+    document.removeEventListener('pointermove', onHoldMove);
+    document.removeEventListener('pointerup', onHoldEnd);
+    document.removeEventListener('pointercancel', onHoldEnd);
+  }
+
+  function onHoldMove(e){
+    /* Ignore other pointers (a second finger / the other hand must not
+       cancel this hold). */
+    if(!holdInfo || e.pointerId !== holdInfo.pid) return;
+    holdPos = { x: e.clientX, y: e.clientY };
+    if(Math.hypot(e.clientX - holdInfo.x, e.clientY - holdInfo.y) > 12) clearHold();
+  }
+
+  function onHoldEnd(e){
+    if(!holdInfo || e.pointerId !== holdInfo.pid) return;
+    clearHold();
+  }
+
+  homeTiles.forEach(tile => {
+    tile.addEventListener('pointerdown', (e) => {
+      if(e.pointerType === 'mouse' && e.button !== 0) return;
+      /* Buttons / inputs keep their own behavior. */
+      if(e.target.closest('button,input,a,select,textarea,label')) return;
+      if(homeDrag){
+        /* A different pointer arrived while a drag is still active:
+           that drag's pointer never released (the button was probably
+           let go outside the window). Drop the stale drag so the UI
+           can't stay frozen. */
+        if(e.pointerId === homeDrag.pid) return;
+        cancelHomeDrag();
+      }
+      if(homeArranging){
+        e.preventDefault();
+        beginHomeDrag(tile, e.clientX, e.clientY, e.pointerId);
+        return;
+      }
+      holdInfo = { tile, x: e.clientX, y: e.clientY, pid: e.pointerId };
+      holdPos  = { x: e.clientX, y: e.clientY };
+      /* A second pointer starting its own hold supersedes the first one —
+         drop the stale timer or it would fire with the new pointer's info. */
+      if(holdTimer) clearTimeout(holdTimer);
+      document.addEventListener('pointermove', onHoldMove);
+      document.addEventListener('pointerup', onHoldEnd);
+      document.addEventListener('pointercancel', onHoldEnd);
+      holdTimer = setTimeout(() => {
+        const info = holdInfo, pos = holdPos, pid = info ? info.pid : 0;
+        holdTimer = null;
+        document.removeEventListener('pointermove', onHoldMove);
+        document.removeEventListener('pointerup', onHoldEnd);
+        document.removeEventListener('pointercancel', onHoldEnd);
+        if(!info) return;
+        enterHomeArrange(info.tile);
+        beginHomeDrag(info.tile, pos.x, pos.y, pid);
+      }, 420);
+    });
+  });
+
+  /* Tap outside a tile (on empty page area) to exit arrange mode. */
+  homePageEl.addEventListener('pointerdown', (e) => {
+    if(!homeArranging) return;
+    if(e.target.closest('.home-tile,.arrange-done')) return;
+    exitHomeArrange();
+  });
+
+  arrangeDoneBtn.addEventListener('click', exitHomeArrange);
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape' && homeArranging) exitHomeArrange();
+  });
+
+  /* First paint: place tiles synchronously (no transition flash), then
+     re-enable transitions so resizes and content changes slide. */
+  homePageEl.classList.add('home-no-trans');
+  applyLayout();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    homePageEl.classList.remove('home-no-trans');
+  }));
+
+  /* Re-layout when the window resizes or a tile's content changes
+     (news feed loading, calendar toggling). Tiles are absolutely
+     positioned, so nothing reflows — placed tiles just clamp into the
+     new area and keep their offsets (and their gaps). */
+  window.addEventListener('resize', relayout);
+  /* If the window loses focus mid-drag (Alt-Tab, a popup) the pointerup
+     may never arrive — settle the tile instead of leaving it floating. */
+  window.addEventListener('blur', () => { if(homeDrag) cancelHomeDrag(); });
+  if('ResizeObserver' in window){
+    const homeRO = new ResizeObserver(() => relayout());
+    homeTiles.forEach(t => homeRO.observe(t));
+  }
   </script>
 
   <script>
