@@ -591,6 +591,32 @@
       100% { box-shadow: inset 0 0 0 0 rgba(29, 185, 84, 0); }
     }
 
+    .avatar-panel[data-weather="hatch"] #avatarCanvas {
+      filter: drop-shadow(0 0 14px rgba(255, 214, 90, 0.75));
+    }
+
+    /* Egg inside its pre-hatch window: gentle gold glow pulsing in the stage. */
+    .avatar-stage.hatch-pulse {
+      animation:hatchPulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes hatchPulse {
+      0%   { box-shadow: inset 0 0 0 0 rgba(255, 214, 90, 0); }
+      50%  { box-shadow: inset 0 0 30px 6px rgba(255, 214, 90, 0.4); }
+      100% { box-shadow: inset 0 0 0 0 rgba(255, 214, 90, 0); }
+    }
+
+    /* One big gold burst the moment the egg hatches. */
+    .avatar-stage.hatching {
+      animation:hatchBurst 1.1s ease-out 1;
+    }
+
+    @keyframes hatchBurst {
+      0%   { box-shadow: inset 0 0 0 0 rgba(255, 244, 200, 0); }
+      40%  { box-shadow: inset 0 0 60px 24px rgba(255, 214, 90, 0.9); }
+      100% { box-shadow: inset 0 0 0 0 rgba(255, 244, 200, 0); }
+    }
+
     @media (max-width:1100px){
       .avatar-panel{flex-basis:170px;min-height:210px;}
       .avatar-sprite,#avatarCanvas{width:130px;height:130px;}
@@ -3301,7 +3327,10 @@
 
      The avatar evolves with the distance driven today (persisted across
      page reloads; resets at local midnight):
-       Form 1 (red1): 0–10 mi    Form 2 (red2): 10–20 mi    Form 3 (red3): 20+ mi
+       Form 0 (egg): 0–5 mi      Form 1 (red1): 5–10 mi
+       Form 2 (red2): 10–20 mi   Form 3 (red3): 20+ mi
+     Form 0 is the egg: Idle while parked, Tumble while moving, and Hurt in
+     the HATCH_SOON_MI window before it hatches (with a gold flash build-up).
      Each form folder keeps its own sprites + AnimData XML. The metadata below
      mirrors those XML files so the page animates without fetching them.
   */
@@ -3319,16 +3348,23 @@
 
     /* ── FORMS ── */
     const FORMS = [
+      { id:'egg',  label:'Form 0', dir:'images/egg/',  suffix:'' },
       { id:'red1', label:'Form 1', dir:'images/red1/', suffix:'' },
       { id:'red2', label:'Form 2', dir:'images/red2/', suffix:'_red2' },
       { id:'red3', label:'Form 3', dir:'images/red3/', suffix:'_red3' }
     ];
-    const FORM_AT_MILES     = [0, 10, 20]; // form i starts at this many miles
+    const FORM_AT_MILES     = [0, 5, 10, 20]; // form i starts at this many miles
     const KM_PER_MILE       = 1.609344;
     const PREFETCH_AHEAD_MI = 2;           // start loading the next form this close
+    const HATCH_SOON_MI     = 2;           // egg shows Hurt this close to hatching
 
     /* Animation metadata per form (mirrors each folder's AnimData*.xml). */
     const FORM_META = [
+      [ /* egg (PMDCollab 0000 form 4 — only Idle, Tumble and Hurt are used) */
+        { name:'Hurt',   index:6,  w:32, h:48, d:[2,8] },
+        { name:'Idle',   index:7,  w:24, h:32, d:[22,6,2,6,6] },
+        { name:'Tumble', index:16, w:24, h:32, d:[3,3,3,3,3,3,3,3] }
+      ],
       [ /* red1 */
         { name:'Walk',         index:0,  w:32, h:32, d:[6,8,6,8] },
         { name:'Attack',       index:1,  w:64, h:64, d:[2,2,4,2,2,2,2,2,2,2,2] },
@@ -3440,11 +3476,14 @@
     const SPEED_DECAY_TAU  = 2;     // s — how fast the speed eases to 0 once decaying
     const ANIM_DEBOUNCE_MS = 1200;  // a mood change must hold this long before it plays
 
-    /* Hidden test hooks: ?test_miles=12 & test_speed=120 */
+    /* Hidden test hooks: ?test_miles=12 & test_speed=120
+       ?test_drive additionally accrues ~75 mi/h of distance so form
+       transitions (e.g. the egg hatching) can be watched live. */
     const urlParams  = new URLSearchParams(location.search);
     const TEST_MILES = parseFloat(urlParams.get('test_miles'));
     const TEST_SPEED = parseFloat(urlParams.get('test_speed'));
     const TEST_MODE  = !Number.isNaN(TEST_SPEED);
+    const TEST_DRIVE = urlParams.has('test_drive');
 
     /* Per-form runtime state */
     const forms = FORMS.map((f, i) => ({
@@ -3524,6 +3563,7 @@
     let evolveTarget = -1;      // form we're loading/transitioning into
     let evolveAnimName = 'Idle';
     let evolveUntil = 0;        // until this timestamp the evolve animation plays
+    let evolveIsHatch = false;  // true when the evolution is the egg hatching
     let speedClassState = 'parked';
     let pendingAnim = null;     // {name, since} — animation-change debounce
     let current = { name: 'Idle', loop: true };
@@ -3664,7 +3704,27 @@
       }, ANIM_DEBOUNCE_MS);
     }
 
+    /* True while the egg is inside its pre-hatch window (the last
+       HATCH_SOON_MI before it hatches into Form 1). */
+    function eggHatchingSoon(){
+      return formIdx === 0 &&
+             forms.length > 1 &&
+             state.totalMiles >= FORM_AT_MILES[1] - HATCH_SOON_MI;
+    }
+
     function chooseAnimation(){
+      /* Form 0 is the egg: it only knows Idle, Tumble and Hurt. */
+      if (forms[formIdx].id === 'egg') {
+        const night = isNightNow();
+        if (eggHatchingSoon()) {
+          return { name:'Hurt', label:'Hatching soon…', cat:'unknown', night };
+        }
+        if (speedClassState !== 'parked') {
+          return { name:'Tumble', label:'Tumbling', cat:'unknown', night };
+        }
+        return { name:'Idle', label:'Resting', cat:'unknown', night };
+      }
+
       const cat = state.weather ? weatherCategory(state.weather.code) : 'unknown';
       const night = isNightNow();
 
@@ -3736,24 +3796,29 @@
       }
     }
 
-    /* Evolution: cross a distance threshold → flash + brief transition anim. */
+    /* Evolution: cross a distance threshold → flash + brief transition anim.
+       The egg hatching (form 0 → form 1) gets a gold burst instead of the
+       green evolve flash. */
     function startEvolution(target){
       if (evolveTarget !== -1) return;
       evolveTarget = target;
-      if (moodLabel) moodLabel.textContent = 'Evolving…';
+      evolveIsHatch = formIdx === 0 && forms[0].id === 'egg';
+      if (moodLabel) moodLabel.textContent = evolveIsHatch ? 'Hatching…' : 'Evolving…';
       loadForm(target).then(() => {
         formIdx = target;
         evolveAnimName = ['Wake','Tumble','Hop','Idle'].find(n => forms[target].metaBy[n]) || 'Idle';
         evolveUntil = Date.now() + 1600;
         playAnim(evolveAnimName, true);
         if (stage) {
-          stage.classList.remove('evolving');
+          const cls = evolveIsHatch ? 'hatching' : 'evolving';
+          stage.classList.remove('evolving', 'hatching', 'hatch-pulse');
           void stage.offsetWidth;
-          stage.classList.add('evolving');
+          stage.classList.add(cls);
         }
         setTimeout(() => {
           evolveTarget = -1;
           pendingAnim = null;
+          if (stage) stage.classList.remove('evolving', 'hatching');
           const again = formIndexForMiles(state.totalMiles);
           if (again !== formIdx) startEvolution(again);
           else updateAvatar();
@@ -3772,7 +3837,7 @@
       const evolving = Date.now() < evolveUntil;
       let chosen;
       if (evolving) {
-        chosen = { name: evolveAnimName, label: 'Evolving → ' + FORMS[formIdx].label, cat: 'unknown', night: isNightNow() };
+        chosen = { name: evolveAnimName, label: (evolveIsHatch ? 'Hatching → ' : 'Evolving → ') + FORMS[formIdx].label, cat: 'unknown', night: isNightNow() };
       } else {
         chosen = chooseAnimation();
         requestAnim(chosen.name);
@@ -3785,8 +3850,11 @@
       }
       if (gpsDot) gpsDot.classList.toggle('ok', state.gpsOk);
 
+      /* Egg inside its pre-hatch window: keep the gold pulse running. */
+      if (stage) stage.classList.toggle('hatch-pulse', !evolving && eggHatchingSoon());
+
       avatarPanel.dataset.speed = speedClassState;
-      avatarPanel.dataset.weather = evolving ? 'evolve' : (chosen.cat || 'unknown');
+      avatarPanel.dataset.weather = evolving ? (evolveIsHatch ? 'hatch' : 'evolve') : (chosen.cat || 'unknown');
       avatarPanel.dataset.time = chosen.night ? 'night' : 'day';
       if (formLabel) formLabel.textContent = FORMS[formIdx].label;
 
@@ -4268,6 +4336,7 @@
           const t = Date.now() / 1000;
           state.smoothSpeed = Math.max(0, TEST_SPEED + Math.sin(t * 0.6) * 2.5);
           state.lastMove = Date.now();
+          if (TEST_DRIVE) state.totalMiles += 1 / 48; // ~75 mi/h — watch evolutions happen
           updateAvatar();
         }, 500);
       } else {
