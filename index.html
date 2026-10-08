@@ -113,7 +113,7 @@
 
     /* ── TICKER ── */
     .ticker-bar{
-      position:sticky;top:0;z-index:200;
+      position:fixed;top:0;left:0;right:0;z-index:200;
       background:rgba(10,10,12,.92);
       backdrop-filter:blur(14px);
       -webkit-backdrop-filter:blur(14px);
@@ -171,10 +171,13 @@
 
     /* ── HEADER ── */
     header{
+      position:fixed;top:44px;left:0;right:0;z-index:200;
       display:flex;align-items:center;justify-content:space-between;
-      padding:11px 20px;
+      padding:0 20px;height:56px;
       border-bottom:1px solid var(--border);
-      background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);
+      background:rgba(11,11,14,.86);
+      backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);
       animation:slideDown .7s var(--ease-out) var(--boot-delay) both;
     }
     @keyframes slideDown{
@@ -709,7 +712,29 @@
     }
 
     /* ── SECTIONS ── */
-    main{padding:16px 0 120px;}
+    /* Page viewport: three stacked full-screen pages (home / streams / filler) */
+    main.page-viewport{
+      position:fixed;top:100px;left:0;right:0;bottom:0;
+      padding:0;z-index:1;overflow:hidden;
+    }
+    .page{
+      position:absolute;inset:0;
+      overflow-y:auto;overscroll-behavior:contain;
+      padding:16px 0 140px 92px;
+      scrollbar-width:none;
+      will-change:transform,filter;
+      transition:transform .62s var(--ease-duo),filter .62s var(--ease-duo);
+    }
+    .page::-webkit-scrollbar{display:none;}
+    .page.pos-above{transform:translateY(-101.5%);}
+    .page.pos-active{transform:translateY(0);}
+    .page.pos-below{transform:translateY(101.5%);}
+    .page.frost{filter:blur(18px) brightness(.5);}
+    /* hover previews: current page nudges + frosts, target peeks in */
+    .page-viewport.preview-down .page.pos-active{transform:translateY(-5%);filter:blur(3px) brightness(.8);transition-duration:.38s;}
+    .page-viewport.preview-down .page.pos-below{transform:translateY(94.5%);transition-duration:.38s;}
+    .page-viewport.preview-up .page.pos-active{transform:translateY(5%);filter:blur(3px) brightness(.8);transition-duration:.38s;}
+    .page-viewport.preview-up .page.pos-above{transform:translateY(-94.5%);transition-duration:.38s;}
     section{
       margin:24px 24px;
       animation:sectionReveal .8s var(--ease-out) both;
@@ -1116,8 +1141,8 @@
     .chat-pill{
       position:fixed;
       left:0;
-      top:50%;
-      transform:translateY(-50%) translateX(-100%);
+      bottom:74px;
+      transform:translateX(-100%);
       z-index:401;
       background:#8B5CF6;
       border-radius:0 14px 14px 0;
@@ -1135,7 +1160,7 @@
       user-select:none;
       box-shadow:4px 0 18px rgba(139,92,246,.28);
     }
-    .chat-pill.visible{transform:translateY(-50%) translateX(0);}
+    .chat-pill.visible{transform:translateX(0);}
     .chat-pill:active{background:#7C3AED;}
     .chat-pill svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
     .chat-pill-label{
@@ -1361,9 +1386,102 @@
       100% {transform:scaleX(1);}
     }
 
+    /* ── LEFT PAGE RAIL ── */
+    .page-rail{
+      position:fixed;left:14px;top:50%;transform:translateY(-50%);
+      z-index:600;display:flex;flex-direction:column;gap:10px;
+      padding:10px;user-select:none;
+      background:rgba(20,20,26,.55);
+      backdrop-filter:blur(22px) saturate(1.5);
+      -webkit-backdrop-filter:blur(22px) saturate(1.5);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:22px;
+      box-shadow:0 18px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08);
+      animation:railIn .6s var(--ease-out) calc(var(--boot-delay) + .3s) both;
+    }
+    @keyframes railIn{
+      from{opacity:0;transform:translateY(-50%) translateX(-12px);}
+      to  {opacity:1;transform:translateY(-50%) translateX(0);}
+    }
+    .rail-indicator{
+      position:absolute;left:6px;right:6px;height:46px;top:10px;
+      border-radius:14px;pointer-events:none;
+      background:var(--accent-soft);
+      border:1px solid rgba(29,185,84,.5);
+      box-shadow:0 0 18px rgba(29,185,84,.35),inset 0 1px 0 rgba(255,255,255,.12);
+      transition:top .5s var(--ease-spring);
+    }
+    .rail-btn{
+      position:relative;width:46px;height:46px;border-radius:14px;
+      border:1px solid transparent;background:transparent;
+      color:var(--muted);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:
+        color .25s var(--ease-smooth),
+        background .25s var(--ease-smooth),
+        transform .3s var(--ease-spring);
+    }
+    .rail-btn:hover{color:#fff;background:rgba(255,255,255,.07);}
+    .rail-btn:active{transform:scale(.9);}
+    .rail-btn.active{color:var(--accent);}
+    .rail-btn svg{width:20px;height:20px;pointer-events:none;}
+    .rail-btn::after{
+      content:attr(data-label);
+      position:absolute;left:calc(100% + 12px);top:50%;
+      transform:translateY(-50%) translateX(-5px);
+      font-size:10px;font-weight:700;letter-spacing:.12em;
+      text-transform:uppercase;color:#fff;
+      background:rgba(15,15,19,.92);border:1px solid var(--border);
+      padding:5px 10px;border-radius:8px;white-space:nowrap;
+      opacity:0;pointer-events:none;
+      transition:opacity .25s var(--ease-smooth),transform .25s var(--ease-smooth);
+    }
+    .rail-btn:hover::after{opacity:1;transform:translateY(-50%) translateX(0);}
+
+    /* ── FROSTED GLASS SWEEP (page transition layer) ── */
+    .glass-sweep{
+      position:fixed;top:0;left:0;right:0;height:55vh;
+      z-index:500;pointer-events:none;opacity:0;
+      transform:translateY(-115%);
+      background:linear-gradient(180deg,
+        transparent 0%,
+        rgba(255,255,255,.045) 38%,
+        rgba(255,255,255,.10) 50%,
+        rgba(255,255,255,.045) 62%,
+        transparent 100%);
+      border-top:1px solid rgba(255,255,255,.20);
+      border-bottom:1px solid rgba(255,255,255,.20);
+      backdrop-filter:blur(8px) saturate(1.3);
+      -webkit-backdrop-filter:blur(8px) saturate(1.3);
+    }
+    .glass-sweep.run-down{animation:sweepDown .66s var(--ease-duo) .03s both;}
+    .glass-sweep.run-up{animation:sweepUp .66s var(--ease-duo) .03s both;}
+    @keyframes sweepDown{
+      0%   {transform:translateY(-115%);opacity:0;}
+      10%  {opacity:1;}
+      90%  {opacity:1;}
+      100% {transform:translateY(315%);opacity:0;}
+    }
+    @keyframes sweepUp{
+      0%   {transform:translateY(315%);opacity:0;}
+      10%  {opacity:1;}
+      90%  {opacity:1;}
+      100% {transform:translateY(-115%);opacity:0;}
+    }
+
+    /* ── STREAMS PAGE GRID ── */
+    .streams-grid{
+      display:grid;gap:14px;
+      grid-template-columns:repeat(auto-fill,minmax(172px,1fr));
+      max-width:1080px;
+    }
+    .streams-grid .card{width:100%;}
+
     /* ── NARROW / HALF SCREEN ── */
     @media (max-width:640px){
       header{padding:9px 12px;}
+      .page{padding-left:84px;}
+      .page-rail{left:8px;}
       .logo{gap:7px;}
       .logo-t{width:26px;height:26px;font-size:12px;border-radius:7px;}
       .logo-name{font-size:14px;white-space:nowrap;}
@@ -1837,8 +1955,11 @@
     </div>
   </header>
 
-  <!-- CONTENT -->
-  <main>
+  <!-- CONTENT: three stacked pages — home / streams / filler -->
+  <main class="page-viewport" id="pageViewport">
+
+    <!-- ── PAGE · HOME ── -->
+    <div class="page pos-active" id="pageHome">
 
     <!-- CALENDAR SECTION -->
     <div class="cal-section" id="calSection" style="display:none;margin-bottom:0;overflow:hidden;transition:none;">
@@ -1941,29 +2062,20 @@
       </aside>
     </div>
 
-    <div class="news-pop" id="newsPop" aria-hidden="true">
-      <article class="news-pop-card" id="newsPopCard" role="dialog" aria-modal="true" aria-labelledby="newsPopTitle">
-        <div class="news-pop-img" id="newsPopImg"></div>
-        <div class="news-pop-body">
-          <div class="news-pop-meta">
-            <span class="news-idx" id="newsPopIdx">01</span>
-            <span id="newsPopSource">News</span>
-            <span class="news-time" id="newsPopTime"></span>
-          </div>
-          <h2 class="news-pop-title" id="newsPopTitle"></h2>
-          <p class="news-pop-desc" id="newsPopDesc"></p>
-          <div class="news-pop-actions">
-            <button class="news-pop-open" id="newsPopOpen" type="button">Read full story</button>
-            <span class="news-pop-hint">Tap outside to close</span>
-          </div>
-        </div>
-      </article>
     </div>
+
+    <!-- ── PAGE · STREAMS ── -->
+    <div class="page pos-below" id="pageStreams">
 
     <section>
       <div class="sec-head"><span>Streaming</span></div>
-      <div class="row" id="streaming"></div>
+      <div class="streams-grid" id="streaming"></div>
     </section>
+
+    </div>
+
+    <!-- ── PAGE · FILLER ── -->
+    <div class="page pos-below" id="pageFiller">
 
     <section>
       <div class="sec-head"><span>Music</span></div>
@@ -1975,11 +2087,50 @@
       <div class="row" id="tools"></div>
     </section>
 
-    <section style="margin-bottom:80px">
+    <section>
       <div class="sec-head"><span>Radio</span></div>
       <div class="row" id="radio"></div>
     </section>
+
+    </div>
   </main>
+
+  <!-- FROSTED GLASS SWEEP (page transition layer) -->
+  <div class="glass-sweep" id="glassSweep" aria-hidden="true"></div>
+
+  <!-- LEFT PAGE RAIL -->
+  <nav class="page-rail" id="pageRail" aria-label="Pages">
+    <div class="rail-indicator" id="railIndicator"></div>
+    <button class="rail-btn active" type="button" data-page="home" data-label="Home" title="Home" aria-label="Home page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/><path d="M10 21v-6h4v6"/></svg>
+    </button>
+    <button class="rail-btn" type="button" data-page="streams" data-label="Streams" title="Streams" aria-label="Streams page">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.5 4.8c0-.8.9-1.3 1.6-.9l11 6.4c.7.4.7 1.4 0 1.8l-11 6.4c-.7.4-1.6-.1-1.6-.9V4.8z"/></svg>
+    </button>
+    <button class="rail-btn" type="button" data-page="filler" data-label="Filler" title="Filler" aria-label="Filler page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
+    </button>
+  </nav>
+
+  <!-- NEWS POPUP (global overlay, lives outside the pages) -->
+  <div class="news-pop" id="newsPop" aria-hidden="true">
+    <article class="news-pop-card" id="newsPopCard" role="dialog" aria-modal="true" aria-labelledby="newsPopTitle">
+      <div class="news-pop-img" id="newsPopImg"></div>
+      <div class="news-pop-body">
+        <div class="news-pop-meta">
+          <span class="news-idx" id="newsPopIdx">01</span>
+          <span id="newsPopSource">News</span>
+          <span class="news-time" id="newsPopTime"></span>
+        </div>
+        <h2 class="news-pop-title" id="newsPopTitle"></h2>
+        <p class="news-pop-desc" id="newsPopDesc"></p>
+        <div class="news-pop-actions">
+          <button class="news-pop-open" id="newsPopOpen" type="button">Read full story</button>
+          <span class="news-pop-hint">Tap outside to close</span>
+        </div>
+      </div>
+    </article>
+  </div>
 
   <!-- NOW PLAYING -->
   <div class="now-playing" id="nowPlaying">
@@ -3319,6 +3470,121 @@
   renderCards(MUSIC,     'music', 'Play');
   renderCards(TOOLS,     'tools', 'Open');
   renderRadio();
+
+  /* ══════════════════════════════════════════
+     PAGES — vertical navigation with
+     frosted-glass transitions (home/streams/filler)
+     ══════════════════════════════════════════ */
+  const PAGE_KEY   = 'tcal.page';
+  const pageEls    = [
+    document.getElementById('pageHome'),
+    document.getElementById('pageStreams'),
+    document.getElementById('pageFiller')
+  ];
+  const pageViewport= document.getElementById('pageViewport');
+  const glassSweep  = document.getElementById('glassSweep');
+  const railBtns    = Array.prototype.slice.call(document.querySelectorAll('.rail-btn'));
+  const railIndicator = document.getElementById('railIndicator');
+  const canHover    = window.matchMedia('(hover:hover)').matches;
+  let curPage       = 0;
+  let pageAnimating = false;
+
+  function setRailIndicator(){
+    const btn = railBtns[curPage];
+    if(btn && railIndicator) railIndicator.style.top = btn.offsetTop + 'px';
+  }
+
+  function pageReveal(pageEl){
+    // Re-run entrance animations the first time a page is shown, so cards
+    // don't pop in static after having animated off-screen.
+    if(!pageEl || pageEl.dataset.revealed) return;
+    pageEl.dataset.revealed = '1';
+    pageEl.style.setProperty('--boot-delay', '0s');
+    const els = pageEl.querySelectorAll('.card, .radio-card, section');
+    els.forEach(el => { el.style.animation = 'none'; });
+    void pageEl.offsetWidth;
+    els.forEach(el => { el.style.animation = ''; });
+  }
+
+  function clearPagePreview(){
+    pageViewport.classList.remove('preview-up','preview-down');
+  }
+
+  function goToPage(next){
+    if(next === curPage || pageAnimating) return;
+    pageAnimating = true;
+    clearPagePreview();
+    closeNewsPopup();
+
+    const from = curPage;
+    curPage = next;
+    const down = next > from;
+    railBtns.forEach((b, i) => b.classList.toggle('active', i === curPage));
+    setRailIndicator();
+
+    const out = pageEls[from];
+    const inn = pageEls[next];
+    inn.style.zIndex = 2;
+    out.style.zIndex = 1;
+
+    /* frosted glass sweep across the screen */
+    glassSweep.classList.remove('run-down','run-up');
+    void glassSweep.offsetWidth;
+    glassSweep.classList.add(down ? 'run-down' : 'run-up');
+
+    /* incoming page: pre-blur without transition, then release */
+    inn.style.transition = 'none';
+    inn.style.filter = 'blur(14px)';
+    void inn.offsetWidth;
+    inn.style.transition = '';
+    inn.classList.remove('pos-above','pos-below');
+    inn.classList.add('pos-active');
+    inn.style.filter = '';
+
+    /* outgoing page: frosts over while sliding away */
+    out.classList.add('frost');
+    out.classList.remove('pos-active');
+    out.classList.add(down ? 'pos-above' : 'pos-below');
+
+    pageReveal(inn);
+    try{ localStorage.setItem(PAGE_KEY, String(curPage)); }catch(e){}
+
+    setTimeout(() => {
+      out.classList.remove('frost');
+      out.style.zIndex = '';
+      inn.style.zIndex = '';
+      pageAnimating = false;
+    }, 700);
+  }
+
+  railBtns.forEach((btn, i) => {
+    btn.addEventListener('mouseenter', () => {
+      if(i === curPage || pageAnimating || !canHover) return;
+      pageViewport.classList.add(i > curPage ? 'preview-down' : 'preview-up');
+    });
+    btn.addEventListener('mouseleave', () => { if(!pageAnimating) clearPagePreview(); });
+    btn.addEventListener('click', () => goToPage(i));
+  });
+
+  window.addEventListener('resize', setRailIndicator);
+  window.addEventListener('load', setRailIndicator);
+
+  /* Restore the last page instantly (no transition on boot). */
+  (function(){
+    let saved = 0;
+    try{ saved = parseInt(localStorage.getItem(PAGE_KEY) || '0', 10) || 0; }catch(e){}
+    if(saved >= 1 && saved < pageEls.length) curPage = saved;
+    pageEls.forEach((el, i) => {
+      el.style.transition = 'none';
+      el.classList.remove('pos-above','pos-active','pos-below');
+      el.classList.add(i === curPage ? 'pos-active' : (i < curPage ? 'pos-above' : 'pos-below'));
+      void el.offsetWidth;
+      el.style.transition = '';
+      el.dataset.revealed = '1';
+    });
+    railBtns.forEach((b, i) => b.classList.toggle('active', i === curPage));
+    setRailIndicator();
+  })();
   </script>
 
   <script>
