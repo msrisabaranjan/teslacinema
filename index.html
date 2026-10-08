@@ -1447,33 +1447,6 @@
     }
     .rail-btn:hover::after{opacity:1;transform:translateY(-50%) translateX(0);}
 
-    /* ── FROSTED GLASS SWEEP (page transition layer) ── */
-    .glass-sweep{
-      position:fixed;top:0;left:0;right:0;height:24vh;
-      z-index:500;pointer-events:none;opacity:0;
-      transform:translateY(-130%);
-      background:linear-gradient(180deg,
-        transparent 0%,
-        rgba(255,255,255,.025) 35%,
-        rgba(255,255,255,.05) 50%,
-        rgba(255,255,255,.025) 65%,
-        transparent 100%);
-    }
-    .glass-sweep.run-down{animation:sweepDown .72s var(--ease-duo) .02s both;}
-    .glass-sweep.run-up{animation:sweepUp .72s var(--ease-duo) .02s both;}
-    @keyframes sweepDown{
-      0%   {transform:translateY(-130%);opacity:0;}
-      15%  {opacity:1;}
-      85%  {opacity:1;}
-      100% {transform:translateY(540%);opacity:0;}
-    }
-    @keyframes sweepUp{
-      0%   {transform:translateY(540%);opacity:0;}
-      15%  {opacity:1;}
-      85%  {opacity:1;}
-      100% {transform:translateY(-130%);opacity:0;}
-    }
-
     /* ── STREAMS PAGE GRID ── */
     .streams-grid{
       display:grid;gap:14px;
@@ -2101,7 +2074,6 @@
   </main>
 
   <!-- FROSTED GLASS SWEEP (page transition layer) -->
-  <div class="glass-sweep" id="glassSweep" aria-hidden="true"></div>
 
   <!-- LEFT PAGE RAIL -->
   <nav class="page-rail" id="pageRail" aria-label="Pages">
@@ -3487,7 +3459,6 @@
     document.getElementById('pageFiller')
   ];
   const pageViewport= document.getElementById('pageViewport');
-  const glassSweep  = document.getElementById('glassSweep');
   const railBtns    = Array.prototype.slice.call(document.querySelectorAll('.rail-btn'));
   const railIndicator = document.getElementById('railIndicator');
   const pageRail      = document.getElementById('pageRail');
@@ -3532,11 +3503,6 @@
     const inn = pageEls[next];
     inn.style.zIndex = 2;
     out.style.zIndex = 1;
-
-    /* frosted glass sweep across the screen */
-    glassSweep.classList.remove('run-down','run-up');
-    void glassSweep.offsetWidth;
-    glassSweep.classList.add(down ? 'run-down' : 'run-up');
 
     /* Leaving page: fog builds in over ~90ms then melts with the slide
        (the .fog-out animation — an instant whole-screen frost would
@@ -3643,14 +3609,8 @@
     inn.style.zIndex = 2;
     out.style.zIndex = 1;
 
-    /* Frosted-glass sweep across the screen (same as the tap
-       transition). The scrub frost already on the pages melts away
-       as they settle into place. */
-    const down = target > from;
-    glassSweep.classList.remove('run-down','run-up');
-    void glassSweep.offsetWidth;
-    glassSweep.classList.add(down ? 'run-down' : 'run-up');
-
+    /* The scrub frost already on the pages melts away as they settle
+       into place. */
     pageEls.forEach((el, i) => {
       el.classList.remove('pos-above','pos-active','pos-below');
       el.classList.add(i === curPage ? 'pos-active' : (i < curPage ? 'pos-above' : 'pos-below'));
