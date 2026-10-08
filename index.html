@@ -301,7 +301,10 @@
 
     /* arrange mode: jiggle + drag */
     #pageHome.arranging{overflow:hidden;}
-    #pageHome.arranging .home-tile{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;}
+    #pageHome.arranging .home-tile{
+      touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;
+      outline:1px dashed rgba(255,255,255,.22);outline-offset:4px;
+    }
     #pageHome.arranging .home-tile>*{pointer-events:none;}
     body.home-arranging{cursor:grabbing;}
     body.home-arranging *{user-select:none;-webkit-user-select:none;}
@@ -311,7 +314,22 @@
       position:fixed;z-index:500;margin:0;
       pointer-events:none;will-change:transform;cursor:grabbing;
       box-shadow:0 24px 48px rgba(0,0,0,.5),var(--tile-shadow);
+      outline:1px dashed rgba(255,255,255,.55);outline-offset:6px;
     }
+    /* Light placement grid — visible only while arranging. Covers the
+       content area (lines start at the content origin so tile edges
+       sit on grid lines). */
+    #pageHome::after{
+      content:'';position:absolute;
+      top:16px;left:116px;right:24px;bottom:0;
+      pointer-events:none;z-index:5;
+      background-image:
+        linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+      background-size:48px 48px;
+      opacity:0;transition:opacity .25s var(--ease-out);
+    }
+    #pageHome.arranging::after{opacity:1;}
     .arrange-done{
       position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
       z-index:510;pointer-events:none;opacity:0;
@@ -659,6 +677,7 @@
     }
     @media (max-width:720px){
       #pageHome{gap:12px;padding:14px 16px 140px 108px;}
+      #pageHome::after{top:14px;left:108px;right:16px;}
       #newsStrip,#avatarPanel{flex:1 1 100%;}
       .avatar-panel{min-height:190px;}
       .avatar-sprite,#avatarCanvas{width:110px;height:110px;}
@@ -1503,6 +1522,7 @@
       .yr-widget{display:none;}
       .fs-btn{width:28px;height:28px;}
       #pageHome{padding:12px 14px 140px 98px;}
+      #pageHome::after{top:12px;left:98px;right:14px;}
       .sec-head{padding:0 2px 10px;}
       .row{gap:10px;padding:0 2px 4px;}
       .card{width:134px;height:162px;border-radius:14px;padding:10px;}
