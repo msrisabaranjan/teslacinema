@@ -285,19 +285,31 @@
       to  {opacity:1;transform:translateY(0) scale(1);}
     }
 
+    /* Free placement: tiles are absolutely positioned inside the content
+       area (origin --hx/--hy, right margin --hxr). JS sets left/top/
+       width; positions survive resizes (clamped, never reflowed). */
     #pageHome{
-      display:flex;
-      flex-wrap:wrap;
-      gap:18px;
-      align-items:flex-start;
-      padding:16px 24px 140px 116px;
+      /* position:relative would override .page's absolute;inset:0 and
+         collapse the page to its padding height — keep .page's box. */
+      padding:0 0 140px 0;
+      --hx:116px;--hy:16px;--hxr:24px;
     }
+    .home-tile{
+      position:absolute;
+      transition:left .18s var(--ease-out),top .18s var(--ease-out),width .18s var(--ease-out);
+    }
+    /* .news-strip / .avatar-panel declare position:relative later in
+       this sheet (for their absolutely-positioned inner chrome); the
+       id rules win the cascade so the tiles stay out of the flow. */
+    #newsStrip,#avatarPanel,#calSection{position:absolute;}
+    #newsStrip.dragging,#avatarPanel.dragging,#calSection.dragging{position:fixed;}
+    #pageHome.home-no-trans .home-tile{transition:none;}
     /* Tiles keep their set size — they move, they never stretch to fill. */
-    #newsStrip{flex:0 1 760px;min-width:0;
+    #newsStrip{min-width:0;
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .15s) backwards;}
-    #avatarPanel{flex:0 0 200px;
+    #avatarPanel{
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .22s) backwards;}
-    #calSection{flex:0 1 100%;margin:0;}
+    #calSection{margin:0;}
 
     /* arrange mode: jiggle + drag */
     #pageHome.arranging{overflow:hidden;}
@@ -321,7 +333,7 @@
        sit on grid lines). */
     #pageHome::after{
       content:'';position:absolute;
-      top:16px;left:116px;right:24px;bottom:0;
+      top:var(--hy);left:var(--hx);right:var(--hxr);bottom:0;
       pointer-events:none;z-index:5;
       background-image:
         linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),
@@ -686,9 +698,7 @@
       .avatar-sprite,#avatarCanvas{width:130px;height:130px;}
     }
     @media (max-width:720px){
-      #pageHome{gap:12px;padding:14px 16px 140px 108px;}
-      #pageHome::after{top:14px;left:108px;right:16px;}
-      #newsStrip,#avatarPanel{flex:1 1 100%;}
+      #pageHome{--hx:108px;--hy:14px;--hxr:16px;}
       .avatar-panel{min-height:190px;}
       .avatar-sprite,#avatarCanvas{width:110px;height:110px;}
     }
@@ -1531,8 +1541,7 @@
       #date-display{display:none;}
       .yr-widget{display:none;}
       .fs-btn{width:28px;height:28px;}
-      #pageHome{padding:12px 14px 140px 98px;}
-      #pageHome::after{top:12px;left:98px;right:14px;}
+      #pageHome{--hx:98px;--hy:12px;--hxr:14px;}
       .sec-head{padding:0 2px 10px;}
       .row{gap:10px;padding:0 2px 4px;}
       .card{width:134px;height:162px;border-radius:14px;padding:10px;}
@@ -3777,37 +3786,65 @@
   })();
 
   /* ══════════════════════════════════════════
-     HOME TILES — hold a tile to enter arrange
-     mode (jiggle), drag to reorder; the order
-     is persisted. Tap outside a tile, Done or
-     Esc to exit.
+     HOME TILES — free placement.
+     Tiles sit at absolute positions in the
+     home content area. Hold a tile to enter
+     arrange mode (jiggle + placement grid),
+     then drag it anywhere: it snaps to the
+     other tiles' edges (18px gutter) or to
+     the 48px grid. Placements persist; on
+     resize tiles keep their offsets and are
+     clamped into the new area — no reflow,
+     no gaps. Unplaced tiles keep the tight
+     default stack.
+     Tap outside a tile, Done or Esc to exit.
      ══════════════════════════════════════════ */
   const homePageEl = pageEls[0];
   const arrangeDoneBtn = document.getElementById('arrangeDone');
-  const HOME_ORDER_KEY = 'tcal.homeOrder';
+  const HOME_POS_KEY = 'tcal.homePos';
+  const HOME_GUTTER  = 18;   // gap when snapping a tile against another
+  const HOME_GRID    = 48;   // placement grid cell (matches the overlay)
   const homeTiles = [
-    document.getElementById('calSection'),
     document.getElementById('newsStrip'),
-    document.getElementById('avatarPanel')
+    document.getElementById('avatarPanel'),
+    document.getElementById('calSection')
   ];
   const homeTileIds = homeTiles.map(t => t.id);
-  let homeOrder = homeTileIds.slice();
+  const homePosById = {};    // id -> {x,y} user placement, content px
+  const tileState   = {};    // id -> {x,y,w,h} last laid-out state
   let homeArranging = false;
   let homeDrag = null;
   let holdTimer = null, holdInfo = null, holdPos = null;
+  let layoutRaf = 0;
 
-  function applyHomeOrder(){
-    homeTiles.forEach(t => { t.style.order = String(homeOrder.indexOf(t.id)); });
+  /* Content area: origin (ox,oy) + usable box (W×H). The CSS custom
+     properties per breakpoint keep this in sync with the grid overlay. */
+  function homeMetrics(){
+    const cs = getComputedStyle(homePageEl);
+    const ox = parseFloat(cs.getPropertyValue('--hx')) || 116;
+    const oy = parseFloat(cs.getPropertyValue('--hy')) || 16;
+    const or = parseFloat(cs.getPropertyValue('--hxr')) || 24;
+    /* The page's viewport offset (the fixed header). The dragged tile is
+       fixed to the viewport, so snap math must convert to page coords. */
+    const pr = homePageEl.getBoundingClientRect();
+    return {
+      ox, oy, pageX: pr.left, pageY: pr.top,
+      W: Math.max(60, homePageEl.clientWidth  - ox - or),
+      H: Math.max(120, homePageEl.clientHeight - oy - 140)
+    };
   }
 
-  /* Restore a saved order (silently ignore bad data). */
+  /* Restore saved placements (silently ignore bad data). */
   (function(){
     try{
-      const saved = JSON.parse(localStorage.getItem(HOME_ORDER_KEY));
-      if(Array.isArray(saved) && saved.length === homeTileIds.length &&
-         homeTileIds.every(id => saved.includes(id))){
-        homeOrder = saved;
-        applyHomeOrder();
+      const saved = JSON.parse(localStorage.getItem(HOME_POS_KEY));
+      if(saved && typeof saved === 'object'){
+        homeTileIds.forEach(id => {
+          const p = saved[id];
+          if(p && isFinite(p.x) && isFinite(p.y)){
+            homePosById[id] = { x: p.x, y: p.y };
+          }
+        });
       }
     }catch(e){}
   })();
@@ -3816,31 +3853,123 @@
     return homeTiles.filter(t => t.style.display !== 'none' && t.offsetParent !== null);
   }
 
-  /* Drop ghost — dashed outline of the slot the dragged tile will snap
-     to. The slot is measured with an invisible clone laid out in the
-     real flex flow (inserted + removed within the same task, so no
-     flicker and the other tiles never paint an intermediate state). */
+  /* Set size of a tile at the current area width. News keeps 760px (or
+     the full width); in the fully-default stack it yields just enough
+     to keep the avatar on its row instead of wrapping with a gap. */
+  function tileWidths(m, allAuto){
+    const news = (allAuto && m.W - HOME_GUTTER - 200 >= 480)
+      ? Math.min(760, m.W - HOME_GUTTER - 200)
+      : Math.min(760, m.W);
+    return {
+      newsStrip:   news,
+      avatarPanel: Math.min(200, m.W),
+      calSection:  m.W
+    };
+  }
+
+  /* Compute the laid-out {x,y,w} of every tile. Placed tiles honor the
+     saved position (clamped into the area); the rest take the tight
+     default stack, pushed clear of any tile already laid out. */
+  function computeLayout(m){
+    const els = {};
+    homeTiles.forEach(t => { els[t.id] = t; });
+    const hOf  = id => els[id].offsetHeight || 0;
+    const allAuto = !homeTileIds.some(id => homePosById[id]);
+    const Wd = tileWidths(m, allAuto);
+
+    const out = {};
+    const rectOf = id => { const o = out[id]; return { x: o.x, y: o.y, w: o.w, h: hOf(id) }; };
+    const overlaps = (a, b) =>
+      a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+    /* 1) placed tiles, clamped into the content area */
+    homeTileIds.forEach(id => {
+      const p = homePosById[id];
+      if(!p) return;
+      out[id] = {
+        x: Math.max(0, Math.min(p.x, Math.max(0, m.W - Wd[id]))),
+        y: Math.max(0, Math.min(p.y, Math.max(0, m.H - hOf(id)))),
+        w: Wd[id]
+      };
+    });
+
+    /* 2) auto tiles: tight default stack, pushed below any overlap */
+    const defaultPos = {
+      newsStrip:   { x: 0, y: 0 },
+      avatarPanel: (Wd.newsStrip + HOME_GUTTER + 200 <= m.W)
+                      ? { x: Wd.newsStrip + HOME_GUTTER, y: 0 }
+                      : { x: 0, y: hOf('newsStrip') + HOME_GUTTER },
+      calSection:  { x: 0, y: 0 }
+    };
+    homeTileIds.forEach(id => {
+      if(out[id]) return;
+      const p = { x: defaultPos[id].x, y: defaultPos[id].y };
+      let guard = 0;
+      for(;;){
+        const r = { x: p.x, y: p.y, w: Wd[id], h: hOf(id) };
+        let pushed = false;
+        for(const k in out){
+          if(overlaps(r, rectOf(k))){
+            p.y = Math.max(p.y, out[k].y + hOf(k) + HOME_GUTTER);
+            pushed = true;
+          }
+        }
+        if(!pushed || guard++ > 8) break;
+      }
+      out[id] = { x: p.x, y: p.y, w: Wd[id] };
+    });
+
+    /* 3) final clamp; the clamp can create an overlap, so push once more */
+    homeTileIds.forEach(id => {
+      const o = out[id];
+      o.x = Math.max(0, Math.min(o.x, Math.max(0, m.W - o.w)));
+      o.y = Math.max(0, Math.min(o.y, Math.max(0, m.H - hOf(id))));
+      const r = { x: o.x, y: o.y, w: o.w, h: hOf(id) };
+      for(const k in out){
+        if(k === id) continue;
+        if(overlaps(r, rectOf(k))) o.y = out[k].y + hOf(k) + HOME_GUTTER;
+      }
+    });
+    return out;
+  }
+
+  /* Apply the current layout to the DOM. */
+  function applyLayout(){
+    const m = homeMetrics();
+    const pos = computeLayout(m);
+    homeTiles.forEach(t => {
+      const p = pos[t.id];
+      if(!p) return;
+      /* h is needed by the snap candidates ("one gutter below this tile"). */
+      tileState[t.id] = { x: p.x, y: p.y, w: p.w, h: t.offsetHeight || 0 };
+      t.style.left  = (m.ox + p.x) + 'px';
+      t.style.top   = (m.oy + p.y) + 'px';
+      t.style.width = p.w + 'px';
+    });
+  }
+
+  /* Debounced re-layout (window resize, news content growing,
+     calendar toggling). Absolute tiles never reflow each other. */
+  function relayout(){
+    if(layoutRaf || homeDrag) return;
+    layoutRaf = requestAnimationFrame(() => {
+      layoutRaf = 0;
+      applyLayout();
+    });
+  }
+
+  /* Drop ghost — dashed outline of where the dragged tile will land. */
   const dropGhost = document.createElement('div');
   dropGhost.className = 'drop-ghost';
   dropGhost.setAttribute('aria-hidden','true');
   homePageEl.appendChild(dropGhost);
 
-  function updateDropGhost(d){
-    const orderVal = d.tile.style.order;
-    const clone = d.tile.cloneNode(true);
-    /* Reset the drag styling (fixed position / size / transform would
-       break the flow measurement) but keep the order that picks the
-       slot, and keep animations off so cardReveal can't skew the box. */
-    clone.classList.remove('dragging','jiggling');
-    clone.style.cssText = 'order:' + orderVal + ';visibility:hidden;animation:none;';
-    homePageEl.appendChild(clone);
-    const pageRect = homePageEl.getBoundingClientRect();
-    const r = clone.getBoundingClientRect();
-    clone.remove();
-    dropGhost.style.left   = (r.left - pageRect.left) + 'px';
-    dropGhost.style.top    = (r.top  - pageRect.top)  + 'px';
-    dropGhost.style.width  = r.width + 'px';
-    dropGhost.style.height = r.height + 'px';
+  function positionDropGhost(d){
+    const m = homeMetrics();
+    dropGhost.style.left   = (m.ox + d.snapped.x) + 'px';
+    dropGhost.style.top    = (m.oy + d.snapped.y) + 'px';
+    dropGhost.style.width  = d.w + 'px';
+    dropGhost.style.height = d.h + 'px';
     dropGhost.classList.add('show');
   }
 
@@ -3867,22 +3996,25 @@
     arrangeDoneBtn.setAttribute('aria-hidden', 'true');
   }
 
-  /* Put a tile back in the grid; if fromRect is given, animate the
-     drop from its floating position to the slot (FLIP). */
-  function settleHomeTile(tile, fromRect){
+  /* Put a tile back at its laid-out slot and animate the drop from its
+     floating position (FLIP). fromX/fromY are viewport coords. The slot
+     left/top/width must already be applied (applyLayout ran first). */
+  function settleHomeTile(tile, fromX, fromY){
+    tile.style.transition = 'none';
     homePageEl.appendChild(tile);
     tile.classList.remove('dragging');
-    tile.style.left = tile.style.top = tile.style.width = tile.style.height = '';
-    if(!fromRect) return;
+    tile.style.height = '';
     const slot = tile.getBoundingClientRect();
-    const dx = fromRect.left - slot.left;
-    const dy = fromRect.top - slot.top;
+    const dx = fromX - slot.left;
+    const dy = fromY - slot.top;
     if(Math.abs(dx) < 1 && Math.abs(dy) < 1){
-      tile.style.transform = '';
+      /* In place — still clear the lifted transform (it carries the
+         1.03 scale-up and would linger on the tile). */
+      tile.style.transition = '';
+      tile.style.transform  = '';
       return;
     }
-    tile.style.transition = 'none';
-    tile.style.transform  = 'translate(' + dx + 'px,' + dy + 'px) scale(1.03)';
+    tile.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(1.03)';
     void tile.offsetWidth;
     tile.style.transition = 'transform .26s var(--ease-smooth)';
     tile.style.transform  = '';
@@ -3891,14 +4023,16 @@
 
   function beginHomeDrag(tile, x, y, pid){
     const rect = tile.getBoundingClientRect();
+    const st = tileState[tile.id] || { x: 0, y: 0, w: rect.width, h: rect.height };
     homeDrag = {
       tile, id: tile.id,
       baseX: rect.left, baseY: rect.top,
       offX: x - rect.left, offY: y - rect.top,
-      index: homeOrder.indexOf(tile.id),
-      orderBefore: homeOrder.slice(),
+      lastX: x, lastY: y,
+      w: rect.width, h: rect.height,
+      snapped: { x: st.x, y: st.y },
       pid: pid,
-      lastX: x, lastY: y, raf: 0, moved: false
+      raf: 0, moved: false
     };
     tile.classList.remove('jiggling');
     tile.classList.add('dragging');
@@ -3912,13 +4046,13 @@
        during the reveal delay) while it follows the pointer. */
     tile.style.animation = 'none';
     /* Move to <body>: fixed to the viewport (the page's will-change
-       transform would make it a containing block) and out of the
-       flex flow so the other tiles can reflow. */
+       transform would make it a containing block). The other tiles are
+       absolutely positioned, so they stay exactly where they are. */
     document.body.appendChild(tile);
     document.addEventListener('pointermove', onHomeDragMove);
     document.addEventListener('pointerup', onHomeDragEnd);
     document.addEventListener('pointercancel', onHomeDragCancel);
-    updateDropGhost(homeDrag);
+    positionDropGhost(homeDrag);
   }
 
   function detachHomeDragListeners(){
@@ -3934,9 +4068,12 @@
     detachHomeDragListeners();
     if(d.raf) cancelAnimationFrame(d.raf);
     hideDropGhost();
-    homeOrder = d.orderBefore;
-    applyHomeOrder();
-    settleHomeTile(d.tile, null);
+    /* Settle from where the tile actually is (its floating position),
+       not from the lift point — a cancelled drag may have moved the
+       tile far away, and the FLIP must fly it back from there. */
+    const floating = d.tile.getBoundingClientRect();
+    applyLayout();
+    settleHomeTile(d.tile, floating.left, floating.top);
   }
 
   function onHomeDragMove(e){
@@ -3955,12 +4092,12 @@
       dd.tile.style.transform =
         'translate(' + (dd.lastX - dd.offX - dd.baseX) + 'px,' +
                       (dd.lastY - dd.offY - dd.baseY) + 'px) scale(1.03)';
-      const idx = homeHoverIndex(dd.lastX, dd.lastY, dd.id);
-      if(idx >= 0 && idx !== dd.index){
-        homeReorder(dd.id, idx);
-        dd.index = idx;
-        updateDropGhost(dd);
-      }
+      const m = homeMetrics();
+      dd.snapped = snapHomePos(
+        dd.lastX - dd.offX - m.pageX - m.ox,
+        dd.lastY - dd.offY - m.pageY - m.oy,
+        dd.w, dd.h, m, dd.id);
+      positionDropGhost(dd);
     });
   }
 
@@ -3971,12 +4108,14 @@
     detachHomeDragListeners();
     if(d.raf) cancelAnimationFrame(d.raf);
     const floating = d.tile.getBoundingClientRect();
-    settleHomeTile(d.tile, floating);
-    /* Let the ghost stay until the tile has flown into its slot. */
-    setTimeout(hideDropGhost, 280);
     if(d.moved){
-      try{ localStorage.setItem(HOME_ORDER_KEY, JSON.stringify(homeOrder)); }catch(e){}
+      homePosById[d.id] = { x: d.snapped.x, y: d.snapped.y };
+      try{ localStorage.setItem(HOME_POS_KEY, JSON.stringify(homePosById)); }catch(err){}
     }
+    applyLayout();
+    settleHomeTile(d.tile, floating.left, floating.top);
+    /* Let the ghost stay until the tile has flown into place. */
+    setTimeout(hideDropGhost, 280);
     if(homeArranging) d.tile.classList.add('jiggling');
   }
 
@@ -3985,49 +4124,34 @@
     cancelHomeDrag();
   }
 
-  /* Which slot would the dragged tile land in at (x, y)? -1 = not
-     over any other tile (keep the current slot). */
-  function homeHoverIndex(x, y, dragId){
-    const vt = homeVisibleTiles().filter(t => t.id !== dragId);
-    for(const t of vt){
-      const r = t.getBoundingClientRect();
-      if(x < r.left - 12 || x > r.right + 12 || y < r.top - 12 || y > r.bottom + 12) continue;
-      const dx = x - (r.left + r.width / 2);
-      const dy = y - (r.top + r.height / 2);
-      let before;
-      if((dx < 0 && dy < 0) || (dx > 0 && dy > 0)) before = dx < 0;
-      else before = Math.abs(dx) >= Math.abs(dy) ? dx < 0 : dy < 0;
-      return homeOrder.indexOf(t.id) + (before ? 0 : 1);
-    }
-    return -1;
-  }
-
-  /* Move a tile to a new slot and FLIP-animate the tiles that shift. */
-  function homeReorder(id, newIdx){
-    const vt = homeVisibleTiles();
-    const first = new Map(vt.map(t => [t.id, t.getBoundingClientRect()]));
-    const cur = homeOrder.indexOf(id);
-    homeOrder.splice(cur, 1);
-    homeOrder.splice(newIdx, 0, id);
-    applyHomeOrder();
-    vt.forEach(t => {
-      const f = first.get(t.id);
-      const l = t.getBoundingClientRect();
-      const dx = f.left - l.left;
-      const dy = f.top - l.top;
-      if(Math.abs(dx) > .5 || Math.abs(dy) > .5){
-        t.style.transition = 'none';
-        t.style.transform  = 'translate(' + dx + 'px,' + dy + 'px)';
-      }
+  /* Snap a raw top-left (content px) for a w×h tile: prefer the
+     content edges and the other tiles' edges (aligned, or one gutter
+     apart — that's how tiles end up close together), else fall back to
+     the 48px placement grid. */
+  function snapHomePos(x, y, w, h, m, dragId){
+    const xs = [0, Math.max(0, m.W - w)];
+    const ys = [0, Math.max(0, m.H - h)];
+    homeTiles.forEach(t => {
+      if(t.id === dragId || t.style.display === 'none') return;
+      const s = tileState[t.id];
+      if(!s) return;
+      xs.push(s.x, s.x + s.w + HOME_GUTTER, s.x - w - HOME_GUTTER);
+      ys.push(s.y, s.y + s.h + HOME_GUTTER, s.y - h - HOME_GUTTER);
     });
-    void homePageEl.offsetWidth;
-    vt.forEach(t => {
-      if(t.style.transform){
-        t.style.transition = 'transform .26s var(--ease-smooth)';
-        t.style.transform  = '';
+    const pick = (raw, cands) => {
+      let best = null, bd = 14;
+      for(const c of cands){
+        const d = Math.abs(c - raw);
+        if(d < bd){ bd = d; best = c; }
       }
-    });
-    setTimeout(() => vt.forEach(t => { t.style.transition = ''; }), 320);
+      return best === null ? Math.round(raw / HOME_GRID) * HOME_GRID : Math.round(best);
+    };
+    const sx = pick(x, xs);
+    const sy = pick(y, ys);
+    return {
+      x: Math.max(0, Math.min(sx, Math.max(0, m.W - w))),
+      y: Math.max(0, Math.min(sy, Math.max(0, m.H - h)))
+    };
   }
 
   /* Hold detection: press still for 420ms to enter arrange mode.
@@ -4060,7 +4184,14 @@
       if(e.pointerType === 'mouse' && e.button !== 0) return;
       /* Buttons / inputs keep their own behavior. */
       if(e.target.closest('button,input,a,select,textarea,label')) return;
-      if(homeDrag) return;
+      if(homeDrag){
+        /* A different pointer arrived while a drag is still active:
+           that drag's pointer never released (the button was probably
+           let go outside the window). Drop the stale drag so the UI
+           can't stay frozen. */
+        if(e.pointerId === homeDrag.pid) return;
+        cancelHomeDrag();
+      }
       if(homeArranging){
         e.preventDefault();
         beginHomeDrag(tile, e.clientX, e.clientY, e.pointerId);
@@ -4068,6 +4199,9 @@
       }
       holdInfo = { tile, x: e.clientX, y: e.clientY, pid: e.pointerId };
       holdPos  = { x: e.clientX, y: e.clientY };
+      /* A second pointer starting its own hold supersedes the first one —
+         drop the stale timer or it would fire with the new pointer's info. */
+      if(holdTimer) clearTimeout(holdTimer);
       document.addEventListener('pointermove', onHoldMove);
       document.addEventListener('pointerup', onHoldEnd);
       document.addEventListener('pointercancel', onHoldEnd);
@@ -4095,6 +4229,27 @@
   document.addEventListener('keydown', (e) => {
     if(e.key === 'Escape' && homeArranging) exitHomeArrange();
   });
+
+  /* First paint: place tiles synchronously (no transition flash), then
+     re-enable transitions so resizes and content changes slide. */
+  homePageEl.classList.add('home-no-trans');
+  applyLayout();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    homePageEl.classList.remove('home-no-trans');
+  }));
+
+  /* Re-layout when the window resizes or a tile's content changes
+     (news feed loading, calendar toggling). Tiles are absolutely
+     positioned, so nothing reflows — placed tiles just clamp into the
+     new area and keep their offsets (and their gaps). */
+  window.addEventListener('resize', relayout);
+  /* If the window loses focus mid-drag (Alt-Tab, a popup) the pointerup
+     may never arrive — settle the tile instead of leaving it floating. */
+  window.addEventListener('blur', () => { if(homeDrag) cancelHomeDrag(); });
+  if('ResizeObserver' in window){
+    const homeRO = new ResizeObserver(() => relayout());
+    homeTiles.forEach(t => homeRO.observe(t));
+  }
   </script>
 
   <script>
