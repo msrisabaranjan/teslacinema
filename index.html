@@ -1922,11 +1922,11 @@
       <!--
         Avatar sprite art: PMDCollab — https://sprites.pmdcollab.org
         License: CC BY-NC 4.0 (https://creativecommons.org/licenses/by-nc/4.0/)
-        Credit file: credits_red.txt
+        Credit files: credits_red.txt, credits_starters.txt
       -->
       <aside class="avatar-panel" id="avatarPanel" data-mood="cute" data-speed="parked">
         <div class="avatar-panel-head">
-          <span>Companion · <span id="avatarFormLabel">Form 1</span></span>
+          <span>Companion · <span id="avatarFormLabel">Egg</span></span>
           <span class="avatar-head-dot" id="avatarGpsDot"></span>
         </div>
 
@@ -3323,14 +3323,21 @@
 
   <script>
   /* ── AVATAR COMPANION — MULTI-FORM SPRITE ENGINE ──
-     Sprite art: PMDCollab (sprites.pmdcollab.org), CC BY-NC 4.0 — credits_red.txt
+     Sprite art: PMDCollab (sprites.pmdcollab.org), CC BY-NC 4.0 —
+     credits_red.txt (Charmander line + egg), credits_starters.txt (starters).
 
      The avatar evolves with the distance driven today (persisted across
-     page reloads; resets at local midnight):
-       Form 0 (egg): 0–5 mi      Form 1 (red1): 5–10 mi
-       Form 2 (red2): 10–20 mi   Form 3 (red3): 20+ mi
-     Form 0 is the egg: Idle while parked, Tumble while moving, and Hurt in
-     the HATCH_SOON_MI window before it hatches (with a gold flash build-up).
+     page reloads; resets at local midnight). Stage 0 (0–5 mi) is the egg,
+     which hatches into one of four lines, chosen uniformly at random at
+     hatch and persisted in the session:
+       red:   Charmander → Charmeleon → Charizard
+       grass: Bulbasaur → Ivysaur → Venusaur
+       water: Mudkip → Marshtomp → Swampert
+       fire:  Torchic → Combusken → Blaziken
+     Stages: 1 = 5–10 mi, 2 = 10–20 mi, 3 = 20+ mi.
+     The egg is shared by all lines: Idle while parked, Tumble while moving,
+     and Hurt in the HATCH_SOON_MI window before it hatches (with a gold
+     flash build-up).
      Each form folder keeps its own sprites + AnimData XML. The metadata below
      mirrors those XML files so the page animates without fetching them.
   */
@@ -3346,26 +3353,43 @@
     const stage = document.getElementById('avatarStage');
     const formLabel = document.getElementById('avatarFormLabel');
 
-    /* ── FORMS ── */
-    const FORMS = [
-      { id:'egg',  label:'Form 0', dir:'images/egg/',  suffix:'' },
-      { id:'red1', label:'Form 1', dir:'images/red1/', suffix:'' },
-      { id:'red2', label:'Form 2', dir:'images/red2/', suffix:'_red2' },
-      { id:'red3', label:'Form 3', dir:'images/red3/', suffix:'_red3' }
+    /* ── EVOLUTION PATHS ──
+       The egg (shared stage 0) hatches into one of four lines, chosen
+       uniformly at random at hatch and persisted in the daily session. */
+    const EGG = { id:'egg', label:'Egg', dir:'images/egg/', suffix:'' };
+    /* Display names are code names (see the header + info line); the id/dir
+       fields are the asset identities and must stay in sync with images/. */
+    const PATHS = [
+      [ EGG,
+        { id:'red1',      label:'Spark',    dir:'images/red1/',      suffix:'' },
+        { id:'red2',      label:'Flare',    dir:'images/red2/',      suffix:'_red2' },
+        { id:'red3',      label:'Pyre',     dir:'images/red3/',      suffix:'_red3' } ],
+      [ EGG,
+        { id:'bulbasaur', label:'Sprout',   dir:'images/bulbasaur/', suffix:'' },
+        { id:'ivysaur',   label:'Thorn',    dir:'images/ivysaur/',   suffix:'' },
+        { id:'venusaur',  label:'Bloom',    dir:'images/venusaur/',  suffix:'' } ],
+      [ EGG,
+        { id:'mudkip',    label:'Droplet',  dir:'images/mudkip/',    suffix:'' },
+        { id:'marshtomp', label:'Ripple',   dir:'images/marshtomp/', suffix:'' },
+        { id:'swampert',  label:'Torrent',  dir:'images/swampert/',  suffix:'' } ],
+      [ EGG,
+        { id:'torchic',   label:'Ember',    dir:'images/torchic/',   suffix:'' },
+        { id:'combusken', label:'Cinder',   dir:'images/combusken/', suffix:'' },
+        { id:'blaziken',  label:'Blaze',    dir:'images/blaziken/',  suffix:'' } ]
     ];
-    const FORM_AT_MILES     = [0, 5, 10, 20]; // form i starts at this many miles
+    const STAGES          = 4;                  // egg + 3 per line
+    const FORM_AT_MILES   = [0, 5, 10, 20];     // stage i starts at this many miles
     const KM_PER_MILE       = 1.609344;
     const PREFETCH_AHEAD_MI = 2;           // start loading the next form this close
     const HATCH_SOON_MI     = 2;           // egg shows Hurt this close to hatching
 
-    /* Animation metadata per form (mirrors each folder's AnimData*.xml). */
-    const FORM_META = [
-      [ /* egg (PMDCollab 0000 form 4 — only Idle, Tumble and Hurt are used) */
+    /* Animation metadata per stage (mirrors each folder's AnimData*.xml). */
+    const EGG_META = [ /* egg (PMDCollab 0000 form 4 — only Idle, Tumble and Hurt are used) */
         { name:'Hurt',   index:6,  w:32, h:48, d:[2,8] },
         { name:'Idle',   index:7,  w:24, h:32, d:[22,6,2,6,6] },
         { name:'Tumble', index:16, w:24, h:32, d:[3,3,3,3,3,3,3,3] }
-      ],
-      [ /* red1 */
+    ];
+    const RED1_META = [ /* red1 */
         { name:'Walk',         index:0,  w:32, h:32, d:[6,8,6,8] },
         { name:'Attack',       index:1,  w:64, h:64, d:[2,2,4,2,2,2,2,2,2,2,2] },
         { name:'Kick',         index:2,  w:56, h:56, d:[2,6,2,4,2,2,2,2,2,2,2] },
@@ -3401,8 +3425,8 @@
         { name:'TumbleBack',   index:32, w:24, h:32, d:[3,3,3,3,3,3,3,3,3,3] },
         { name:'Faint',        index:33, w:32, h:32, d:[8,12,4,10] },
         { name:'HitGround',    index:34, w:40, h:32, d:[4,4,4,4,4,6,4,4] }
-      ],
-      [ /* red2 */
+    ];
+    const RED2_META = [ /* red2 */
         { name:'Walk',         index:0,  w:24, h:32, d:[8,10,8,10] },
         { name:'Attack',       index:1,  w:72, h:80, d:[2,2,2,2,4,1,1,2,2,2,2,2,2,2] },
         { name:'Strike',       index:2,  w:64, h:72, d:[2,2,6,1,2,2,2,2,2,2,2,2,2,2] },
@@ -3438,8 +3462,8 @@
         { name:'TumbleBack',   index:32, w:24, h:32, d:[3,3,3,3,3,3,3,3,3,3] },
         { name:'Faint',        index:33, w:40, h:32, d:[8,12,4,10] },
         { name:'HitGround',    index:34, w:48, h:40, d:[4,4,4,4,4,6,4,4] }
-      ],
-      [ /* red3 */
+    ];
+    const RED3_META = [ /* red3 */
         { name:'Walk',         index:0,  w:40, h:48, d:[8,10,8,10] },
         { name:'Attack',       index:1,  w:80, h:88, d:[2,2,2,2,4,1,1,2,2,2,2,2,2,2] },
         { name:'Strike',       index:2,  w:72, h:80, d:[2,2,6,1,2,2,2,2,2,2,2,2,2,2] },
@@ -3454,12 +3478,260 @@
         { name:'Charge',       index:11, w:48, h:48, d:[2,2,2,2,2,2,2,2,2,2] },
         { name:'Rotate',       index:12, w:40, h:48, d:[2,2,2,2,2,2,2,2,2] },
         { name:'Faint',        index:33, w:48, h:48, d:[8,12,4,10] }
-      ]
+    ];
+
+    const BULBASAUR_META = [ /* Bulbasaur */
+        { name:'Walk', index:0,  w:40, h:40, d:[4,4,4,4,4,4] },
+        { name:'Attack', index:1,  w:64, h:72, d:[4,2,4,2,2,2,2,2,2,2,4] },
+        { name:'Strike', w:64, h:72, d:[4,2,4,2,2,2,2,2,2,2,4], copyOf:'Attack' },
+        { name:'Shoot', index:3,  w:32, h:32, d:[12,4,4,4,2,2] },
+        { name:'Dance', w:24, h:32, d:[6,6,6,6,6,6], copyOf:'Shake' },
+        { name:'Shake', index:4,  w:24, h:32, d:[6,6,6,6,6,6] },
+        { name:'Sleep', index:5,  w:24, h:24, d:[30,35] },
+        { name:'Hurt', index:6,  w:40, h:56, d:[2,8] },
+        { name:'Idle', index:7,  w:32, h:40, d:[40,6,6] },
+        { name:'Swing', index:8,  w:72, h:72, d:[2,1,2,2,3,2,2,1,1] },
+        { name:'Double', index:9,  w:48, h:56, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
+        { name:'Hop', index:10,  w:32, h:80, d:[2,1,2,3,4,4,3,2,1,2] },
+        { name:'Charge', index:11,  w:32, h:40, d:[2,2,2,2,2,2,2,2,2,2] },
+        { name:'Rotate', index:12,  w:24, h:32, d:[2,2,2,2,2,2,2,2,2] },
+        { name:'EventSleep', index:13,  w:24, h:24, d:[30,35] },
+        { name:'Wake', index:14,  w:32, h:24, d:[8,4,12,4,10,4] },
+        { name:'Eat', index:15,  w:24, h:32, d:[6,8,6,8] },
+        { name:'Tumble', index:16,  w:24, h:32, d:[3,3,3,3,3,3,3,3] },
+        { name:'Pose', index:17,  w:24, h:32, d:[8,1,3,2,8] },
+        { name:'Pull', index:18,  w:32, h:40, d:[10,12,10,12,10,12,10] },
+        { name:'Pain', index:19,  w:24, h:40, d:[4,1,1,1,2,1,4,2,2,2,2,2] },
+        { name:'Float', index:20,  w:24, h:24, d:[9,18,9,14] },
+        { name:'DeepBreath', index:21,  w:24, h:32, d:[12,6,6,6,6,6,6,10,4] },
+        { name:'Nod', index:22,  w:32, h:32, d:[6,8,6] },
+        { name:'Sit', index:23,  w:24, h:32, d:[8,8,8] },
+        { name:'LookUp', index:24,  w:24, h:32, d:[6,6] },
+        { name:'Sink', index:25,  w:24, h:32, d:[6,6,6,6,6,6,6,6,6,6,6,6] },
+        { name:'Trip', index:26,  w:32, h:24, d:[4,6,4,4,4] },
+        { name:'Laying', index:27,  w:24, h:24, d:[12] },
+        { name:'LeapForth', index:28,  w:24, h:72, d:[6,1,1,2,2,2] },
+        { name:'Head', index:29,  w:24, h:40, d:[4] },
+        { name:'Cringe', index:30,  w:24, h:56, d:[2,8] },
+        { name:'LostBalance', index:31,  w:24, h:32, d:[8,8] },
+        { name:'TumbleBack', index:32,  w:24, h:32, d:[3,3,3,3,3,3,3,3,3,3] },
+        { name:'Faint', index:33,  w:32, h:24, d:[8,12,4,10] },
+        { name:'HitGround', index:34,  w:32, h:32, d:[4,4,4,4,4,6,4,4] },
+    ];
+
+    const IVYSAUR_META = [ /* Ivysaur */
+        { name:'Walk', index:0,  w:32, h:32, d:[8,10,8,10] },
+        { name:'Attack', index:1,  w:64, h:64, d:[4,2,4,2,2,2,2,2,4] },
+        { name:'Strike', w:64, h:64, d:[4,2,4,2,2,2,2,2,4], copyOf:'Attack' },
+        { name:'Shoot', index:3,  w:32, h:40, d:[12,4,4,4,2,2] },
+        { name:'Dance', w:32, h:32, d:[6,6,6,6,6,6], copyOf:'Shake' },
+        { name:'Shake', index:4,  w:32, h:32, d:[6,6,6,6,6,6] },
+        { name:'Sleep', index:5,  w:24, h:32, d:[30,35] },
+        { name:'Hurt', index:6,  w:48, h:56, d:[2,8] },
+        { name:'Idle', index:7,  w:32, h:32, d:[40,12,12,12] },
+        { name:'Swing', index:8,  w:72, h:72, d:[2,1,2,2,3,2,2,1,1] },
+        { name:'Double', index:9,  w:56, h:56, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
+        { name:'Hop', index:10,  w:32, h:80, d:[2,1,2,3,4,4,3,2,1,2] },
+        { name:'Charge', index:11,  w:32, h:32, d:[2,2,2,2,2,2,2,2,2,2] },
+        { name:'Rotate', index:12,  w:24, h:32, d:[2,2,2,2,2,2,2,2,2] },
+    ];
+
+    const VENUSAUR_META = [ /* Venusaur */
+        { name:'Walk', index:0,  w:32, h:32, d:[8,16,8,16] },
+        { name:'Attack', index:1,  w:72, h:72, d:[4,2,4,2,2,2,2,2,2,2,4] },
+        { name:'Strike', w:72, h:72, d:[4,2,4,2,2,2,2,2,2,2,4], copyOf:'Attack' },
+        { name:'Shoot', index:3,  w:40, h:40, d:[12,4,4,4,2,2] },
+        { name:'Dance', w:40, h:40, d:[6,6,6,6,6,6], copyOf:'Shake' },
+        { name:'Shake', index:4,  w:40, h:40, d:[6,6,6,6,6,6] },
+        { name:'Sleep', index:5,  w:32, h:32, d:[30,35] },
+        { name:'Hurt', index:6,  w:48, h:48, d:[2,8] },
+        { name:'Idle', index:7,  w:32, h:32, d:[30,16,12,16] },
+        { name:'Swing', index:8,  w:72, h:72, d:[2,1,2,2,3,2,2,1,1] },
+        { name:'Double', index:9,  w:56, h:64, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
+        { name:'Hop', index:10,  w:40, h:80, d:[2,1,2,3,4,4,3,2,1,2] },
+        { name:'Charge', index:11,  w:32, h:40, d:[2,2,2,2,2,2,2,2,2,2] },
+        { name:'Rotate', index:12,  w:32, h:40, d:[2,2,2,2,2,2,2,2,2] },
+    ];
+
+    const MUDKIP_META = [ /* Mudkip */
+        { name:'Walk', index:0,  w:32, h:40, d:[4,6,4,6,6,4] },
+        { name:'Attack', index:1,  w:72, h:80, d:[2,4,2,2,2,2,2,2,2,4] },
+        { name:'Strike', w:72, h:80, d:[2,4,2,2,2,2,2,2,2,4], copyOf:'Attack' },
+        { name:'Shoot', index:3,  w:32, h:40, d:[2,3,4,2,6,2,2,2,2,2,2] },
+        { name:'Twirl', index:4,  w:32, h:48, d:[1,2,2,2,2,2,2,1,6,2,2,2,2,2,2] },
+        { name:'Sleep', index:5,  w:24, h:24, d:[30,35] },
+        { name:'Hurt', index:6,  w:48, h:56, d:[2,8] },
+        { name:'Idle', index:7,  w:24, h:40, d:[38,2,2,5,3,3,2] },
+        { name:'Swing', index:8,  w:72, h:80, d:[2,1,2,2,3,2,2,1,1] },
+        { name:'Double', index:9,  w:48, h:56, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
+        { name:'Hop', index:10,  w:24, h:80, d:[2,1,2,3,4,4,3,2,1,2] },
+        { name:'Charge', index:11,  w:24, h:32, d:[2,2,2,2,2,2,2,2,2,2] },
+        { name:'Rotate', index:12,  w:24, h:32, d:[2,2,2,2,2,2,2,2,2] },
+        { name:'EventSleep', index:13,  w:24, h:24, d:[30,35] },
+        { name:'Wake', index:14,  w:24, h:32, d:[8,4,16,8,10] },
+        { name:'Eat', index:15,  w:24, h:24, d:[6,8,6,8] },
+        { name:'Tumble', index:16,  w:24, h:40, d:[3,3,3,3,3,3,3,3] },
+        { name:'Pose', index:17,  w:24, h:32, d:[8,1,3,2,8] },
+        { name:'Pull', index:18,  w:32, h:32, d:[10,12,10,12,10,12,10] },
+        { name:'Pain', index:19,  w:32, h:32, d:[4,1,1,1,2,1,4,2,2,2,2,2] },
+        { name:'Float', index:20,  w:24, h:24, d:[9,18,9,14] },
+        { name:'DeepBreath', index:21,  w:24, h:24, d:[12,6,6,6,6,6,6,10,4] },
+        { name:'Nod', index:22,  w:24, h:32, d:[6,8,6] },
+        { name:'Sit', index:23,  w:24, h:32, d:[8,8,8] },
+        { name:'LookUp', index:24,  w:24, h:32, d:[6,6,6] },
+        { name:'Sink', index:25,  w:24, h:32, d:[6,6,6,6,6,6,6,6,6,6,6,6] },
+        { name:'Trip', index:26,  w:32, h:32, d:[4,6,4,4,4] },
+        { name:'Laying', index:27,  w:24, h:24, d:[12] },
+        { name:'LeapForth', index:28,  w:24, h:80, d:[6,1,1,2,2,2] },
+        { name:'Head', index:29,  w:24, h:40, d:[4] },
+        { name:'Cringe', index:30,  w:32, h:56, d:[2,8] },
+        { name:'LostBalance', index:31,  w:24, h:32, d:[8,8] },
+        { name:'TumbleBack', index:32,  w:24, h:32, d:[3,3,3,3,3,3,3,3,3,3] },
+        { name:'Faint', index:33,  w:32, h:32, d:[8,12,4,10] },
+        { name:'HitGround', index:34,  w:32, h:32, d:[4,4,4,4,4,6,4,4] },
+    ];
+
+    const MARSHTOMP_META = [ /* Marshtomp */
+        { name:'Walk', index:0,  w:24, h:32, d:[8,10,8,10] },
+        { name:'Attack', index:1,  w:64, h:72, d:[2,4,1,1,1,2,2,2,2,2] },
+        { name:'Strike', w:64, h:72, d:[2,4,1,1,1,2,2,2,2,2], copyOf:'Attack' },
+        { name:'Shoot', index:3,  w:40, h:48, d:[2,6,2,2,2,2,2,2,2,2,2] },
+        { name:'Rumble', w:40, h:40, d:[1,2,4,2,1,4,2,2,2,2,2,2], copyOf:'Withdraw' },
+        { name:'SpAttack', w:40, h:40, d:[1,2,4,2,1,4,2,2,2,2,2,2], copyOf:'Withdraw' },
+        { name:'Withdraw', index:4,  w:40, h:40, d:[1,2,4,2,1,4,2,2,2,2,2,2] },
+        { name:'Sleep', index:5,  w:24, h:16, d:[30,35] },
+        { name:'Hurt', index:6,  w:40, h:56, d:[2,8] },
+        { name:'Idle', index:7,  w:24, h:32, d:[36,16,36,16] },
+        { name:'Swing', index:8,  w:72, h:72, d:[2,1,2,2,3,2,2,1,1] },
+        { name:'Double', index:9,  w:48, h:56, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
+        { name:'Hop', index:10,  w:24, h:80, d:[2,1,2,3,4,4,3,2,1,2] },
+        { name:'Charge', index:11,  w:32, h:40, d:[2,2,2,2,2,2,2,2,2,2] },
+        { name:'Rotate', index:12,  w:24, h:32, d:[2,2,2,2,2,2,2,2,2] },
+    ];
+
+    const SWAMPERT_META = [ /* Swampert */
+        { name:'Walk', index:0,  w:32, h:48, d:[8,10,8,10] },
+        { name:'Attack', index:1,  w:64, h:80, d:[2,2,2,2,2,1,1,1,2,2,2,2,2] },
+        { name:'Strike', w:64, h:80, d:[2,2,2,2,2,1,1,1,2,2,2,2,2], copyOf:'Attack' },
+        { name:'Shoot', index:3,  w:48, h:48, d:[2,2,4,2,2,2,2,2,2,2,2,2] },
+        { name:'Rumble', w:40, h:56, d:[6,2,2,2,2,2,2,2,2,2], copyOf:'RearUp' },
+        { name:'SpAttack', w:40, h:56, d:[6,2,2,2,2,2,2,2,2,2], copyOf:'RearUp' },
+        { name:'RearUp', index:4,  w:40, h:56, d:[6,2,2,2,2,2,2,2,2,2] },
+        { name:'Sleep', index:5,  w:32, h:32, d:[30,35] },
+        { name:'Hurt', index:6,  w:48, h:56, d:[2,8] },
+        { name:'Idle', index:7,  w:32, h:64, d:[40,1,2,4,2,2] },
+        { name:'Swing', index:8,  w:72, h:88, d:[2,1,2,2,3,2,2,1,1] },
+        { name:'Double', index:9,  w:64, h:80, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
+        { name:'Hop', index:10,  w:32, h:96, d:[2,1,2,3,4,4,3,2,1,2] },
+        { name:'Charge', index:11,  w:40, h:40, d:[2,2,2,2,2,2,2,2,2,2] },
+        { name:'Rotate', index:12,  w:32, h:48, d:[2,2,2,2,2,2,2,2,2] },
+        { name:'EventSleep', index:13,  w:40, h:32, d:[30,35] },
+        { name:'Wake', index:14,  w:32, h:48, d:[8,6,14,4,10] },
+        { name:'Eat', index:15,  w:24, h:40, d:[6,8,6,8] },
+        { name:'Tumble', index:16,  w:32, h:40, d:[3,3,3,3,3,3,3,3,3,3] },
+        { name:'Pose', index:17,  w:32, h:40, d:[12,2,8] },
+        { name:'Pull', index:18,  w:32, h:48, d:[10,12,10,12,10,12,10] },
+        { name:'Pain', index:19,  w:32, h:48, d:[4,1,1,1,2,1,4,2,2,2,2,2] },
+        { name:'Float', index:20,  w:32, h:32, d:[9,18,9,14] },
+        { name:'DeepBreath', index:21,  w:32, h:40, d:[12,6,6,6,6,6,6,10,4] },
+        { name:'Nod', index:22,  w:40, h:48, d:[6,8,6] },
+        { name:'Sit', index:23,  w:24, h:40, d:[8,8,8] },
+        { name:'LookUp', index:24,  w:24, h:40, d:[6,6] },
+        { name:'Sink', index:25,  w:32, h:40, d:[6,6,6,6,6,6,6,6,6,6,6,6] },
+        { name:'Trip', index:26,  w:40, h:48, d:[4,6,4,4,4] },
+        { name:'Laying', index:27,  w:40, h:32, d:[12] },
+        { name:'LeapForth', index:28,  w:24, h:88, d:[6,1,1,2,2,2] },
+        { name:'Head', index:29,  w:24, h:48, d:[4] },
+        { name:'Cringe', index:30,  w:40, h:56, d:[2,8] },
+        { name:'LostBalance', index:31,  w:32, h:40, d:[8,8] },
+        { name:'TumbleBack', index:32,  w:32, h:40, d:[3,3,3,3,3,3,3,3,3,3] },
+        { name:'Faint', index:33,  w:40, h:48, d:[8,12,4,10] },
+        { name:'HitGround', index:34,  w:40, h:48, d:[4,4,4,2,4,4,6,4,4] },
+    ];
+
+    const TORCHIC_META = [ /* Torchic */
+        { name:'Walk', index:0,  w:24, h:32, d:[8,8,8,8] },
+        { name:'Attack', index:1,  w:64, h:64, d:[4,2,4,2,2,2,2,2,2,2,4] },
+        { name:'Strike', w:64, h:64, d:[4,2,4,2,2,2,2,2,2,2,4], copyOf:'Attack' },
+        { name:'Shoot', index:3,  w:32, h:40, d:[2,2,2,2,4,6,2,2,2,2,2,2,2] },
+        { name:'Dance', w:24, h:40, d:[4,4,4,4,4,4], copyOf:'Shake' },
+        { name:'Shake', index:4,  w:24, h:40, d:[4,4,4,4,4,4] },
+        { name:'Sleep', index:5,  w:24, h:32, d:[30,35] },
+        { name:'Hurt', index:6,  w:48, h:56, d:[2,8] },
+        { name:'Idle', index:7,  w:24, h:40, d:[30,3,4,3,3] },
+        { name:'Swing', index:8,  w:72, h:72, d:[2,1,2,2,3,2,2,1,1] },
+        { name:'Double', index:9,  w:48, h:64, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
+        { name:'Hop', index:10,  w:24, h:80, d:[2,1,2,3,4,4,3,2,1,2] },
+        { name:'Charge', index:11,  w:24, h:40, d:[2,2,2,2,2,2,2,2,2,2] },
+        { name:'Rotate', index:12,  w:24, h:32, d:[2,2,2,2,2,2,2,2,2] },
+        { name:'EventSleep', index:13,  w:32, h:16, d:[30,35] },
+        { name:'Wake', index:14,  w:32, h:32, d:[8,6,14,4,10] },
+        { name:'Eat', index:15,  w:24, h:32, d:[6,8,6,8] },
+        { name:'Tumble', index:16,  w:24, h:32, d:[3,3,3,3,3,3,3,3,3] },
+        { name:'Pose', index:17,  w:24, h:40, d:[12,2,1,2,1,2,1,2] },
+        { name:'Pull', index:18,  w:32, h:32, d:[10,12,10,12,10,12,10] },
+        { name:'Pain', index:19,  w:32, h:40, d:[4,1,1,1,2,1,4,2,2,2,2,2] },
+        { name:'Float', index:20,  w:32, h:24, d:[9,18,9,14] },
+        { name:'DeepBreath', index:21,  w:24, h:32, d:[12,6,6,6,6,6,6,10,4] },
+        { name:'Nod', index:22,  w:24, h:32, d:[6,8,6] },
+        { name:'Sit', index:23,  w:24, h:32, d:[8,8,8] },
+        { name:'LookUp', index:24,  w:24, h:32, d:[6,6,6] },
+        { name:'Sink', index:25,  w:24, h:24, d:[6,6,6,6,6,6,6,6,6,6,6,6] },
+        { name:'Trip', index:26,  w:24, h:32, d:[4,6,4,4,4] },
+        { name:'Laying', index:27,  w:32, h:16, d:[12] },
+        { name:'LeapForth', index:28,  w:24, h:72, d:[6,1,1,2,2,2] },
+        { name:'Head', index:29,  w:24, h:48, d:[4] },
+        { name:'Cringe', index:30,  w:32, h:56, d:[2,8] },
+        { name:'LostBalance', index:31,  w:24, h:24, d:[8,8] },
+        { name:'TumbleBack', index:32,  w:24, h:40, d:[3,3,3,3,3,3,3,3,3,3] },
+        { name:'Faint', index:33,  w:32, h:32, d:[8,12,4,10] },
+        { name:'HitGround', index:34,  w:24, h:40, d:[4,4,4,4,4,6,4,4] },
+    ];
+
+    const COMBUSKEN_META = [ /* Combusken */
+        { name:'Walk', index:0,  w:24, h:48, d:[8,10,8,10] },
+        { name:'Attack', index:1,  w:72, h:96, d:[2,6,2,2,2,2,2,2,2,2] },
+        { name:'Strike', index:2,  w:72, h:112, d:[2,4,1,1,6,1,1,3,3,3,2,2,2] },
+        { name:'Shoot', index:3,  w:32, h:56, d:[2,6,2,2,2,2,2,2,2,2,2] },
+        { name:'Twirl', w:24, h:48, d:[2,2,2,2,2,2,2,2,2], copyOf:'Rotate' },
+        { name:'Sleep', index:5,  w:32, h:32, d:[30,35] },
+        { name:'Hurt', index:6,  w:56, h:64, d:[2,8] },
+        { name:'Idle', index:7,  w:24, h:48, d:[40,4,6,6,4] },
+        { name:'Swing', index:8,  w:72, h:88, d:[2,1,2,2,3,2,2,1,1] },
+        { name:'Double', index:9,  w:48, h:80, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
+        { name:'Hop', index:10,  w:24, h:88, d:[2,1,2,3,4,4,3,2,1,2] },
+        { name:'Charge', index:11,  w:24, h:40, d:[2,2,2,2,2,2,2,2,2,2] },
+        { name:'Rotate', index:12,  w:24, h:48, d:[2,2,2,2,2,2,2,2,2] },
+    ];
+
+    const BLAZIKEN_META = [ /* Blaziken */
+        { name:'Walk', index:0,  w:32, h:56, d:[8,10,8,10] },
+        { name:'Attack', index:1,  w:72, h:80, d:[2,6,1,1,2,2,2,2,2] },
+        { name:'Strike', w:80, h:88, d:[2,2,4,2,1,2,2,1,1,1,1,1,1,1,1,1,1,1,2], copyOf:'Slam' },
+        { name:'Slam', index:2,  w:80, h:88, d:[2,2,4,2,1,2,2,1,1,1,1,1,1,1,1,1,1,1,2] },
+        { name:'Shoot', index:3,  w:40, h:72, d:[2,2,2,4,2,2,2,2,2,2,2] },
+        { name:'Kick', index:4,  w:72, h:88, d:[2,2,4,2,2,1,2,4,2,2] },
+        { name:'Sleep', index:5,  w:40, h:32, d:[30,35] },
+        { name:'Hurt', index:6,  w:48, h:56, d:[2,8] },
+        { name:'Idle', index:7,  w:32, h:56, d:[30,30] },
+        { name:'Swing', index:8,  w:80, h:88, d:[2,1,2,2,3,2,2,1,1] },
+        { name:'Double', index:9,  w:64, h:80, d:[2,2,2,2,2,2,3,3,3,2,3,2,2,2,2,2] },
+        { name:'Hop', index:10,  w:40, h:96, d:[2,1,2,3,4,4,3,2,1,2] },
+        { name:'Charge', index:11,  w:32, h:56, d:[2,2,2,2,2,2,2,2,2,2] },
+        { name:'Rotate', index:12,  w:32, h:56, d:[2,2,2,2,2,2,2,2,2] },
+    ];
+
+    /* Evolution paths × stages: [path][stage] — stage 0 is the shared egg. */
+    const FORM_META = [
+      [ /* red   — Charmander → Charmeleon → Charizard */ EGG_META, RED1_META, RED2_META, RED3_META ],
+      [ /* grass — Bulbasaur → Ivysaur → Venusaur */ EGG_META, BULBASAUR_META, IVYSAUR_META, VENUSAUR_META ],
+      [ /* water — Mudkip → Marshtomp → Swampert */ EGG_META, MUDKIP_META, MARSHTOMP_META, SWAMPERT_META ],
+      [ /* fire  — Torchic → Combusken → Blaziken */ EGG_META, TORCHIC_META, COMBUSKEN_META, BLAZIKEN_META ]
     ];
 
     /* Anim names a form may lack → what to play instead. */
     const ANIM_FALLBACKS = {
-      Kick:'Attack', SpAttack:'Shoot',
+      Kick:'Attack', SpAttack:'Shoot', Faint:'Hurt',
       Trip:'Idle', Sit:'Idle', DeepBreath:'Idle', EventSleep:'Sleep',
       Laying:'Sleep', Wake:'Idle', Tumble:'Idle', TumbleBack:'Idle',
       HitGround:'Idle', Head:'Idle', Nod:'Idle', Pose:'Idle', Pull:'Idle',
@@ -3478,24 +3750,44 @@
 
     /* Hidden test hooks: ?test_miles=12 & test_speed=120
        ?test_drive additionally accrues ~75 mi/h of distance so form
-       transitions (e.g. the egg hatching) can be watched live. */
+       transitions (e.g. the egg hatching) can be watched live.
+       ?test_path=0..3 forces a specific evolution line; ?test_weather=61
+       fakes the Open-Meteo weather code so the emoji can be previewed. */
     const urlParams  = new URLSearchParams(location.search);
     const TEST_MILES = parseFloat(urlParams.get('test_miles'));
     const TEST_SPEED = parseFloat(urlParams.get('test_speed'));
     const TEST_MODE  = !Number.isNaN(TEST_SPEED);
     const TEST_DRIVE = urlParams.has('test_drive');
+    const TEST_PATH  = parseInt(urlParams.get('test_path'), 10);
+    const TEST_WEATHER = parseInt(urlParams.get('test_weather'), 10);
 
-    /* Per-form runtime state */
-    const forms = FORMS.map((f, i) => ({
-      ...f,
-      metaList: FORM_META[i],
-      metaBy: Object.fromEntries(FORM_META[i].map(m => [m.name, m])),
-      images: { anim:{}, shadow:{}, offsets:{} },
-      pending: { anim:new Map(), shadow:new Map(), offsets:new Map() },
-      offsetCache: new Map(),
-      ready: false,
-      loadPromise: null
-    }));
+    /* Per-stage runtime state. The egg is shared by all four paths, so it's
+       one object referenced as stage 0 of every path. */
+    function makeForm(f, metaList){
+      return {
+        ...f,
+        metaList,
+        metaBy: Object.fromEntries(metaList.map(m => [m.name, m])),
+        images: { anim:{}, shadow:{}, offsets:{} },
+        pending: { anim:new Map(), shadow:new Map(), offsets:new Map() },
+        offsetCache: new Map(),
+        ready: false,
+        loadPromise: null
+      };
+    }
+    const eggForm = makeForm(EGG, EGG_META);
+    const forms = PATHS.map((path, pi) => [
+      eggForm,
+      makeForm(path[1], FORM_META[pi][1]),
+      makeForm(path[2], FORM_META[pi][2]),
+      makeForm(path[3], FORM_META[pi][3])
+    ]);
+
+    /* Active stage for the current (path, stage). Before the egg hatches the
+       path is still unknown, so stage 0 uses path 0's egg (same files). */
+    function curForm(){
+      return forms[pathIdx >= 0 ? pathIdx : 0][formIdx];
+    }
 
     /* ── "Driven today" session — persists across page reloads (the in-car
        browser can reload/kill the page). Storage is best-effort: if it's
@@ -3510,18 +3802,19 @@
     function loadAvatarSession(){
       try {
         const raw = localStorage.getItem(AVATAR_SESSION_KEY);
-        if (!raw) return { miles: 0, last: null };
+        if (!raw) return { miles: 0, last: null, path: null };
         const p = JSON.parse(raw);
-        if (!p || p.date !== todayKey()) return { miles: 0, last: null };
+        if (!p || p.date !== todayKey()) return { miles: 0, last: null, path: null };
         const miles = Number(p.miles);
-        if (!Number.isFinite(miles) || miles < 0) return { miles: 0, last: null };
+        if (!Number.isFinite(miles) || miles < 0) return { miles: 0, last: null, path: null };
         let last = null;
         if (Number.isFinite(p.lat) && Number.isFinite(p.lon) && Number.isFinite(p.t)) {
           last = { lat: p.lat, lon: p.lon, t: p.t };
         }
-        return { miles, last };
+        const path = Number.isInteger(p.path) && p.path >= 0 && p.path < PATHS.length ? p.path : null;
+        return { miles, last, path };
       } catch(_) {
-        return { miles: 0, last: null };
+        return { miles: 0, last: null, path: null };
       }
     }
 
@@ -3538,6 +3831,7 @@
           lat: state.last ? state.last.lat : null,
           lon: state.last ? state.last.lon : null,
           t: state.last ? state.last.t : null,
+          path: pathIdx,
           date: todayKey()
         }));
       } catch(_) { /* storage unavailable — session stays in memory */ }
@@ -3556,6 +3850,18 @@
     };
 
     let formIdx = formIndexForMiles(state.totalMiles);
+    /* The evolution line: -1 until the egg hatches. A restored session may
+       predate the multi-path change (or have been saved while still an egg),
+       in which case an already-hatched companion rolls its line now. */
+    let pathIdx = -1;
+    if (formIdx > 0) {
+      const savedPath = restored && restored.path !== null && restored.path !== undefined ? restored.path : -1;
+      pathIdx = savedPath >= 0 ? savedPath : Math.floor(Math.random() * PATHS.length);
+      if (savedPath < 0) saveAvatarSession(true);
+    }
+    if (TEST_MODE && Number.isInteger(TEST_PATH) && TEST_PATH >= 0 && TEST_PATH < PATHS.length) {
+      pathIdx = TEST_PATH;
+    }
     let sessionDate = todayKey();
     let watchId = null;
     let lastFixArrivedAt = 0;
@@ -3590,7 +3896,7 @@
     }
 
     function formIndexForMiles(mi){
-      for(let i = forms.length - 1; i >= 0; i--){
+      for(let i = STAGES - 1; i >= 0; i--){
         if (mi >= FORM_AT_MILES[i]) return i;
       }
       return 0;
@@ -3636,30 +3942,31 @@
       return hour >= 19 || hour < 6;
     }
 
-    function weatherText(){
-      if (!state.weather) return 'waiting for GPS weather';
-      const labels = {
-        clear: 'clear',
-        partly: 'partly cloudy',
-        overcast: 'overcast',
-        fog: 'fog',
-        drizzle: 'drizzle',
-        rain: 'rain',
-        snow: 'snow',
-        storm: 'storm',
-        unknown: 'unknown'
-      };
-      const cat = weatherCategory(state.weather.code);
-      const night = Number(state.weather.isDay) === 0 ? ' night' : '';
-      return `${Math.round(state.weather.tempC || 0)}°C ${labels[cat] || 'unknown'}${night}`;
+    /* Weather shown as a single emoji at the end of the info line; '' until
+       the first weather fetch resolves (no GPS yet) so the line stays clean. */
+    function weatherEmoji(){
+      if (!state.weather) return '';
+      const code = Number(state.weather.code) || 0;
+      const night = Number(state.weather.isDay) === 0;
+      if (code === 0) return night ? '🌙' : '☀️';
+      if (code === 1) return night ? '🌙' : '🌤️';
+      if (code === 2) return '⛅';
+      if (code === 3) return '☁️';
+      if (code === 45 || code === 48) return '🌫️';
+      if (code >= 51 && code <= 57) return '🌦️';
+      if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return '🌧️';
+      if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) return '🌨️';
+      if (code >= 95 && code <= 99) return '⛈️';
+      return '';
     }
 
     function milesInfo(){
       const mi = state.totalMiles;
-      const lastIdx = forms.length - 1;
-      if (formIdx >= lastIdx) return mi.toFixed(1) + ' mi total';
+      if (formIdx >= STAGES - 1) return mi.toFixed(1) + ' mi total';
       const rem = Math.max(0, FORM_AT_MILES[formIdx + 1] - mi);
-      return rem.toFixed(1) + ' mi to ' + FORMS[formIdx + 1].label;
+      // While still an egg, keep the line a mystery — never reveal what's about to hatch.
+      const next = formIdx === 0 ? '???' : forms[pathIdx][formIdx + 1].label;
+      return rem.toFixed(1) + ' mi to ' + next;
     }
 
     /* ── ANIMATION LOOKUP ── */
@@ -3681,7 +3988,7 @@
     }
 
     function playAnim(name, loop = true){
-      const real = animNameInForm(forms[formIdx], name);
+      const real = animNameInForm(curForm(), name);
       if (current.name === real && current.loop === loop) return;
       current = { name: real, loop };
       frame = 0;
@@ -3692,7 +3999,7 @@
 
     /* Debounced mood switching — brief state flaps never reach the canvas. */
     function requestAnim(name){
-      const real = animNameInForm(forms[formIdx], name);
+      const real = animNameInForm(curForm(), name);
       if (current.name === real) return;
       const now = Date.now();
       if (pendingAnim && pendingAnim.name === real) return;
@@ -3705,16 +4012,16 @@
     }
 
     /* True while the egg is inside its pre-hatch window (the last
-       HATCH_SOON_MI before it hatches into Form 1). */
+       HATCH_SOON_MI before it hatches into stage 1). */
     function eggHatchingSoon(){
       return formIdx === 0 &&
-             forms.length > 1 &&
+             formIdx + 1 < STAGES &&
              state.totalMiles >= FORM_AT_MILES[1] - HATCH_SOON_MI;
     }
 
     function chooseAnimation(){
-      /* Form 0 is the egg: it only knows Idle, Tumble and Hurt. */
-      if (forms[formIdx].id === 'egg') {
+      /* The egg only knows Idle, Tumble and Hurt. */
+      if (curForm().id === 'egg') {
         const night = isNightNow();
         if (eggHatchingSoon()) {
           return { name:'Hurt', label:'Hatching soon…', cat:'unknown', night };
@@ -3788,25 +4095,34 @@
       return { name: 'Idle', label: 'Idle', cat, night };
     }
 
+    /* Prefetches the next stage of the current line once the line is known.
+       (Before the hatch there is no line to prefetch — the hatching load
+       happens in startEvolution.) */
     function checkPrefetch(){
-      if (formIdx + 1 < forms.length &&
+      if (pathIdx >= 0 && formIdx + 1 < STAGES &&
           state.totalMiles >= FORM_AT_MILES[formIdx + 1] - PREFETCH_AHEAD_MI &&
-          !forms[formIdx + 1].loadPromise) {
-        loadForm(formIdx + 1);
+          !forms[pathIdx][formIdx + 1].loadPromise) {
+        loadForm(pathIdx, formIdx + 1);
       }
     }
 
     /* Evolution: cross a distance threshold → flash + brief transition anim.
-       The egg hatching (form 0 → form 1) gets a gold burst instead of the
-       green evolve flash. */
+       The egg hatching (stage 0 → 1) gets a gold burst instead of the green
+       evolve flash, and is where the evolution line is rolled. */
     function startEvolution(target){
       if (evolveTarget !== -1) return;
+      // Roll the line once at hatch and persist it so a page reload doesn't
+      // re-roll the companion.
+      if (formIdx === 0 && pathIdx === -1) {
+        pathIdx = Math.floor(Math.random() * PATHS.length);
+        saveAvatarSession(true);
+      }
       evolveTarget = target;
-      evolveIsHatch = formIdx === 0 && forms[0].id === 'egg';
+      evolveIsHatch = formIdx === 0;
       if (moodLabel) moodLabel.textContent = evolveIsHatch ? 'Hatching…' : 'Evolving…';
-      loadForm(target).then(() => {
+      loadForm(pathIdx, target).then(() => {
         formIdx = target;
-        evolveAnimName = ['Wake','Tumble','Hop','Idle'].find(n => forms[target].metaBy[n]) || 'Idle';
+        evolveAnimName = ['Wake','Tumble','Hop','Idle'].find(n => forms[pathIdx][target].metaBy[n]) || 'Idle';
         evolveUntil = Date.now() + 1600;
         playAnim(evolveAnimName, true);
         if (stage) {
@@ -3837,7 +4153,7 @@
       const evolving = Date.now() < evolveUntil;
       let chosen;
       if (evolving) {
-        chosen = { name: evolveAnimName, label: (evolveIsHatch ? 'Hatching → ' : 'Evolving → ') + FORMS[formIdx].label, cat: 'unknown', night: isNightNow() };
+        chosen = { name: evolveAnimName, label: (evolveIsHatch ? 'Hatching → ' : 'Evolving → ') + curForm().label, cat: 'unknown', night: isNightNow() };
       } else {
         chosen = chooseAnimation();
         requestAnim(chosen.name);
@@ -3845,8 +4161,14 @@
 
       if (moodLabel) moodLabel.textContent = chosen.label;
       if (infoLabel) {
-        infoLabel.textContent =
-          Math.round(Math.max(0, state.smoothSpeed) / KM_PER_MILE) + ' mph · ' + weatherText() + ' · ' + milesInfo();
+        /* speed · distance-to-next · weather emoji (omitted until known) */
+        const parts = [
+          Math.round(Math.max(0, state.smoothSpeed) / KM_PER_MILE) + ' mph',
+          milesInfo()
+        ];
+        const emoji = weatherEmoji();
+        if (emoji) parts.push(emoji);
+        infoLabel.textContent = parts.join(' · ');
       }
       if (gpsDot) gpsDot.classList.toggle('ok', state.gpsOk);
 
@@ -3856,7 +4178,7 @@
       avatarPanel.dataset.speed = speedClassState;
       avatarPanel.dataset.weather = evolving ? (evolveIsHatch ? 'hatch' : 'evolve') : (chosen.cat || 'unknown');
       avatarPanel.dataset.time = chosen.night ? 'night' : 'day';
-      if (formLabel) formLabel.textContent = FORMS[formIdx].label;
+      if (formLabel) formLabel.textContent = curForm().label;
 
       document.body.style.setProperty(
         '--speed-glow',
@@ -4005,6 +4327,7 @@
           state.totalMiles = 0;
           state.last = null;
           formIdx = 0;
+          pathIdx = -1; // back to the egg — the line is re-rolled at hatch
           saveAvatarSession(true);
           updateAvatar();
           return;
@@ -4074,8 +4397,8 @@
       return promise;
     }
 
-    function loadForm(i){
-      const f = forms[i];
+    function loadForm(pi, stage){
+      const f = forms[pi][stage];
       if (f.loadPromise) return f.loadPromise;
 
       f.loadPromise = new Promise(resolve => {
@@ -4181,7 +4504,7 @@
 
     function getOffset(meta, frameIndex){
       const key = meta.copyOf || meta.name;
-      const offsets = forms[formIdx].offsetCache.get(key);
+      const offsets = curForm().offsetCache.get(key);
 
       if (offsets && offsets.length) {
         return offsets[frameIndex % offsets.length] || { x: meta.w / 2, y: meta.h / 2 };
@@ -4196,7 +4519,7 @@
       const dt = Math.min(50, ts - lastTs);
       lastTs = ts;
 
-      const f = forms[formIdx];
+      const f = curForm();
       const meta = resolveAnim(f, current.name);
       const key = meta.copyOf || meta.name;
       const durations = meta.d || [8];
@@ -4324,12 +4647,15 @@
     async function init(){
       updateAvatar();
 
-      await loadForm(formIdx);
+      await loadForm(pathIdx >= 0 ? pathIdx : 0, formIdx);
 
       updateAvatar();
 
       if (TEST_MODE) {
         // Synthetic speed source — preview forms/speeds without GPS.
+        if (Number.isInteger(TEST_WEATHER)) {
+          state.weather = { code: TEST_WEATHER, tempC: 21, windKmh: 8, isDay: 1 };
+        }
         state.hasFix = true;
         state.gpsOk = true;
         setInterval(() => {
@@ -4347,10 +4673,10 @@
 
         registerWatch();
 
-        // Warm the next form's cache in case the drive runs long.
+        // Warm the next stage's cache in case the drive runs long.
         setTimeout(() => {
-          if (formIdx + 1 < forms.length && !forms[formIdx + 1].loadPromise) {
-            loadForm(formIdx + 1);
+          if (pathIdx >= 0 && formIdx + 1 < STAGES && !forms[pathIdx][formIdx + 1].loadPromise) {
+            loadForm(pathIdx, formIdx + 1);
           }
         }, 120000);
       }

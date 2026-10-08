@@ -1,0 +1,17 @@
+All custom graphics not originating from official PMD games are licensed under Attribution-NonCommercial 4.0 International http://creativecommons.org/licenses/by-nc/4.0/.
+All graphics referred to in this file can be found in http://sprites.pmdcollab.org/
+
+CHUNSOFT	Discord:<@!CHUNSOFT>	Contact:https://www.spike-chunsoft.com/
+	Sprite:
+		Bulbasaur: Walk,Attack,Shoot,Shake,Sleep,Hurt,Idle,Swing,Double,Hop,Charge,Rotate,EventSleep,Wake,Eat,Tumble,Pose,Pull,Pain,Float,DeepBreath,Nod,Sit,LookUp,Sink,Trip,Laying,LeapForth,Head,Cringe,LostBalance,TumbleBack,Faint,HitGround
+		Ivysaur: Walk,Attack,Shoot,Shake,Sleep,Hurt,Idle,Swing,Double,Hop,Charge,Rotate
+		Venusaur: Walk,Attack,Shoot,Shake,Sleep,Hurt,Idle,Swing,Double,Hop,Charge,Rotate
+		Torchic: Walk,Attack,Shoot,Shake,Sleep,Hurt,Idle,Swing,Double,Hop,Charge,Rotate,EventSleep,Wake,Eat,Tumble,Pose,Pull,Pain,Float,DeepBreath,Nod,Sit,LookUp,Sink,Trip,Laying,LeapForth,Head,Cringe,LostBalance,TumbleBack,Faint,HitGround
+		Combusken: Walk,Attack,Strike,Shoot,Sleep,Hurt,Idle,Swing,Double,Hop,Charge,Rotate
+		Blaziken: Walk,Attack,Slam,Shoot,Kick,Sleep,Hurt,Idle,Swing,Double,Hop,Charge,Rotate
+		Mudkip: Walk,Attack,Shoot,Twirl,Sleep,Hurt,Idle,Swing,Double,Hop,Charge,Rotate,EventSleep,Wake,Eat,Tumble,Pose,Pull,Pain,Float,DeepBreath,Nod,Sit,LookUp,Sink,Trip,Laying,LeapForth,Head,Cringe,LostBalance,TumbleBack,Faint,HitGround
+		Marshtomp: Walk,Attack,Shoot,Withdraw,Sleep,Hurt,Idle,Swing,Double,Hop,Charge,Rotate
+		Swampert: Attack,Charge,Double,Hop,Hurt,Idle,RearUp,Rotate,Shoot,Sleep,Swing,Walk
+Emmuffin	Discord:<@!356635814668664832>	Contact:https://twitter.com/Ernmuffin
+	Sprite:
+		Swampert: Attack,Charge,Cringe,DeepBreath,Double,Eat,EventSleep,Faint,Float,Head,HitGround,Hop,Hurt,Idle,Laying,LeapForth,LookUp,LostBalance,Nod,Pain,Pose,Pull,RearUp,Rotate,Shoot,Sink,Sit,Sleep,Swing,Trip,Tumble,TumbleBack,Wake,Walk
