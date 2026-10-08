@@ -279,19 +279,49 @@
       font-family:'Inter',sans-serif;
     }
 
-    /* ── NEWS + AVATAR LAYOUT ── */
+    /* ── HOME TILES (hold a tile to rearrange) ── */
     @keyframes cardReveal{
       from{opacity:0;transform:translateY(8px) scale(.99);}
       to  {opacity:1;transform:translateY(0) scale(1);}
     }
 
-    .news-layout{
+    #pageHome{
       display:flex;
-      gap:14px;
-      margin:18px 24px 0;
+      flex-wrap:wrap;
+      gap:18px;
       align-items:stretch;
-      animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .15s) both;
+      padding:16px 24px 140px 116px;
     }
+    #newsStrip{flex:1 1 480px;min-width:0;
+      animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .15s) backwards;}
+    #avatarPanel{flex:0 1 200px;min-width:0;
+      animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .22s) backwards;}
+    #calSection{flex:1 1 100%;margin:0;}
+
+    /* arrange mode: jiggle + drag */
+    #pageHome.arranging{overflow:hidden;}
+    #pageHome.arranging .home-tile{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;}
+    #pageHome.arranging .home-tile>*{pointer-events:none;}
+    body.home-arranging{cursor:grabbing;}
+    body.home-arranging *{user-select:none;-webkit-user-select:none;}
+    .home-tile.jiggling{animation:tileJiggle .3s ease-in-out infinite alternate;}
+    @keyframes tileJiggle{from{rotate:-.35deg;}to{rotate:.35deg;}}
+    .home-tile.dragging{
+      position:fixed;z-index:500;margin:0;
+      pointer-events:none;will-change:transform;cursor:grabbing;
+      box-shadow:0 24px 48px rgba(0,0,0,.5),var(--tile-shadow);
+    }
+    .arrange-done{
+      position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+      z-index:510;pointer-events:none;opacity:0;
+      border:1px solid var(--border);border-radius:999px;
+      padding:9px 18px;background:rgba(255,255,255,.08);
+      color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;
+      text-transform:uppercase;cursor:pointer;
+      transition:opacity .18s var(--ease-out),background .18s;
+    }
+    .arrange-done:hover{background:rgba(255,255,255,.14);}
+    .arrange-done.show{opacity:1;pointer-events:auto;}
 
     .news-strip{
       flex:1;
@@ -526,6 +556,7 @@
     .avatar-sprite{
       width:150px;
       height:150px;
+      max-width:100%;
       overflow:visible;
       display:block;
     }
@@ -622,17 +653,17 @@
     }
 
     @media (max-width:1100px){
-      .avatar-panel{flex-basis:170px;min-height:210px;}
+      .avatar-panel{min-height:210px;}
       .avatar-sprite,#avatarCanvas{width:130px;height:130px;}
     }
     @media (max-width:720px){
-      .news-layout{gap:12px;margin:14px 16px 0;}
-      .avatar-panel{flex-basis:150px;min-height:190px;}
+      #pageHome{gap:12px;padding:14px 16px 140px 108px;}
+      #newsStrip,#avatarPanel{flex:1 1 100%;}
+      .avatar-panel{min-height:190px;}
       .avatar-sprite,#avatarCanvas{width:110px;height:110px;}
     }
     @media (max-width:520px){
-      .news-layout{flex-wrap:wrap;}
-      .avatar-panel{flex:1 1 100%;min-height:160px;}
+      .avatar-panel{min-height:160px;}
     }
 
     /* ── NEWS POPUP ── */
@@ -1470,7 +1501,7 @@
       #date-display{display:none;}
       .yr-widget{display:none;}
       .fs-btn{width:28px;height:28px;}
-      .news-layout{margin:12px 14px 0;}
+      #pageHome{padding:12px 14px 140px 98px;}
       .sec-head{padding:0 2px 10px;}
       .row{gap:10px;padding:0 2px 4px;}
       .card{width:134px;height:162px;border-radius:14px;padding:10px;}
@@ -1939,8 +1970,8 @@
     <!-- ── PAGE · HOME ── -->
     <div class="page pos-active" id="pageHome">
 
-    <!-- CALENDAR SECTION -->
-    <div class="cal-section" id="calSection" style="display:none;margin-bottom:0;overflow:hidden;transition:none;">
+    <!-- CALENDAR SECTION (home tile — hold to rearrange) -->
+    <div class="cal-section home-tile" id="calSection" style="display:none;margin-bottom:0;overflow:hidden;transition:none;">
       <div class="cal-topbar">
         <span class="cal-sec-label">Calendar</span>
         <span class="cal-week-label" id="calWeekLabel"></span>
@@ -1980,9 +2011,8 @@
       </div>
     </div>
 
-    <!-- NEWS + AVATAR -->
-    <div class="news-layout" id="newsLayout">
-      <div class="news-strip" id="newsStrip">
+    <!-- NEWS (home tile — hold to rearrange) -->
+    <div class="news-strip home-tile" id="newsStrip">
         <div class="news-header">
           <span class="news-label">Live</span>
           <span class="news-dot">·</span>
@@ -2023,7 +2053,7 @@
         License: CC BY-NC 4.0 (https://creativecommons.org/licenses/by-nc/4.0/)
         Credit files: credits_red.txt, credits_starters.txt
       -->
-      <aside class="avatar-panel" id="avatarPanel" data-mood="cute" data-speed="parked">
+      <aside class="avatar-panel home-tile" id="avatarPanel" data-mood="cute" data-speed="parked">
         <div class="avatar-panel-head">
           <span>Companion · <span id="avatarFormLabel">Egg</span></span>
           <span class="avatar-head-dot" id="avatarGpsDot"></span>
@@ -2038,8 +2068,9 @@
           <span class="avatar-info" id="avatarInfo">Waiting for GPS…</span>
         </div>
       </aside>
-    </div>
 
+    <!-- ARRANGE MODE — exit pill -->
+    <button class="arrange-done" id="arrangeDone" aria-hidden="true">Done</button>
     </div>
 
     <!-- ── PAGE · STREAMS ── -->
@@ -3489,6 +3520,7 @@
 
   function goToPage(next){
     if(next === curPage || pageAnimating) return;
+    if(homeArranging) exitHomeArrange();
     pageAnimating = true;
     clearPagePreview();
     closeNewsPopup();
@@ -3602,6 +3634,7 @@
   }
 
   function commitDrag(target){
+    if(homeArranging) exitHomeArrange();
     const from = curPage;
     curPage = target;
     const inn = pageEls[target];
@@ -3711,6 +3744,277 @@
     railBtns.forEach((b, i) => b.classList.toggle('active', i === curPage));
     setRailIndicator();
   })();
+
+  /* ══════════════════════════════════════════
+     HOME TILES — hold a tile to enter arrange
+     mode (jiggle), drag to reorder; the order
+     is persisted. Tap outside a tile, Done or
+     Esc to exit.
+     ══════════════════════════════════════════ */
+  const homePageEl = pageEls[0];
+  const arrangeDoneBtn = document.getElementById('arrangeDone');
+  const HOME_ORDER_KEY = 'tcal.homeOrder';
+  const homeTiles = [
+    document.getElementById('calSection'),
+    document.getElementById('newsStrip'),
+    document.getElementById('avatarPanel')
+  ];
+  const homeTileIds = homeTiles.map(t => t.id);
+  let homeOrder = homeTileIds.slice();
+  let homeArranging = false;
+  let homeDrag = null;
+  let holdTimer = null, holdInfo = null, holdPos = null;
+
+  function applyHomeOrder(){
+    homeTiles.forEach(t => { t.style.order = String(homeOrder.indexOf(t.id)); });
+  }
+
+  /* Restore a saved order (silently ignore bad data). */
+  (function(){
+    try{
+      const saved = JSON.parse(localStorage.getItem(HOME_ORDER_KEY));
+      if(Array.isArray(saved) && saved.length === homeTileIds.length &&
+         homeTileIds.every(id => saved.includes(id))){
+        homeOrder = saved;
+        applyHomeOrder();
+      }
+    }catch(e){}
+  })();
+
+  function homeVisibleTiles(){
+    return homeTiles.filter(t => t.style.display !== 'none' && t.offsetParent !== null);
+  }
+
+  function enterHomeArrange(tile){
+    homeArranging = true;
+    document.body.classList.add('home-arranging');
+    homePageEl.classList.add('arranging');
+    homeVisibleTiles().forEach(t => { if(t !== tile) t.classList.add('jiggling'); });
+    arrangeDoneBtn.classList.add('show');
+    arrangeDoneBtn.setAttribute('aria-hidden', 'false');
+    try{ if(navigator.vibrate) navigator.vibrate(15); }catch(e){}
+  }
+
+  function exitHomeArrange(){
+    if(!homeArranging) return;
+    cancelHomeDrag();
+    homeArranging = false;
+    document.body.classList.remove('home-arranging');
+    homePageEl.classList.remove('arranging');
+    homeTiles.forEach(t => t.classList.remove('jiggling'));
+    arrangeDoneBtn.classList.remove('show');
+    arrangeDoneBtn.setAttribute('aria-hidden', 'true');
+  }
+
+  /* Put a tile back in the grid; if fromRect is given, animate the
+     drop from its floating position to the slot (FLIP). */
+  function settleHomeTile(tile, fromRect){
+    homePageEl.appendChild(tile);
+    tile.classList.remove('dragging');
+    tile.style.left = tile.style.top = tile.style.width = tile.style.height = '';
+    if(!fromRect) return;
+    const slot = tile.getBoundingClientRect();
+    const dx = fromRect.left - slot.left;
+    const dy = fromRect.top - slot.top;
+    if(Math.abs(dx) < 1 && Math.abs(dy) < 1){
+      tile.style.transform = '';
+      return;
+    }
+    tile.style.transition = 'none';
+    tile.style.transform  = 'translate(' + dx + 'px,' + dy + 'px) scale(1.03)';
+    void tile.offsetWidth;
+    tile.style.transition = 'transform .26s var(--ease-smooth)';
+    tile.style.transform  = '';
+    setTimeout(() => { tile.style.transition = ''; tile.style.transform = ''; }, 320);
+  }
+
+  function beginHomeDrag(tile, x, y){
+    const rect = tile.getBoundingClientRect();
+    homeDrag = {
+      tile, id: tile.id,
+      baseX: rect.left, baseY: rect.top,
+      offX: x - rect.left, offY: y - rect.top,
+      index: homeOrder.indexOf(tile.id),
+      orderBefore: homeOrder.slice(),
+      lastX: x, lastY: y, raf: 0, moved: false
+    };
+    tile.classList.remove('jiggling');
+    tile.classList.add('dragging');
+    tile.style.left = rect.left + 'px';
+    tile.style.top  = rect.top + 'px';
+    tile.style.width  = rect.width + 'px';
+    tile.style.height = rect.height + 'px';
+    tile.style.transform = 'translate(0px,0px) scale(1.03)';
+    /* Move to <body>: fixed to the viewport (the page's will-change
+       transform would make it a containing block) and out of the
+       grid flow so the other tiles can reflow. */
+    document.body.appendChild(tile);
+    document.addEventListener('pointermove', onHomeDragMove);
+    document.addEventListener('pointerup', onHomeDragEnd);
+    document.addEventListener('pointercancel', onHomeDragCancel);
+  }
+
+  function detachHomeDragListeners(){
+    document.removeEventListener('pointermove', onHomeDragMove);
+    document.removeEventListener('pointerup', onHomeDragEnd);
+    document.removeEventListener('pointercancel', onHomeDragCancel);
+  }
+
+  function cancelHomeDrag(){
+    const d = homeDrag;
+    if(!d) return;
+    homeDrag = null;
+    detachHomeDragListeners();
+    if(d.raf) cancelAnimationFrame(d.raf);
+    homeOrder = d.orderBefore;
+    applyHomeOrder();
+    settleHomeTile(d.tile, null);
+  }
+
+  function onHomeDragMove(e){
+    const d = homeDrag;
+    if(!d) return;
+    e.preventDefault();
+    d.lastX = e.clientX;
+    d.lastY = e.clientY;
+    d.moved = true;
+    if(d.raf) return;
+    d.raf = requestAnimationFrame(() => {
+      const dd = homeDrag;
+      if(!dd) return;
+      dd.raf = 0;
+      dd.tile.style.transform =
+        'translate(' + (dd.lastX - dd.offX - dd.baseX) + 'px,' +
+                      (dd.lastY - dd.offY - dd.baseY) + 'px) scale(1.03)';
+      const idx = homeHoverIndex(dd.lastX, dd.lastY, dd.id);
+      if(idx >= 0 && idx !== dd.index){
+        homeReorder(dd.id, idx);
+        dd.index = idx;
+      }
+    });
+  }
+
+  function onHomeDragEnd(){
+    const d = homeDrag;
+    if(!d) return;
+    homeDrag = null;
+    detachHomeDragListeners();
+    if(d.raf) cancelAnimationFrame(d.raf);
+    const floating = d.tile.getBoundingClientRect();
+    settleHomeTile(d.tile, floating);
+    if(d.moved){
+      try{ localStorage.setItem(HOME_ORDER_KEY, JSON.stringify(homeOrder)); }catch(e){}
+    }
+    if(homeArranging) d.tile.classList.add('jiggling');
+  }
+
+  function onHomeDragCancel(){ cancelHomeDrag(); }
+
+  /* Which slot would the dragged tile land in at (x, y)? -1 = not
+     over any other tile (keep the current slot). */
+  function homeHoverIndex(x, y, dragId){
+    const vt = homeVisibleTiles().filter(t => t.id !== dragId);
+    for(const t of vt){
+      const r = t.getBoundingClientRect();
+      if(x < r.left - 12 || x > r.right + 12 || y < r.top - 12 || y > r.bottom + 12) continue;
+      const dx = x - (r.left + r.width / 2);
+      const dy = y - (r.top + r.height / 2);
+      let before;
+      if((dx < 0 && dy < 0) || (dx > 0 && dy > 0)) before = dx < 0;
+      else before = Math.abs(dx) >= Math.abs(dy) ? dx < 0 : dy < 0;
+      return homeOrder.indexOf(t.id) + (before ? 0 : 1);
+    }
+    return -1;
+  }
+
+  /* Move a tile to a new slot and FLIP-animate the tiles that shift. */
+  function homeReorder(id, newIdx){
+    const vt = homeVisibleTiles();
+    const first = new Map(vt.map(t => [t.id, t.getBoundingClientRect()]));
+    const cur = homeOrder.indexOf(id);
+    homeOrder.splice(cur, 1);
+    homeOrder.splice(newIdx, 0, id);
+    applyHomeOrder();
+    vt.forEach(t => {
+      const f = first.get(t.id);
+      const l = t.getBoundingClientRect();
+      const dx = f.left - l.left;
+      const dy = f.top - l.top;
+      if(Math.abs(dx) > .5 || Math.abs(dy) > .5){
+        t.style.transition = 'none';
+        t.style.transform  = 'translate(' + dx + 'px,' + dy + 'px)';
+      }
+    });
+    void homePageEl.offsetWidth;
+    vt.forEach(t => {
+      if(t.style.transform){
+        t.style.transition = 'transform .26s var(--ease-smooth)';
+        t.style.transform  = '';
+      }
+    });
+    setTimeout(() => vt.forEach(t => { t.style.transition = ''; }), 320);
+  }
+
+  /* Hold detection: press still for 420ms to enter arrange mode.
+     Any movement (>12px) or release cancels, so scrolling, the news
+     swipe and plain taps all keep working. */
+  function clearHold(){
+    if(holdTimer){ clearTimeout(holdTimer); holdTimer = null; }
+    holdInfo = null;
+    holdPos = null;
+    document.removeEventListener('pointermove', onHoldMove);
+    document.removeEventListener('pointerup', onHoldEnd);
+    document.removeEventListener('pointercancel', onHoldEnd);
+  }
+
+  function onHoldMove(e){
+    if(!holdInfo) return;
+    holdPos = { x: e.clientX, y: e.clientY };
+    if(Math.hypot(e.clientX - holdInfo.x, e.clientY - holdInfo.y) > 12) clearHold();
+  }
+
+  function onHoldEnd(){ clearHold(); }
+
+  homeTiles.forEach(tile => {
+    tile.addEventListener('pointerdown', (e) => {
+      if(e.pointerType === 'mouse' && e.button !== 0) return;
+      /* Buttons / inputs keep their own behavior. */
+      if(e.target.closest('button,input,a,select,textarea,label')) return;
+      if(homeDrag) return;
+      if(homeArranging){
+        e.preventDefault();
+        beginHomeDrag(tile, e.clientX, e.clientY);
+        return;
+      }
+      holdInfo = { tile, x: e.clientX, y: e.clientY };
+      holdPos  = { x: e.clientX, y: e.clientY };
+      document.addEventListener('pointermove', onHoldMove);
+      document.addEventListener('pointerup', onHoldEnd);
+      document.addEventListener('pointercancel', onHoldEnd);
+      holdTimer = setTimeout(() => {
+        const info = holdInfo, pos = holdPos;
+        holdTimer = null;
+        document.removeEventListener('pointermove', onHoldMove);
+        document.removeEventListener('pointerup', onHoldEnd);
+        document.removeEventListener('pointercancel', onHoldEnd);
+        if(!info) return;
+        enterHomeArrange(info.tile);
+        beginHomeDrag(info.tile, pos.x, pos.y);
+      }, 420);
+    });
+  });
+
+  /* Tap outside a tile (on empty page area) to exit arrange mode. */
+  homePageEl.addEventListener('pointerdown', (e) => {
+    if(!homeArranging) return;
+    if(e.target.closest('.home-tile,.arrange-done')) return;
+    exitHomeArrange();
+  });
+
+  arrangeDoneBtn.addEventListener('click', exitHomeArrange);
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape' && homeArranging) exitHomeArrange();
+  });
   </script>
 
   <script>
