@@ -730,6 +730,14 @@
     .page.pos-above{transform:translateY(-101.5%);}
     .page.pos-active{transform:translateY(0);}
     .page.pos-below{transform:translateY(101.5%);}
+    /* leaving page on tap: fog builds in fast (~90ms) then melts with
+       the slide — one animation, so no whole-screen flash frame */
+    .page.fog-out{animation:fogOut .62s both;}
+    @keyframes fogOut{
+      0%  {filter:none;animation-timing-function:linear;}
+      14% {filter:blur(8px) brightness(.7);animation-timing-function:var(--ease-duo);}
+      100%{filter:none;}
+    }
     /* hover previews: current page nudges + frosts, target peeks in */
     .page-viewport.preview-down .page.pos-active{transform:translateY(-5%);filter:blur(3px) brightness(.8);transition-duration:.38s;}
     .page-viewport.preview-down .page.pos-below{transform:translateY(94.5%);transition-duration:.38s;}
@@ -3530,22 +3538,16 @@
     void glassSweep.offsetWidth;
     glassSweep.classList.add(down ? 'run-down' : 'run-up');
 
-    /* t=0: frost the glass instantly (no transition) — the tap starts
-       in the frosted state instead of ramping up from a clear frame.
-       The page being left gets a light fog (a full-strength instant
-       dim would flash the whole screen dark); the incoming page is
-       fully frosted while off-screen. Both melt as the pages settle. */
-    out.style.transition = 'none';
+    /* Leaving page: fog builds in over ~90ms then melts with the slide
+       (the .fog-out animation — an instant whole-screen frost would
+       flash the screen in a single frame). Incoming page: fully
+       frosted while off-screen, clears as it slides in. */
+    out.classList.add('fog-out');
     inn.style.transition = 'none';
-    out.style.filter = 'blur(8px) brightness(.7)';
     inn.style.filter = 'blur(18px) brightness(.5)';
-    void out.offsetWidth;
-
-    /* Release: slide while the frost melts */
-    out.style.transition = '';
+    void inn.offsetWidth;
     inn.style.transition = '';
     void pageViewport.offsetWidth;
-    out.style.filter = '';
     inn.style.filter = '';
     inn.classList.remove('pos-above','pos-below');
     inn.classList.add('pos-active');
@@ -3556,6 +3558,7 @@
     try{ localStorage.setItem(PAGE_KEY, String(curPage)); }catch(e){}
 
     setTimeout(() => {
+      out.classList.remove('fog-out');
       out.style.zIndex = '';
       inn.style.zIndex = '';
       pageAnimating = false;
