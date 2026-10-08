@@ -289,14 +289,15 @@
       display:flex;
       flex-wrap:wrap;
       gap:18px;
-      align-items:stretch;
+      align-items:flex-start;
       padding:16px 24px 140px 116px;
     }
-    #newsStrip{flex:1 1 480px;min-width:0;
+    /* Tiles keep their set size — they move, they never stretch to fill. */
+    #newsStrip{flex:0 1 760px;min-width:0;
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .15s) backwards;}
-    #avatarPanel{flex:0 1 200px;min-width:0;
+    #avatarPanel{flex:0 0 200px;
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .22s) backwards;}
-    #calSection{flex:1 1 100%;margin:0;}
+    #calSection{flex:0 1 100%;margin:0;}
 
     /* arrange mode: jiggle + drag */
     #pageHome.arranging{overflow:hidden;}
@@ -3828,7 +3829,7 @@
     setTimeout(() => { tile.style.transition = ''; tile.style.transform = ''; }, 320);
   }
 
-  function beginHomeDrag(tile, x, y){
+  function beginHomeDrag(tile, x, y, pid){
     const rect = tile.getBoundingClientRect();
     homeDrag = {
       tile, id: tile.id,
@@ -3836,6 +3837,7 @@
       offX: x - rect.left, offY: y - rect.top,
       index: homeOrder.indexOf(tile.id),
       orderBefore: homeOrder.slice(),
+      pid: pid,
       lastX: x, lastY: y, raf: 0, moved: false
     };
     tile.classList.remove('jiggling');
@@ -3845,9 +3847,13 @@
     tile.style.width  = rect.width + 'px';
     tile.style.height = rect.height + 'px';
     tile.style.transform = 'translate(0px,0px) scale(1.03)';
+    /* Re-inserting a node restarts its CSS animations — kill the one-shot
+       boot reveal now or the lifted tile would flash invisible (opacity:0
+       during the reveal delay) while it follows the pointer. */
+    tile.style.animation = 'none';
     /* Move to <body>: fixed to the viewport (the page's will-change
        transform would make it a containing block) and out of the
-       grid flow so the other tiles can reflow. */
+       flex flow so the other tiles can reflow. */
     document.body.appendChild(tile);
     document.addEventListener('pointermove', onHomeDragMove);
     document.addEventListener('pointerup', onHomeDragEnd);
@@ -3873,7 +3879,8 @@
 
   function onHomeDragMove(e){
     const d = homeDrag;
-    if(!d) return;
+    /* Only the pointer that lifted the tile drives the drag. */
+    if(!d || e.pointerId !== d.pid) return;
     e.preventDefault();
     d.lastX = e.clientX;
     d.lastY = e.clientY;
@@ -3894,9 +3901,9 @@
     });
   }
 
-  function onHomeDragEnd(){
+  function onHomeDragEnd(e){
     const d = homeDrag;
-    if(!d) return;
+    if(!d || e.pointerId !== d.pid) return;
     homeDrag = null;
     detachHomeDragListeners();
     if(d.raf) cancelAnimationFrame(d.raf);
@@ -3908,7 +3915,10 @@
     if(homeArranging) d.tile.classList.add('jiggling');
   }
 
-  function onHomeDragCancel(){ cancelHomeDrag(); }
+  function onHomeDragCancel(e){
+    if(!homeDrag || e.pointerId !== homeDrag.pid) return;
+    cancelHomeDrag();
+  }
 
   /* Which slot would the dragged tile land in at (x, y)? -1 = not
      over any other tile (keep the current slot). */
@@ -3968,12 +3978,17 @@
   }
 
   function onHoldMove(e){
-    if(!holdInfo) return;
+    /* Ignore other pointers (a second finger / the other hand must not
+       cancel this hold). */
+    if(!holdInfo || e.pointerId !== holdInfo.pid) return;
     holdPos = { x: e.clientX, y: e.clientY };
     if(Math.hypot(e.clientX - holdInfo.x, e.clientY - holdInfo.y) > 12) clearHold();
   }
 
-  function onHoldEnd(){ clearHold(); }
+  function onHoldEnd(e){
+    if(!holdInfo || e.pointerId !== holdInfo.pid) return;
+    clearHold();
+  }
 
   homeTiles.forEach(tile => {
     tile.addEventListener('pointerdown', (e) => {
@@ -3983,23 +3998,23 @@
       if(homeDrag) return;
       if(homeArranging){
         e.preventDefault();
-        beginHomeDrag(tile, e.clientX, e.clientY);
+        beginHomeDrag(tile, e.clientX, e.clientY, e.pointerId);
         return;
       }
-      holdInfo = { tile, x: e.clientX, y: e.clientY };
+      holdInfo = { tile, x: e.clientX, y: e.clientY, pid: e.pointerId };
       holdPos  = { x: e.clientX, y: e.clientY };
       document.addEventListener('pointermove', onHoldMove);
       document.addEventListener('pointerup', onHoldEnd);
       document.addEventListener('pointercancel', onHoldEnd);
       holdTimer = setTimeout(() => {
-        const info = holdInfo, pos = holdPos;
+        const info = holdInfo, pos = holdPos, pid = info ? info.pid : 0;
         holdTimer = null;
         document.removeEventListener('pointermove', onHoldMove);
         document.removeEventListener('pointerup', onHoldEnd);
         document.removeEventListener('pointercancel', onHoldEnd);
         if(!info) return;
         enterHomeArrange(info.tile);
-        beginHomeDrag(info.tile, pos.x, pos.y);
+        beginHomeDrag(info.tile, pos.x, pos.y, pid);
       }, 420);
     });
   });
