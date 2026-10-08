@@ -56,6 +56,7 @@
       --ease-spring:cubic-bezier(.34,1.4,.64,1);
       --ease-smooth:cubic-bezier(.22,.61,.36,1);
       --ease-fluid:cubic-bezier(.4,0,.2,1);
+      --ease-duo:cubic-bezier(.32,.72,0,1);
       --accent-glow:0 10px 30px -8px rgba(29,185,84,.42),0 0 0 1px rgba(29,185,84,.28);
       --tile-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 -1px 0 rgba(0,0,0,.32) inset;
       --boot-delay:1.7s;
@@ -729,7 +730,6 @@
     .page.pos-above{transform:translateY(-101.5%);}
     .page.pos-active{transform:translateY(0);}
     .page.pos-below{transform:translateY(101.5%);}
-    .page.frost{filter:blur(18px) brightness(.5);}
     /* hover previews: current page nudges + frosts, target peeks in */
     .page-viewport.preview-down .page.pos-active{transform:translateY(-5%);filter:blur(3px) brightness(.8);transition-duration:.38s;}
     .page-viewport.preview-down .page.pos-below{transform:translateY(94.5%);transition-duration:.38s;}
@@ -3534,17 +3534,24 @@
     void glassSweep.offsetWidth;
     glassSweep.classList.add(down ? 'run-down' : 'run-up');
 
-    /* incoming page: pre-blur without transition, then release */
+    /* t=0: frost both pages instantly (no transition) — the glass is
+       already there before anything moves, so the tap starts in the
+       frosted state instead of ramping up from a jarringly clear
+       frame. The frost then melts away as the pages settle. */
+    out.style.transition = 'none';
     inn.style.transition = 'none';
-    inn.style.filter = 'blur(14px)';
-    void inn.offsetWidth;
+    out.style.filter = 'blur(18px) brightness(.5)';
+    inn.style.filter = 'blur(18px) brightness(.5)';
+    void out.offsetWidth;
+
+    /* Release: slide while the frost melts */
+    out.style.transition = '';
     inn.style.transition = '';
+    void pageViewport.offsetWidth;
+    out.style.filter = '';
+    inn.style.filter = '';
     inn.classList.remove('pos-above','pos-below');
     inn.classList.add('pos-active');
-    inn.style.filter = '';
-
-    /* outgoing page: frosts over while sliding away */
-    out.classList.add('frost');
     out.classList.remove('pos-active');
     out.classList.add(down ? 'pos-above' : 'pos-below');
 
@@ -3552,7 +3559,6 @@
     try{ localStorage.setItem(PAGE_KEY, String(curPage)); }catch(e){}
 
     setTimeout(() => {
-      out.classList.remove('frost');
       out.style.zIndex = '';
       inn.style.zIndex = '';
       pageAnimating = false;
@@ -3573,10 +3579,13 @@
 
   /* ── Rail input: tap commits, finger-drag scrubs the pages ──
      Press a rail icon and slide the finger along the rail: the pages
-     follow the finger (one page per icon spacing, like detents) and
-     the indicator tracks it 1:1. On release they spring-settle to the
-     nearest icon — or back to the current page. A plain tap still
-     commits instantly. Works with mouse and touch alike. */
+     follow the finger (one page per icon spacing, like detents), frost
+     in proportion to how far they are pushed, and the indicator tracks
+     it 1:1. On release the pages settle to the nearest icon — or, if
+     the slide stayed in the current page's half, to the icon that was
+     pressed, continuing the slide from where the finger left it. A
+     plain tap frosts the glass instantly and commits. Works with mouse
+     and touch alike. */
   let railPointer = null; /* {id, startY, btnIdx, dragging} */
 
   function railSpacing(){
@@ -3708,11 +3717,14 @@
     const dy = e.clientY - ptr.startY;
     const p = Math.min(2, Math.max(0, curPage + dy / railSpacing()));
     const target = Math.round(p);
-    if(target === curPage){
-      /* The slide stayed within the current page's half — spring back,
-         then treat the gesture as a tap on the pressed icon. */
-      if(ptr.btnIdx >= 0) snapBackFromDrag(() => goToPage(ptr.btnIdx));
-      else snapBackFromDrag();
+    if(target === curPage && (ptr.btnIdx < 0 || ptr.btnIdx === curPage)){
+      /* No icon pressed, or jitter on the current icon → spring back. */
+      snapBackFromDrag();
+    } else if(target === curPage){
+      /* The slide stayed in the current page's half but a different
+         icon was pressed → commit to that icon, continuing the slide
+         from wherever the finger left it (no wobble back first). */
+      commitDrag(ptr.btnIdx);
     } else {
       commitDrag(target);
     }
