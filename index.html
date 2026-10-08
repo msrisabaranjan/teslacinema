@@ -330,6 +330,16 @@
       opacity:0;transition:opacity .25s var(--ease-out);
     }
     #pageHome.arranging::after{opacity:1;}
+    /* Drop ghost — the slot the dragged tile will snap to */
+    .drop-ghost{
+      position:absolute;z-index:6;
+      border:2px dashed rgba(29,185,84,.6);
+      background:rgba(29,185,84,.06);
+      border-radius:18px;
+      pointer-events:none;
+      opacity:0;transition:opacity .12s var(--ease-out);
+    }
+    .drop-ghost.show{opacity:1;}
     .arrange-done{
       position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
       z-index:510;pointer-events:none;opacity:0;
@@ -3806,6 +3816,36 @@
     return homeTiles.filter(t => t.style.display !== 'none' && t.offsetParent !== null);
   }
 
+  /* Drop ghost — dashed outline of the slot the dragged tile will snap
+     to. The slot is measured with an invisible clone laid out in the
+     real flex flow (inserted + removed within the same task, so no
+     flicker and the other tiles never paint an intermediate state). */
+  const dropGhost = document.createElement('div');
+  dropGhost.className = 'drop-ghost';
+  dropGhost.setAttribute('aria-hidden','true');
+  homePageEl.appendChild(dropGhost);
+
+  function updateDropGhost(d){
+    const orderVal = d.tile.style.order;
+    const clone = d.tile.cloneNode(true);
+    /* Reset the drag styling (fixed position / size / transform would
+       break the flow measurement) but keep the order that picks the
+       slot, and keep animations off so cardReveal can't skew the box. */
+    clone.classList.remove('dragging','jiggling');
+    clone.style.cssText = 'order:' + orderVal + ';visibility:hidden;animation:none;';
+    homePageEl.appendChild(clone);
+    const pageRect = homePageEl.getBoundingClientRect();
+    const r = clone.getBoundingClientRect();
+    clone.remove();
+    dropGhost.style.left   = (r.left - pageRect.left) + 'px';
+    dropGhost.style.top    = (r.top  - pageRect.top)  + 'px';
+    dropGhost.style.width  = r.width + 'px';
+    dropGhost.style.height = r.height + 'px';
+    dropGhost.classList.add('show');
+  }
+
+  function hideDropGhost(){ dropGhost.classList.remove('show'); }
+
   function enterHomeArrange(tile){
     homeArranging = true;
     document.body.classList.add('home-arranging');
@@ -3878,6 +3918,7 @@
     document.addEventListener('pointermove', onHomeDragMove);
     document.addEventListener('pointerup', onHomeDragEnd);
     document.addEventListener('pointercancel', onHomeDragCancel);
+    updateDropGhost(homeDrag);
   }
 
   function detachHomeDragListeners(){
@@ -3892,6 +3933,7 @@
     homeDrag = null;
     detachHomeDragListeners();
     if(d.raf) cancelAnimationFrame(d.raf);
+    hideDropGhost();
     homeOrder = d.orderBefore;
     applyHomeOrder();
     settleHomeTile(d.tile, null);
@@ -3917,6 +3959,7 @@
       if(idx >= 0 && idx !== dd.index){
         homeReorder(dd.id, idx);
         dd.index = idx;
+        updateDropGhost(dd);
       }
     });
   }
@@ -3929,6 +3972,8 @@
     if(d.raf) cancelAnimationFrame(d.raf);
     const floating = d.tile.getBoundingClientRect();
     settleHomeTile(d.tile, floating);
+    /* Let the ghost stay until the tile has flown into its slot. */
+    setTimeout(hideDropGhost, 280);
     if(d.moved){
       try{ localStorage.setItem(HOME_ORDER_KEY, JSON.stringify(homeOrder)); }catch(e){}
     }
