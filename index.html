@@ -3586,6 +3586,13 @@
   function applyRailProgress(p){
     pageEls.forEach((el, i) => {
       el.style.transform = 'translateY(' + ((i - p) * 101.5).toFixed(3) + '%)';
+      /* Frosted-glass feel while the finger is held: the farther a
+         page is from its rest position, the more it frosts — full
+         frost (blur 18 / dim .5) once it is a whole page away. */
+      const d = Math.min(1, Math.abs(i - p));
+      el.style.filter = d < 0.02
+        ? ''
+        : 'blur(' + (18 * d).toFixed(1) + 'px) brightness(' + (1 - 0.5 * d).toFixed(3) + ')';
     });
     const top0 = railBtns[0].offsetTop;
     const top2 = railBtns[2].offsetTop;
@@ -3627,14 +3634,13 @@
     inn.style.zIndex = 2;
     out.style.zIndex = 1;
 
-    /* Stage a light frost on the outgoing page and a soft blur on the
-       incoming one (no transition), so they melt away while the pages
-       settle into place — a quieter cousin of the tap transition. */
-    inn.style.transition = 'none';
-    out.style.transition = 'none';
-    inn.style.filter = 'blur(10px)';
-    out.style.filter = 'blur(14px) brightness(.6)';
-    void pageViewport.offsetWidth;
+    /* Frosted-glass sweep across the screen (same as the tap
+       transition). The scrub frost already on the pages melts away
+       as they settle into place. */
+    const down = target > from;
+    glassSweep.classList.remove('run-down','run-up');
+    void glassSweep.offsetWidth;
+    glassSweep.classList.add(down ? 'run-down' : 'run-up');
 
     pageEls.forEach((el, i) => {
       el.classList.remove('pos-above','pos-active','pos-below');
