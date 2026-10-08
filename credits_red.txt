@@ -20,6 +20,9 @@ CHUNSOFT	Discord:<@!CHUNSOFT>	Contact:https://www.spike-chunsoft.com/
 		Charmander: Walk,Attack,Kick,Shoot,Strike,Sleep,Hurt,Idle,Swing,Double,Hop,Charge,Rotate,EventSleep,Wake,Eat,Tumble,Pose,Pull,Pain,Float,DeepBreath,Nod,Sit,LookUp,Sink,Trip,Laying,LeapForth,Head,Cringe,LostBalance,TumbleBack,Faint,HitGround
 		Charmeleon: Attack,Charge,Double,Hop,Hurt,Idle,Rotate,Shoot,Sleep,Strike,Swing,Walk
 		Charizard: Attack,Charge,Double,Hop,Hurt,Idle,Rotate,Shoot,Sleep,Strike,Swing,Walk
+CUR	Discord:<@!237286997645983744>
+	Sprite:
+		Egg: Idle,Hurt,Tumble
 Discord:<@!199989579682414592>
 	Sprite:
 		Charmeleon: Cringe,DeepBreath,Double,Eat,EventSleep,Faint,Float,Head,HitGround,Laying,LeapForth,LookUp,LostBalance,Nod,Pain,Pose,Pull,Sink,Sit,Trip,Tumble,TumbleBack,Wake
