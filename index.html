@@ -31,7 +31,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
 
   <style>
     :root{
@@ -170,41 +169,42 @@
     .t-chg.dn{color:var(--red);}
     .t-dot{color:var(--muted2);font-size:10px;}
 
-    /* ── HEADER ── */
-    header{
-      position:fixed;top:44px;left:0;right:0;z-index:200;
-      display:flex;align-items:center;justify-content:space-between;
-      padding:0 20px;height:56px;
-      border-bottom:1px solid var(--border);
-      background:rgba(11,11,14,.86);
-      backdrop-filter:blur(14px);
-      -webkit-backdrop-filter:blur(14px);
-      animation:slideDown .7s var(--ease-out) var(--boot-delay) both;
-    }
+    /* ── RIGHT ISLAND BAR (replaces the old top header) ──
+       A borderless floating stack pinned to the top-right:
+       logo → time + date → year-progress ring.
+       The fullscreen button floats alone in the bottom-right corner. */
     @keyframes slideDown{
       from{opacity:0;transform:translateY(-8px);}
       to  {opacity:1;transform:translateY(0);}
     }
-    .logo{display:flex;align-items:center;gap:10px;}
+    /* Ungrouped floating stack — borderless, each element sized like
+       the nav rail's 40px buttons and aligned with it. */
+    .island-bar{
+      position:fixed;top:60px;right:14px;z-index:600;
+      display:flex;flex-direction:column;align-items:center;
+      gap:8px;width:58px;
+      user-select:none;
+      animation:islandIn .7s var(--ease-out) var(--boot-delay) both;
+    }
+    @keyframes islandIn{
+      from{opacity:0;transform:translateX(12px);}
+      to  {opacity:1;transform:translateX(0);}
+    }
     .logo-t{
-      width:28px;height:28px;background:var(--accent);border-radius:8px;
+      width:36px;height:36px;background:var(--accent);border-radius:11px;
       display:flex;align-items:center;justify-content:center;
-      font-weight:800;font-size:13px;color:#07110C;letter-spacing:-.02em;
+      font-weight:800;font-size:15px;color:#07110C;letter-spacing:-.02em;
       box-shadow:0 0 0 0 rgba(29,185,84,.4),0 8px 20px rgba(29,185,84,.18);
       animation:logoBreathe 4.5s var(--ease-smooth) infinite;
-      transition:transform .3s var(--ease-spring);
+      flex-shrink:0;
     }
-    .logo-t:hover{transform:scale(1.07) rotate(-3deg);}
     @keyframes logoBreathe{
       0%,100% {box-shadow:0 0 0 0 rgba(29,185,84,0),0 2px 8px rgba(29,185,84,.18);}
       50%     {box-shadow:0 0 0 5px rgba(29,185,84,.06),0 8px 18px rgba(29,185,84,.32);}
     }
-    .logo-name{font-size:15px;font-weight:700;letter-spacing:-.02em;}
-    .logo-name span{color:var(--muted);font-weight:400;margin-left:4px;}
-    .header-right{display:flex;align-items:center;gap:10px;}
-    #clock-wrap{display:flex;align-items:baseline;gap:8px;}
+    #clock-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;}
     #clock{
-      font-size:22px;font-weight:300;letter-spacing:-.02em;
+      font-size:15px;font-weight:300;letter-spacing:-.02em;line-height:1;
       font-variant-numeric:tabular-nums;
       transition:color .3s var(--ease-smooth);
     }
@@ -215,13 +215,14 @@
       100% {opacity:1;transform:translateY(0);}
     }
     #date-display{
-      font-size:11px;font-weight:600;
+      font-size:9px;font-weight:600;
       color:var(--muted);
       letter-spacing:.02em;
       white-space:nowrap;
+      max-width:58px;overflow:hidden;text-overflow:ellipsis;
     }
     .fs-btn{
-      width:32px;height:32px;border-radius:999px;
+      width:36px;height:36px;border-radius:999px;
       border:1px solid var(--border);
       background:rgba(255,255,255,.04);
       color:var(--muted);cursor:pointer;
@@ -243,40 +244,32 @@
       transform:scale(.92);
     }
     .fs-btn svg{
-      width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;
+      width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;
       transition:transform .35s var(--ease-spring);
     }
     .fs-btn:hover svg{transform:scale(1.08);}
-    .fs-btn.cal-active{
-      background:var(--accent-soft);
-      border-color:var(--accent);
-      color:#fff;
+    #fsBtn{
+      position:fixed;bottom:16px;right:14px;z-index:600;
+      animation:islandIn .7s var(--ease-out) calc(var(--boot-delay) + .45s) both;
     }
 
-    /* ── YEAR PROGRESS WIDGET ── */
-    .yr-widget{
-      display:flex;align-items:center;gap:7px;
-      padding:6px 10px;
-      border:1px solid var(--border);
-      border-radius:999px;
-      background:rgba(255,255,255,.04);
-      cursor:default;
-      user-select:none;
-      flex-shrink:0;
+    /* Year progress: a ring with the days-left number inside it. */
+    .yr-ring{
+      cursor:default;display:flex;flex-direction:column;
+      align-items:center;gap:5px;flex-shrink:0;
     }
-    .yr-text{display:flex;flex-direction:column;align-items:flex-end;gap:1px;}
-    .yr-days{
-      font-size:13px;font-weight:700;color:#fff;
-      font-variant-numeric:tabular-nums;line-height:1;
-    }
-    .yr-label{font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
-    .yr-arc{flex-shrink:0;}
+    .yr-arc{display:block;width:36px;height:36px;}
     .yr-arc-track{stroke:rgba(255,255,255,0.08);fill:none;stroke-linecap:round;}
     .yr-arc-fill{fill:none;stroke-linecap:round;transition:stroke-dashoffset 1.2s var(--ease-smooth),stroke .6s var(--ease-smooth);}
-    .yr-arc-pct{
-      font-size:8px;font-weight:800;fill:var(--muted);
-      text-anchor:middle;dominant-baseline:middle;
+    .yr-arc-days{
+      font-size:15px;font-weight:800;fill:#fff;
+      text-anchor:middle;dominant-baseline:central;
       font-family:'Inter',sans-serif;
+      font-variant-numeric:tabular-nums;
+    }
+    .yr-ring-cap{
+      font-size:7px;font-weight:800;letter-spacing:.16em;
+      text-transform:uppercase;color:var(--muted);line-height:1;
     }
 
     /* ── HOME TILES (hold a tile to rearrange) ── */
@@ -292,7 +285,7 @@
       /* position:relative would override .page's absolute;inset:0 and
          collapse the page to its padding height — keep .page's box. */
       padding:0 0 140px 0;
-      --hx:116px;--hy:16px;--hxr:24px;
+      --hx:24px;--hy:16px;--hxr:104px;
     }
     .home-tile{
       position:absolute;
@@ -301,8 +294,8 @@
     /* .news-strip / .avatar-panel declare position:relative later in
        this sheet (for their absolutely-positioned inner chrome); the
        id rules win the cascade so the tiles stay out of the flow. */
-    #newsStrip,#avatarPanel,#calSection,#navSection{position:absolute;}
-    #newsStrip.dragging,#avatarPanel.dragging,#calSection.dragging,#navSection.dragging{position:fixed;}
+    #newsStrip,#avatarPanel,#navSection{position:absolute;}
+    #newsStrip.dragging,#avatarPanel.dragging,#navSection.dragging{position:fixed;}
     #pageHome.home-no-trans .home-tile{transition:none;}
     /* Tiles keep their set size — they move, they never stretch to fill. */
     #newsStrip{min-width:0;
@@ -311,7 +304,6 @@
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .22s) backwards;}
     #navSection{
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .3s) backwards;}
-    #calSection{margin:0;}
 
     /* arrange mode: jiggle + drag */
     #pageHome.arranging{overflow:hidden;}
@@ -409,7 +401,7 @@
       transform:scale(.92);
     }
     .news-nav svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
-    .news-items{overflow:hidden;position:relative;height:176px;touch-action:pan-y;}
+    .news-items{overflow:hidden;position:relative;height:140px;touch-action:pan-y;}
     .news-slide{
       position:absolute;inset:0;
       display:flex;align-items:stretch;
@@ -489,7 +481,7 @@
     }
     @keyframes newsPipFill{to{width:100%;}}
     .news-skeleton{
-      height:176px;display:flex;align-items:stretch;
+      height:140px;display:flex;align-items:stretch;
     }
     .news-skel-img{
       flex:0 0 260px;
@@ -510,7 +502,7 @@
       .news-img-wrap,.news-skel-img{flex-basis:170px;}
       .news-title{font-size:16px;}
       .news-desc{display:none;}
-      .news-items,.news-skeleton{height:160px;}
+      .news-items,.news-skeleton{height:132px;}
     }
     .news-error{
       height:100%;display:flex;flex-direction:column;
@@ -700,7 +692,7 @@
       .avatar-sprite,#avatarCanvas{width:130px;height:130px;}
     }
     @media (max-width:720px){
-      #pageHome{--hx:108px;--hy:14px;--hxr:16px;}
+      #pageHome{--hx:16px;--hy:14px;--hxr:100px;}
       .avatar-panel{min-height:190px;}
       .avatar-sprite,#avatarCanvas{width:110px;height:110px;}
     }
@@ -741,7 +733,7 @@
       border-radius:18px;
       overflow:hidden;
       background:var(--bg-raised);
-      min-height:384px;
+      min-height:330px;
       /* Tile box AND the map framing vars on one clock (see @property
          above). The iframe recomputes its size/transform from the
          interpolated vars every frame, so expand/collapse reads as a
@@ -857,7 +849,7 @@
       cursor:grab;
     }
     @media (max-width:720px){
-      .nav-section{min-height:300px;}
+      .nav-section{min-height:280px;}
     }
 
     /* ── NEWS POPUP ── */
@@ -940,13 +932,13 @@
     /* ── SECTIONS ── */
     /* Page viewport: three stacked full-screen pages (home / streams / filler) */
     main.page-viewport{
-      position:fixed;top:100px;left:0;right:0;bottom:0;
+      position:fixed;top:44px;left:0;right:0;bottom:0;
       padding:0;z-index:1;overflow:hidden;
     }
     .page{
       position:absolute;inset:0;
       overflow-y:auto;overscroll-behavior:contain;
-      padding:16px 0 140px 92px;
+      padding:16px 104px 140px 24px;
       scrollbar-width:none;
       will-change:transform,filter;
       transition:transform .62s var(--ease-duo),filter .62s var(--ease-duo);
@@ -1247,6 +1239,7 @@
     }
     .now-playing.visible{
       display:flex;
+      right:64px;
       animation:npSlideUp .55s var(--ease-spring) both;
     }
     @keyframes npSlideUp{
@@ -1403,145 +1396,6 @@
       text-orientation:mixed;
     }
 
-    /* ── CALENDAR SECTION ── */
-    .cal-section{
-      margin:18px 24px 0;
-      border:1px solid var(--border);
-      border-radius:18px;
-      overflow:hidden;
-      background:var(--surface);
-    }
-    .cal-topbar{
-      display:flex;align-items:center;gap:10px;
-      padding:12px 16px;
-      border-bottom:1px solid var(--border);
-    }
-    .cal-topbar::before{
-      content:'';width:3px;height:15px;
-      background:var(--accent);border-radius:999px;flex-shrink:0;
-      box-shadow:0 0 10px rgba(29,185,84,.35);
-    }
-    .cal-sec-label{
-      font-size:11px;font-weight:800;letter-spacing:.13em;
-      text-transform:uppercase;color:var(--muted);
-    }
-    .cal-week-label{
-      font-size:11px;font-weight:600;color:rgba(255,255,255,.5);
-      white-space:nowrap;margin-left:4px;
-    }
-    .cal-nav-group{
-      display:flex;align-items:center;gap:6px;margin-left:auto;
-    }
-    .cal-nav-btn{
-      width:36px;height:36px;border:1px solid var(--border-em);
-      border-radius:999px;background:rgba(255,255,255,.04);cursor:pointer;
-      display:flex;align-items:center;justify-content:center;
-      color:var(--muted);transition:background .15s,color .15s,transform .1s;
-    }
-    .cal-nav-btn:active{background:var(--accent-soft);color:#fff;transform:scale(0.9);}
-    .cal-nav-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;}
-    .cal-today-btn{
-      padding:8px 14px;border:1px solid var(--border-em);
-      border-radius:999px;background:rgba(255,255,255,.04);cursor:pointer;
-      font-family:'Inter',sans-serif;font-size:10px;font-weight:800;
-      color:var(--muted);letter-spacing:.08em;text-transform:uppercase;
-      transition:background .15s,color .15s,border-color .15s;
-    }
-    .cal-today-btn:active{background:var(--accent-soft);border-color:var(--accent);color:#fff;}
-
-    .cal-setup{
-      display:flex;flex-direction:column;align-items:center;
-      padding:28px 22px 24px;gap:14px;text-align:center;
-    }
-    .cal-setup-icon{
-      width:52px;height:52px;border-radius:16px;
-      background:linear-gradient(135deg,var(--accent),#8B5CF6);
-      display:flex;align-items:center;justify-content:center;flex-shrink:0;
-      box-shadow:0 12px 28px rgba(29,185,84,.18);
-    }
-    .cal-setup-icon svg{width:26px;height:26px;}
-    .cal-setup h2{font-size:17px;font-weight:800;color:#fff;margin:0;letter-spacing:-.01em;}
-    .cal-setup p{font-size:12px;color:var(--muted);margin:0;line-height:1.65;max-width:460px;}
-    .cal-input-group{width:100%;max-width:480px;display:flex;gap:8px;}
-    .cal-input{
-      flex:1;min-width:0;padding:12px 14px;
-      background:rgba(255,255,255,.055);
-      border:1px solid var(--border-em);border-radius:999px;
-      color:#fff;font-family:'Inter',sans-serif;font-size:12px;
-      outline:none;transition:border-color .2s,background .2s;
-    }
-    .cal-input:focus{border-color:var(--accent);background:rgba(29,185,84,.06);}
-    .cal-input::placeholder{color:var(--muted2);}
-    .cal-connect-btn{
-      flex-shrink:0;padding:12px 18px;border:none;border-radius:999px;
-      background:var(--accent);
-      color:#062B12;font-family:'Inter',sans-serif;
-      font-size:12px;font-weight:800;cursor:pointer;
-      white-space:nowrap;transition:opacity .2s,transform .1s,filter .15s;
-    }
-    .cal-connect-btn:hover{filter:brightness(1.05);}
-    .cal-connect-btn:active{opacity:.85;transform:scale(0.97);}
-    .cal-hint{font-size:10px;color:var(--muted2);max-width:460px;line-height:1.55;}
-
-    .cal-body{display:none;flex-direction:column;}
-    .cal-body.visible{display:flex;}
-    .cal-days{
-      display:grid;grid-template-columns:repeat(7,1fr);
-      gap:10px;padding:14px 16px 16px;
-    }
-    .cal-day{
-      display:flex;flex-direction:column;gap:5px;min-height:102px;
-      background:rgba(255,255,255,.02);
-      border:1px solid rgba(255,255,255,.04);
-      border-radius:14px;
-      padding:8px 6px;
-    }
-    .cal-day-head{
-      display:flex;flex-direction:column;align-items:center;gap:3px;
-      padding-bottom:7px;border-bottom:1px solid var(--border);
-    }
-    .cal-day-name{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
-    .cal-day-num{
-      width:28px;height:28px;border-radius:50%;
-      display:flex;align-items:center;justify-content:center;
-      font-size:13px;font-weight:700;color:rgba(255,255,255,.72);
-    }
-    .cal-day.today .cal-day-num{background:var(--accent);color:#062B12;}
-    .cal-day.today .cal-day-name{color:var(--accent);}
-    .cal-event{
-      border-radius:6px;padding:4px 6px;font-size:10px;font-weight:600;
-      line-height:1.3;overflow:hidden;text-overflow:ellipsis;
-      white-space:nowrap;border-left:2px solid;
-    }
-    .cal-event-time{font-size:9px;font-weight:800;opacity:.72;display:block;margin-bottom:1px;}
-    .cal-allday{
-      font-size:9px;font-weight:700;border-radius:6px;padding:4px 6px;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    }
-    .cal-empty{font-size:10px;color:var(--muted2);text-align:center;padding-top:8px;}
-    .cal-loading{
-      display:flex;align-items:center;justify-content:center;
-      gap:8px;color:var(--muted);font-size:12px;padding:22px;
-    }
-    .cal-spinner{
-      width:16px;height:16px;border-radius:50%;flex-shrink:0;
-      border:2px solid var(--border-em);border-top-color:var(--accent);
-      animation:spin .7s linear infinite;
-    }
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .cal-error{
-      display:flex;flex-direction:column;align-items:center;
-      gap:10px;padding:22px;text-align:center;
-    }
-    .cal-error p{font-size:12px;color:var(--muted);max-width:280px;line-height:1.6;margin:0;}
-    .cal-reconnect-btn{
-      padding:9px 16px;border:1px solid var(--border-em);
-      border-radius:999px;background:rgba(255,255,255,.04);cursor:pointer;
-      font-family:'Inter',sans-serif;font-size:11px;font-weight:700;
-      color:var(--muted);transition:background .15s,color .15s,border-color .15s;
-    }
-    .cal-reconnect-btn:active{background:var(--accent-soft);border-color:var(--accent);color:#fff;}
-
     ::-webkit-scrollbar{width:3px}
     ::-webkit-scrollbar-track{background:transparent}
     ::-webkit-scrollbar-thumb{background:var(--border-em);border-radius:999px}
@@ -1619,33 +1473,33 @@
       100% {transform:scaleX(1);}
     }
 
-    /* ── LEFT PAGE RAIL ── */
+    /* ── RIGHT PAGE RAIL ── */
     .page-rail{
-      position:fixed;left:14px;top:50%;transform:translateY(-50%);
-      z-index:600;display:flex;flex-direction:column;gap:10px;
-      padding:10px;user-select:none;touch-action:none;
+      position:fixed;right:14px;top:50%;transform:translateY(-50%);
+      z-index:600;display:flex;flex-direction:column;gap:8px;
+      padding:8px;user-select:none;touch-action:none;
       background:rgba(20,20,26,.55);
       backdrop-filter:blur(22px) saturate(1.5);
       -webkit-backdrop-filter:blur(22px) saturate(1.5);
       border:1px solid rgba(255,255,255,.12);
-      border-radius:22px;
+      border-radius:20px;
       box-shadow:0 18px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08);
       animation:railIn .6s var(--ease-out) calc(var(--boot-delay) + .3s) both;
     }
     @keyframes railIn{
-      from{opacity:0;transform:translateY(-50%) translateX(-12px);}
+      from{opacity:0;transform:translateY(-50%) translateX(12px);}
       to  {opacity:1;transform:translateY(-50%) translateX(0);}
     }
     .rail-indicator{
-      position:absolute;left:6px;right:6px;height:46px;top:10px;
-      border-radius:14px;pointer-events:none;
+      position:absolute;left:6px;right:6px;height:40px;top:8px;
+      border-radius:12px;pointer-events:none;
       background:var(--accent-soft);
       border:1px solid rgba(29,185,84,.5);
       box-shadow:0 0 18px rgba(29,185,84,.35),inset 0 1px 0 rgba(255,255,255,.12);
       transition:top .5s var(--ease-spring);
     }
     .rail-btn{
-      position:relative;width:46px;height:46px;border-radius:14px;
+      position:relative;width:40px;height:40px;border-radius:12px;
       border:1px solid transparent;background:transparent;
       color:var(--muted);cursor:pointer;touch-action:none;
       display:flex;align-items:center;justify-content:center;
@@ -1658,11 +1512,11 @@
     .rail-btn:active{transform:scale(.9);}
     .rail-btn.active{color:var(--accent);}
     .rail-btn.drag-target{color:#fff;background:rgba(255,255,255,.08);}
-    .rail-btn svg{width:20px;height:20px;pointer-events:none;}
+    .rail-btn svg{width:17px;height:17px;pointer-events:none;}
     .rail-btn::after{
       content:attr(data-label);
-      position:absolute;left:calc(100% + 12px);top:50%;
-      transform:translateY(-50%) translateX(-5px);
+      position:absolute;right:calc(100% + 12px);top:50%;
+      transform:translateY(-50%) translateX(5px);
       font-size:10px;font-weight:700;letter-spacing:.12em;
       text-transform:uppercase;color:#fff;
       background:rgba(15,15,19,.92);border:1px solid var(--border);
@@ -1676,26 +1530,16 @@
     .streams-grid{
       display:grid;gap:14px;
       grid-template-columns:repeat(auto-fill,minmax(172px,1fr));
-      max-width:1080px;
+      max-width:1080px;margin:0 auto;
     }
     .streams-grid .card{width:100%;}
 
     /* ── NARROW / HALF SCREEN ── */
     @media (max-width:640px){
-      header{padding:9px 12px;}
-      .page{padding-left:84px;}
-      .page-rail{left:8px;}
-      .logo{gap:7px;}
-      .logo-t{width:26px;height:26px;font-size:12px;border-radius:7px;}
-      .logo-name{font-size:14px;white-space:nowrap;}
-      .logo-name span{margin-left:3px;}
-      .header-right{gap:7px;}
-      #clock-wrap{gap:5px;}
-      #clock{font-size:16px;}
-      #date-display{display:none;}
-      .yr-widget{display:none;}
-      .fs-btn{width:28px;height:28px;}
-      #pageHome{--hx:98px;--hy:12px;--hxr:14px;}
+      .page{padding:12px 92px 140px 12px;}
+      .page-rail{right:8px;}
+      .island-bar{top:56px;right:10px;width:54px;gap:7px;}
+      #pageHome{--hx:12px;--hy:12px;--hxr:92px;}
       .sec-head{padding:0 2px 10px;}
       .row{gap:10px;padding:0 2px 4px;}
       .card{width:134px;height:162px;border-radius:14px;padding:10px;}
@@ -1703,10 +1547,6 @@
       .radio-card{width:134px;height:162px;border-radius:14px;}
       .radio-icon{width:54px;height:54px;font-size:14px;}
       section{margin:18px 14px;}
-      .cal-section{margin:14px 14px 0;}
-      .cal-setup{padding:22px 16px 18px;}
-      .cal-input-group{flex-wrap:wrap;}
-      .cal-connect-btn{width:100%;}
       .now-playing{padding:10px 14px;}
       .np-frame-wrap{width:120px;height:68px;}
       .chat-panel{width:300px;}
@@ -1737,16 +1577,12 @@
     .radio-card,
     .news-strip,
     .avatar-panel,
-    .cal-section,
     .news-pop-card{
       border-radius:8px;
     }
 
     .card-media,
-    .news-thumb,
-    .cal-day,
-    .cal-event,
-    .cal-allday{
+    .news-thumb{
       border-radius:6px;
     }
 
@@ -2123,87 +1959,35 @@
     </div>
   </div>
 
-  <!-- HEADER -->
-  <header>
-    <div class="logo">
-      <div class="logo-t">T</div>
-      <div class="logo-name">Cinema<span>/ Drive</span></div>
+  <!-- RIGHT ISLAND BAR (replaces the old top header) -->
+  <div class="island-bar" id="islandBar">
+    <div class="logo-t" title="T / Cinema">T</div>
+    <div id="clock-wrap">
+      <div id="clock">--:--</div>
+      <div id="date-display"></div>
     </div>
-    <div class="header-right">
-      <div id="clock-wrap">
-        <div id="clock">--:--</div>
-        <div id="date-display"></div>
-      </div>
-
-      <div class="yr-widget" id="yrWidget">
-        <div class="yr-text">
-          <span class="yr-days" id="yrDays">—</span>
-          <span class="yr-label">days left</span>
-        </div>
-        <svg class="yr-arc" id="yrArc" width="30" height="30" viewBox="0 0 38 38">
-          <circle class="yr-arc-track" cx="19" cy="19" r="15" stroke-width="3"/>
-          <circle class="yr-arc-fill" id="yrFill" cx="19" cy="19" r="15" stroke-width="3"
-            stroke-dasharray="94.25" stroke-dashoffset="94.25"
-            transform="rotate(-90 19 19)"/>
-          <text class="yr-arc-pct" id="yrPct" x="19" y="19.5">0%</text>
-        </svg>
-      </div>
-
-      <button class="fs-btn" id="calToggleBtn" title="Calendar" style="border-color:var(--border);">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-      </button>
-      <button class="fs-btn" id="fsBtn" title="Fullscreen">
-        <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-      </button>
+    <div class="yr-ring" id="yrWidget" title="Days left in the year">
+      <svg class="yr-arc" id="yrArc" width="48" height="48" viewBox="0 0 48 48">
+        <circle class="yr-arc-track" cx="24" cy="24" r="20" stroke-width="3"/>
+        <circle class="yr-arc-fill" id="yrFill" cx="24" cy="24" r="20" stroke-width="3"
+          stroke-dasharray="125.66" stroke-dashoffset="125.66"
+          transform="rotate(-90 24 24)"/>
+        <text class="yr-arc-days" id="yrDays" x="24" y="24">—</text>
+      </svg>
+      <span class="yr-ring-cap">Days left</span>
     </div>
-  </header>
+  </div>
+
+  <!-- FULLSCREEN (floating, bottom-right corner) -->
+  <button class="fs-btn" id="fsBtn" title="Fullscreen">
+    <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+  </button>
 
   <!-- CONTENT: three stacked pages — home / streams / filler -->
   <main class="page-viewport" id="pageViewport">
 
     <!-- ── PAGE · HOME ── -->
     <div class="page pos-active" id="pageHome">
-
-    <!-- CALENDAR SECTION (home tile — hold to rearrange) -->
-    <div class="cal-section home-tile" id="calSection" style="display:none;margin-bottom:0;overflow:hidden;transition:none;">
-      <div class="cal-topbar">
-        <span class="cal-sec-label">Calendar</span>
-        <span class="cal-week-label" id="calWeekLabel"></span>
-        <div class="cal-nav-group" id="calNavGroup" style="display:none">
-          <button class="cal-nav-btn" id="calPrevWeek">
-            <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-          </button>
-          <button class="cal-today-btn" id="calTodayBtn">Today</button>
-          <button class="cal-nav-btn" id="calNextWeek">
-            <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-          </button>
-        </div>
-      </div>
-
-      <div class="cal-setup" id="calSetup">
-        <div class="cal-setup-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
-        </div>
-        <h2>Connect Google Calendar</h2>
-        <p>Enter your Google OAuth Client ID to sync your calendar. Events are fetched directly — nothing is stored externally.</p>
-        <div class="cal-input-group">
-          <input class="cal-input" id="calClientId" type="text" placeholder="Paste Client ID  (…apps.googleusercontent.com)" autocomplete="off" spellcheck="false"/>
-          <button class="cal-connect-btn" id="calConnectBtn">Sign in with Google</button>
-        </div>
-        <p class="cal-hint">ⓘ One-time setup — console.cloud.google.com → Google Calendar API → OAuth 2.0 Client ID (Web). Authorised origin: <strong>msrisabaranjan.github.io</strong></p>
-      </div>
-
-      <div class="cal-body" id="calBody">
-        <div class="cal-loading" id="calLoading" style="display:none">
-          <div class="cal-spinner"></div><span>Loading events…</span>
-        </div>
-        <div class="cal-days" id="calDays" style="display:none"></div>
-        <div class="cal-error" id="calErrMsg" style="display:none">
-          <p id="calErrText">Could not load events.</p>
-          <button class="cal-reconnect-btn" id="calReconnectBtn">Reconnect</button>
-        </div>
-      </div>
-    </div>
 
     <!-- NEWS (home tile — hold to rearrange) -->
     <div class="news-strip home-tile" id="newsStrip">
@@ -2316,7 +2100,7 @@
 
   <!-- FROSTED GLASS SWEEP (page transition layer) -->
 
-  <!-- LEFT PAGE RAIL -->
+  <!-- RIGHT PAGE RAIL -->
   <nav class="page-rail" id="pageRail" aria-label="Pages">
     <div class="rail-indicator" id="railIndicator"></div>
     <button class="rail-btn active" type="button" data-page="home" data-label="Home" title="Home" aria-label="Home page">
@@ -2486,10 +2270,10 @@
     const pct     = elapsed / total;
     const daysLeft= Math.ceil((end - now) / 86400000);
 
-    document.getElementById('yrDays').textContent = daysLeft.toLocaleString('en-US');
-    document.getElementById('yrPct').textContent  = Math.round(pct * 100) + '%';
+    const daysEl = document.getElementById('yrDays');
+    daysEl.textContent = daysLeft.toLocaleString('en-US');
 
-    const circ  = 2 * Math.PI * 15;
+    const circ  = 2 * Math.PI * 20;
     const fill  = document.getElementById('yrFill');
     fill.setAttribute('stroke-dasharray', circ.toFixed(2));
     fill.setAttribute('stroke-dashoffset', (circ * (1 - pct)).toFixed(2));
@@ -2498,20 +2282,9 @@
                : pct < 0.75 ? '#FFD166'
                :               '#FF453A';
     fill.setAttribute('stroke', colour);
-    document.getElementById('yrPct').setAttribute('fill', colour);
+    daysEl.setAttribute('fill', colour);
   }
   updateYearProgress();
-
-  /* ── CALENDAR TOGGLE ── */
-  const calToggleBtn = document.getElementById('calToggleBtn');
-  const calSectionEl = document.getElementById('calSection');
-  let calVisible = false;
-
-  calToggleBtn.addEventListener('click', () => {
-    calVisible = !calVisible;
-    calSectionEl.style.display = calVisible ? 'block' : 'none';
-    calToggleBtn.classList.toggle('cal-active', calVisible);
-  });
 
   /* ── FULLSCREEN ── */
   const THIS_URL = 'https://msrisabaranjan.github.io/teslacinema/';
@@ -3510,179 +3283,6 @@
 
   document.getElementById('npStop').addEventListener('click', stopRadio);
 
-  /* ══════════════════════════════════════════
-     GOOGLE CALENDAR
-     ══════════════════════════════════════════ */
-  const CAL_SCOPE     = 'https://www.googleapis.com/auth/calendar.events.readonly';
-  const CAL_STORE_KEY = 'tcal_client_id';
-  const EVENT_COLORS  = ['#1DB954','#8B5CF6','#FF453A','#FFD166','#3B82F6','#00BCD4','#FF5722','#607D8B'];
-
-  let calClient      = null;
-  let calToken       = null;
-  let calWeekOffset  = 0;
-  let calEventsCache = {};
-
-  const calSetup      = document.getElementById('calSetup');
-  const calBody       = document.getElementById('calBody');
-  const calDays       = document.getElementById('calDays');
-  const calLoadingEl  = document.getElementById('calLoading');
-  const calErrMsg     = document.getElementById('calErrMsg');
-  const calErrText    = document.getElementById('calErrText');
-  const calWeekLabel  = document.getElementById('calWeekLabel');
-  const calNavGroup   = document.getElementById('calNavGroup');
-  const calClientIdEl = document.getElementById('calClientId');
-  const calConnectBtn = document.getElementById('calConnectBtn');
-
-  function showCalBody(){
-    calSetup.style.display    = 'none';
-    calBody.classList.add('visible');
-    calNavGroup.style.display = 'flex';
-  }
-  function showCalSetup(){
-    calSetup.style.display    = 'flex';
-    calBody.classList.remove('visible');
-    calNavGroup.style.display = 'none';
-    calWeekLabel.textContent  = '';
-    calToken = null;
-  }
-  function showCalError(msg){
-    calLoadingEl.style.display = 'none';
-    calDays.style.display      = 'none';
-    calErrMsg.style.display    = 'flex';
-    calErrText.textContent     = msg;
-  }
-
-  function initCalClient(clientId, silent=false){
-    if(!window.google?.accounts?.oauth2){
-      setTimeout(()=> initCalClient(clientId, silent), 500);
-      return;
-    }
-    calClient = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope:     CAL_SCOPE,
-      callback:  (resp) => {
-        if(resp.error){ showCalError('Sign-in failed or cancelled.'); return; }
-        calToken = resp.access_token;
-        localStorage.setItem(CAL_STORE_KEY, clientId);
-        showCalBody();
-        loadWeek();
-      }
-    });
-    calClient.requestAccessToken({prompt: silent ? 'none' : ''});
-  }
-
-  calConnectBtn.addEventListener('click', ()=>{
-    const id = calClientIdEl.value.trim();
-    if(!id){ calClientIdEl.focus(); return; }
-    initCalClient(id, false);
-  });
-  calClientIdEl.addEventListener('keydown', e=>{ if(e.key==='Enter') calConnectBtn.click(); });
-  document.getElementById('calReconnectBtn').addEventListener('click', ()=>{
-    const stored = localStorage.getItem(CAL_STORE_KEY);
-    if(stored) initCalClient(stored, false); else showCalSetup();
-  });
-
-  function weekStart(offset){
-    const d = new Date(); d.setHours(0,0,0,0);
-    const day = d.getDay();
-    const m = new Date(d);
-    m.setDate(d.getDate() - (day===0?6:day-1) + offset*7);
-    return m;
-  }
-  function fmtWeekLabel(start){
-    const end = new Date(start); end.setDate(start.getDate()+6);
-    if(start.getMonth()===end.getMonth())
-      return `${start.toLocaleDateString('en-US',{month:'short'})} ${start.getDate()}–${end.getDate()}`;
-    return `${start.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${end.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
-  }
-
-  async function fetchCalEvents(tMin,tMax){
-    const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
-    url.searchParams.set('timeMin',      tMin.toISOString());
-    url.searchParams.set('timeMax',      tMax.toISOString());
-    url.searchParams.set('singleEvents', 'true');
-    url.searchParams.set('orderBy',      'startTime');
-    url.searchParams.set('maxResults',   '100');
-    const res = await fetch(url,{headers:{Authorization:`Bearer ${calToken}`},signal:AbortSignal.timeout(10000)});
-    if(res.status===401){calToken=null;throw new Error('auth');}
-    if(!res.ok) throw new Error('api');
-    return (await res.json()).items||[];
-  }
-
-  function colorForId(id){
-    let h=0; for(let i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))&0xffffffff;
-    return EVENT_COLORS[Math.abs(h)%EVENT_COLORS.length];
-  }
-  function fmtEvtTime(dt){
-    if(!dt) return '';
-    return new Date(dt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
-  }
-
-  function renderWeekGrid(events, start){
-    calLoadingEl.style.display = 'none';
-    calErrMsg.style.display    = 'none';
-    calDays.style.display      = 'grid';
-    calDays.innerHTML          = '';
-    const today = new Date(); today.setHours(0,0,0,0);
-    const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    for(let i=0;i<7;i++){
-      const dayDate = new Date(start); dayDate.setDate(start.getDate()+i);
-      const isToday = dayDate.getTime()===today.getTime();
-      const dateStr = dayDate.toISOString().slice(0,10);
-      const evts    = events.filter(ev=>(ev.start?.dateTime||ev.start?.date||'').startsWith(dateStr));
-      const col     = document.createElement('div');
-      col.className = 'cal-day'+(isToday?' today':'');
-      let html = `<div class="cal-day-head">
-        <span class="cal-day-name">${DAY_NAMES[i]}</span>
-        <span class="cal-day-num">${dayDate.getDate()}</span>
-      </div>`;
-      if(!evts.length){
-        html+=`<div class="cal-empty">—</div>`;
-      } else {
-        evts.slice(0,4).forEach(ev=>{
-          const color    = colorForId(ev.id||ev.summary||'x');
-          const isAllDay = !!ev.start?.date&&!ev.start?.dateTime;
-          const title    = (ev.summary||'Event').replace(/</g,'&lt;');
-          if(isAllDay){
-            html+=`<div class="cal-allday" style="background:${color}22;color:${color}">${title}</div>`;
-          } else {
-            const t = fmtEvtTime(ev.start?.dateTime);
-            html+=`<div class="cal-event" style="background:${color}18;color:${color};border-color:${color}">
-              <span class="cal-event-time">${t}</span>${title}</div>`;
-          }
-        });
-        if(evts.length>4) html+=`<div class="cal-empty">+${evts.length-4} more</div>`;
-      }
-      col.innerHTML=html; calDays.appendChild(col);
-    }
-  }
-
-  async function loadWeek(){
-    calLoadingEl.style.display = 'flex';
-    calDays.style.display      = 'none';
-    calErrMsg.style.display    = 'none';
-    const start = weekStart(calWeekOffset);
-    const end   = new Date(start); end.setDate(start.getDate()+7);
-    calWeekLabel.textContent = fmtWeekLabel(start);
-    if(calEventsCache[calWeekOffset]){ renderWeekGrid(calEventsCache[calWeekOffset],start); return; }
-    try {
-      const evts = await fetchCalEvents(start,end);
-      calEventsCache[calWeekOffset]=evts;
-      renderWeekGrid(evts,start);
-    } catch(e){
-      showCalError(e.message==='auth'?'Session expired — tap Reconnect.':'Could not load events. Check your connection.');
-    }
-  }
-
-  document.getElementById('calPrevWeek').addEventListener('click',()=>{ calWeekOffset--; loadWeek(); });
-  document.getElementById('calNextWeek').addEventListener('click',()=>{ calWeekOffset++; loadWeek(); });
-  document.getElementById('calTodayBtn').addEventListener('click',()=>{ calWeekOffset=0; loadWeek(); });
-
-  window.addEventListener('load',()=>{
-    const stored = localStorage.getItem(CAL_STORE_KEY);
-    if(stored){ calClientIdEl.value=stored; initCalClient(stored,true); }
-  });
-
   /* ── BOOT ── */
   renderCards(STREAMING, 'streaming', 'Stream');
   renderCards(MUSIC,     'music', 'Play');
@@ -3977,7 +3577,6 @@
   const homeTiles = [
     document.getElementById('newsStrip'),
     document.getElementById('avatarPanel'),
-    document.getElementById('calSection'),
     document.getElementById('navSection')
   ];
   const homeTileIds = homeTiles.map(t => t.id);
@@ -4034,7 +3633,6 @@
     return {
       newsStrip:   news,
       avatarPanel: Math.min(200, m.W),
-      calSection:  m.W,
       navSection:  Math.min(520, m.W)
     };
   }
@@ -4071,7 +3669,6 @@
       avatarPanel: (Wd.newsStrip + HOME_GUTTER + 200 <= m.W)
                       ? { x: Wd.newsStrip + HOME_GUTTER, y: 0 }
                       : { x: 0, y: hOf('newsStrip') + HOME_GUTTER },
-      calSection:  { x: 0, y: 0 },
       navSection:  { x: 0, y: hOf('newsStrip') + HOME_GUTTER }
     };
     homeTileIds.forEach(id => {
@@ -4121,8 +3718,8 @@
     });
   }
 
-  /* Debounced re-layout (window resize, news content growing,
-     calendar toggling). Absolute tiles never reflow each other. */
+  /* Debounced re-layout (window resize, news content growing).
+     Absolute tiles never reflow each other. */
   function relayout(){
     if(layoutRaf || homeDrag) return;
     layoutRaf = requestAnimationFrame(() => {
@@ -4623,9 +4220,9 @@
   }));
 
   /* Re-layout when the window resizes or a tile's content changes
-     (news feed loading, calendar toggling). Tiles are absolutely
-     positioned, so nothing reflows — placed tiles just clamp into the
-     new area and keep their offsets (and their gaps). */
+     (news feed loading). Tiles are absolutely positioned, so nothing
+     reflows — placed tiles just clamp into the new area and keep
+     their offsets (and their gaps). */
   window.addEventListener('resize', relayout);
   /* If the window loses focus mid-drag (Alt-Tab, a popup) the pointerup
      may never arrive — settle the tile instead of leaving it floating. */
