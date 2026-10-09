@@ -709,6 +709,20 @@
     }
 
     /* ── NAV MAP TILE (live TeslaNav map — seamless, no chrome) ── */
+    /* Register the framing vars so they can transition. Unregistered,
+       toggling .expanded snaps them instantly while the tile box
+       animates — and since the iframe derives its size/transform from
+       these vars + the tile's 100%, the map content jumped 2.7× in a
+       single frame before the tile started moving. Registered, they
+       interpolate on the same 180ms clock as the box (transition
+       below), so the morph is one continuous zoom/reveal.
+       Needs Chromium 85+ / Safari 16.4+ / Firefox 128+; older
+       browsers ignore @property and get the previous snap behavior. */
+    @property --nav-zoom{syntax:"<number>";inherits:true;initial-value:.7;}
+    @property --crop-l{syntax:"<length>";inherits:true;initial-value:410px;}
+    @property --crop-r{syntax:"<length>";inherits:true;initial-value:250px;}
+    @property --crop-t{syntax:"<length>";inherits:true;initial-value:110px;}
+    @property --crop-b{syntax:"<length>";inherits:true;initial-value:120px;}
     .nav-section{
       --nav-zoom:.7;
       /* Collapsed: the app's edge UI is cropped out — map only.
@@ -728,6 +742,27 @@
       overflow:hidden;
       background:var(--bg-raised);
       min-height:384px;
+      /* Tile box AND the map framing vars on one clock (see @property
+         above). The iframe recomputes its size/transform from the
+         interpolated vars every frame, so expand/collapse reads as a
+         continuous morph instead of jump-then-slide. Must repeat the
+         box props: this rule follows .home-tile in the sheet and
+         would otherwise override its transition for this element. */
+      transition:left .18s var(--ease-out),top .18s var(--ease-out),width .18s var(--ease-out),min-height .18s var(--ease-out),
+                 --nav-zoom .18s var(--ease-out),--crop-l .18s var(--ease-out),--crop-r .18s var(--ease-out),--crop-t .18s var(--ease-out),--crop-b .18s var(--ease-out);
+    }
+    /* While the JS morph (setNavExpanded) is running, the tile box and
+       framing vars are pinned inline per frame — CSS transitions must
+       stay out of the way so the two never fight over the same props. */
+    .nav-section.nav-morphing{transition:none;}
+    /* The wrapper carries the zoom as a pure-GPU transform during the
+       morph. The cross-origin map re-renders on every iframe resize,
+       so resizing the iframe ~12 times mid-animation was what made the
+       morph choppy — instead the iframe is frozen at a fixed size and
+       this wrapper scales/pans the already-rasterized layer. */
+    .nav-frame-wrap{
+      position:absolute;inset:0;
+      transform-origin:top left;
     }
     /* TeslaNav is a full-screen app: render a virtual viewport bigger
        than the tile and show only the map's center, so the edge UI
@@ -745,9 +780,13 @@
       ) scale(var(--nav-zoom));
       transform-origin:top left;
       /* NOTE: no transition here — this browser sticks width/transform
-         transitions when the target changes via a custom property.
-         The tile's own 180ms resize still animates, and the iframe
-         tracks it every frame, so the morph stays smooth. */
+         transitions on var()-derived targets. During the expand/collapse
+         morph the JS driver (setNavExpanded) freezes this iframe at a
+         fixed size and animates the .nav-frame-wrap transform instead —
+         the map never resizes mid-animation. The registered
+         --nav-zoom/--crop-* transitions on the tile remain as the
+         fallback for any path that toggles .expanded without the JS
+         morph (the iframe then recomputes size/transform per frame). */
     }
     /* Expanded: the tile grows to fill the content area in place — one
        iframe instance, it never reloads. The layout engine's inline
@@ -2226,8 +2265,13 @@
 
     <!-- NAV MAP (home tile — hold to rearrange) — seamless live TeslaNav map -->
     <div class="nav-section home-tile" id="navSection">
-      <iframe id="navFrame" src="https://teslanav.com/" title="TeslaNav live map"
-              allow="geolocation"></iframe>
+      <!-- wrapper carries the morph's zoom as a GPU transform (see
+           .nav-frame-wrap / setNavExpanded) while the iframe stays
+           frozen at a fixed size -->
+      <div class="nav-frame-wrap" id="navFrameWrap">
+        <iframe id="navFrame" src="https://teslanav.com/" title="TeslaNav live map"
+                allow="geolocation"></iframe>
+      </div>
       <div class="nav-drag-layer" aria-hidden="true"></div>
       <button class="nav-expand" id="navExpandBtn" type="button" aria-label="Expand map" title="Expand map">
         <svg class="ic-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
@@ -4130,16 +4174,207 @@
 
   /* Expand / collapse the nav map in place — one iframe instance, the
      tile just grows to fill the content area (see .nav-section.expanded).
-     Collapsing hands the slot back to the layout engine. */
+     Collapsing hands the slot back to the layout engine.
+     The cross-origin map re-renders on every iframe resize, so the
+     morph never resizes the iframe: it stays frozen at its current
+     size while the tile box + a .nav-frame-wrap transform carry the
+     whole motion (layout + compositor only). Only when the morph
+     finishes does the iframe swap to its target geometry — one
+     re-render, at matched on-screen zoom and framing, so it reads as
+     a frame, not a jump. The CSS var transitions above remain as a
+     fallback for paths that toggle .expanded without this driver. */
   const navSectionEl = document.getElementById('navSection');
   const navExpandBtn = document.getElementById('navExpandBtn');
+  const navWrapEl    = document.getElementById('navFrameWrap');
+  const navFrameEl   = document.getElementById('navFrame');
+  const NAV_MORPH_MS = 180;
+  let navMorph  = null;                       // { raf, t0, from, to, fromWrap, toWrap }
+  let navWrapT  = { tx: 0, ty: 0, s: 1 };     // last rendered wrapper transform
+  let navRender = null;                       // frozen map framing { r, ox, oy }
+  let navMorphCleanup = 0;                    // rAF that re-enables CSS transitions
+
+  /* cubic-bezier(.16,.84,.44,1) — the page's --ease-out in JS, so the
+     tile box and the wrapper transform share one exact clock. */
+  function navEase(x){
+    if(x <= 0) return 0;
+    if(x >= 1) return 1;
+    const cx = 3 * .16, bx = 3 * (.44 - .16) - cx, ax = 1 - cx - bx;
+    const cy = 3 * .84, by = 3 * (1 - .84) - cy, ay = 1 - cy - by;
+    const X  = t => ((ax * t + bx) * t + cx) * t;
+    const Y  = t => ((ay * t + by) * t + cy) * t;
+    const DX = t => (3 * ax * t + 2 * bx) * t + cx;
+    let t = x;
+    for(let i = 0; i < 8; i++){               /* Newton-Raphson */
+      const e = X(t) - x;
+      if(Math.abs(e) < 1e-6) break;
+      const d = DX(t);
+      if(Math.abs(d) < 1e-6) break;
+      t -= e / d;
+    }
+    let lo = 0, hi = 1;
+    for(let i = 0; i < 24 && Math.abs(X(t) - x) >= 1e-6; i++){  /* bisection */
+      if(X(t) > x) hi = t; else lo = t;
+      t = (lo + hi) / 2;
+    }
+    return Y(t);
+  }
+
   function setNavExpanded(on){
-    if(!navSectionEl || !navExpandBtn) return;
-    navSectionEl.classList.toggle('expanded', on);
+    if(!navSectionEl || !navExpandBtn || !navWrapEl || !navFrameEl) return;
+    const tile = navSectionEl;
+    if(tile.classList.contains('expanded') === on){
+      /* Same state (e.g. arrange mode re-settling a collapsed tile) —
+         just refresh the slot values. */
+      if(!on) relayout();
+      return;
+    }
     navExpandBtn.setAttribute('aria-label', on ? 'Shrink map' : 'Expand map');
     navExpandBtn.title = on ? 'Shrink map' : 'Expand map';
-    if(!on) relayout();
+
+    const m = homeMetrics();
+
+    /* Re-aim mid-morph: cancel the running clock. The frozen rendering
+       stays frozen (no map re-render) and the new morph starts from
+       whatever frame is on screen. */
+    if(navMorph) cancelAnimationFrame(navMorph.raf);
+    if(navMorphCleanup) cancelAnimationFrame(navMorphCleanup);
+
+    /* Current box, read BEFORE the class flips below (a style recalc
+       after the flip would already report the target box). */
+    const rect = tile.getBoundingClientRect();
+    const from = {
+      x: rect.left - m.pageX,
+      y: rect.top  - m.pageY,
+      w: rect.width,
+      h: rect.height
+    };
+
+    /* Freeze the map at its current size (at rest the 100%-based size
+       equals the current rest geometry) and remember its framing:
+       the iframe's own transform is translate(ox,oy) scale(r). */
+    if(!navRender){
+      const cs0 = getComputedStyle(tile);
+      const r0 = parseFloat(cs0.getPropertyValue('--nav-zoom')) || 1;
+      navRender = {
+        r:  r0,
+        ox: -r0 * (parseFloat(cs0.getPropertyValue('--crop-l')) || 0),
+        oy: -r0 * (parseFloat(cs0.getPropertyValue('--crop-t')) || 0)
+      };
+      /* The iframe's LAYOUT box — getBoundingClientRect would report
+         the post-transform rect (0.7× the layout size when collapsed). */
+      const cfw = getComputedStyle(navFrameEl);
+      navFrameEl.style.width  = cfw.width;
+      navFrameEl.style.height = cfw.height;
+    }
+
+    /* Class = destination (icon + drag layer reflect the target). Its
+       box !important values and var values are overridden by the pins
+       below — all within this task, before the next paint. */
+    tile.classList.add('nav-morphing');
+    tile.classList.toggle('expanded', on);
+
+    /* Target rest box + framing, straight off the computed style
+       (the class holds them). */
+    const cs = getComputedStyle(tile);
+    let toH = parseFloat(cs.minHeight);
+    if(!isFinite(toH)){
+      /* The expanded min-height is calc(100% - var(--hy) - 156px): a
+         computed value that keeps its % (it resolves against the page
+         at use time), so resolve it here by hand. A NaN pin would be
+         an invalid no-op and silently keep the old pin in place. */
+      toH = homePageEl.clientHeight - m.oy - 156;
+    }
+    const to = {
+      x: parseFloat(cs.left),
+      y: parseFloat(cs.top),
+      w: parseFloat(cs.width),
+      h: toH
+    };
+    const K  = parseFloat(cs.getPropertyValue('--nav-zoom')) || 1;
+    const Ox = -K * (parseFloat(cs.getPropertyValue('--crop-l')) || 0);
+    const Oy = -K * (parseFloat(cs.getPropertyValue('--crop-t')) || 0);
+
+    /* Pin the box at the CURRENT position (inline !important beats the
+       .expanded !important rules) and the framing vars at the frozen
+       rendering's values, so the iframe's own transform matches what
+       it is actually rendering. */
+    const pin = (p, v, imp) => tile.style.setProperty(p, v, imp ? 'important' : '');
+    pin('left', from.x + 'px', true);
+    pin('top', from.y + 'px', true);
+    pin('width', from.w + 'px', true);
+    pin('min-height', from.h + 'px', true);
+    pin('--nav-zoom', String(navRender.r));
+    pin('--crop-l', (-navRender.ox / navRender.r) + 'px');
+    pin('--crop-t', (-navRender.oy / navRender.r) + 'px');
+
+    /* Wrapper transform: from = what is on screen now, to = the
+       transform that makes the frozen rendering (r*app + o) present
+       the destination's framing (K*app + O): s = K/r, t = O - s*o. */
+    const sT = K / navRender.r;
+    navMorph = {
+      raf: 0, t0: performance.now(), from, to,
+      fromWrap: { tx: navWrapT.tx, ty: navWrapT.ty, s: navWrapT.s },
+      toWrap: { s: sT, tx: Ox - sT * navRender.ox, ty: Oy - sT * navRender.oy }
+    };
+    const step = now => {
+      const p = navEase(Math.min(1, (now - navMorph.t0) / NAV_MORPH_MS));
+      const f = navMorph.from, tg = navMorph.to,
+            fw = navMorph.fromWrap, tw = navMorph.toWrap;
+      pin('left', (f.x + (tg.x - f.x) * p) + 'px', true);
+      pin('top', (f.y + (tg.y - f.y) * p) + 'px', true);
+      pin('width', (f.w + (tg.w - f.w) * p) + 'px', true);
+      pin('min-height', (f.h + (tg.h - f.h) * p) + 'px', true);
+      navWrapT = {
+        tx: fw.tx + (tw.tx - fw.tx) * p,
+        ty: fw.ty + (tw.ty - fw.ty) * p,
+        s: fw.s + (tw.s - fw.s) * p
+      };
+      navWrapEl.style.transform =
+        'translate(' + navWrapT.tx + 'px,' + navWrapT.ty + 'px) scale(' + navWrapT.s + ')';
+      if(p < 1){
+        navMorph.raf = requestAnimationFrame(step);
+      }else{
+        finishNavMorph();
+      }
+    };
+    navMorph.raf = requestAnimationFrame(step);
   }
+
+  /* Swap the frozen iframe to its target geometry — the one and only
+     map re-render of the morph (same on-screen zoom and framing, so
+     it reads as a frame, not a jump; the frozen rendering can fall a
+     few px short of the new window at one edge for this single frame)
+     — then hand control back to the CSS and the layout engine. */
+  function finishNavMorph(){
+    const tile = navSectionEl;
+    navMorph = null;
+    navRender = null;
+    navWrapT = { tx: 0, ty: 0, s: 1 };
+    navWrapEl.style.transform = '';
+    navFrameEl.style.width = '';
+    navFrameEl.style.height = '';
+    tile.style.removeProperty('--nav-zoom');
+    tile.style.removeProperty('--crop-l');
+    tile.style.removeProperty('--crop-t');
+    tile.style.removeProperty('left');
+    tile.style.removeProperty('top');
+    tile.style.removeProperty('width');
+    tile.style.removeProperty('min-height');
+    /* Keep the CSS transitions disabled for one more frame: the var
+       pins just snapped to the class values (transition:none → the
+       fallback @property transition cannot start on that jump). Only
+       once the new values are settled is it safe to re-enable — with
+       no pending change, there is nothing left to animate. */
+    navMorphCleanup = requestAnimationFrame(() => {
+      tile.classList.remove('nav-morphing');
+      navMorphCleanup = 0;
+    });
+    /* Refresh the slot inline values (hidden while expanded,
+       authoritative while collapsed) so the next collapse starts
+       from a fresh layout. */
+    applyLayout();
+  }
+
   if(navExpandBtn){
     navExpandBtn.addEventListener('click', () =>
       setNavExpanded(!navSectionEl.classList.contains('expanded')));
