@@ -709,6 +709,20 @@
     }
 
     /* ── NAV MAP TILE (live TeslaNav map — seamless, no chrome) ── */
+    /* Register the framing vars so they can transition. Unregistered,
+       toggling .expanded snaps them instantly while the tile box
+       animates — and since the iframe derives its size/transform from
+       these vars + the tile's 100%, the map content jumped 2.7× in a
+       single frame before the tile started moving. Registered, they
+       interpolate on the same 180ms clock as the box (transition
+       below), so the morph is one continuous zoom/reveal.
+       Needs Chromium 85+ / Safari 16.4+ / Firefox 128+; older
+       browsers ignore @property and get the previous snap behavior. */
+    @property --nav-zoom{syntax:"<number>";inherits:true;initial-value:.7;}
+    @property --crop-l{syntax:"<length>";inherits:true;initial-value:410px;}
+    @property --crop-r{syntax:"<length>";inherits:true;initial-value:250px;}
+    @property --crop-t{syntax:"<length>";inherits:true;initial-value:110px;}
+    @property --crop-b{syntax:"<length>";inherits:true;initial-value:120px;}
     .nav-section{
       --nav-zoom:.7;
       /* Collapsed: the app's edge UI is cropped out — map only.
@@ -728,6 +742,14 @@
       overflow:hidden;
       background:var(--bg-raised);
       min-height:384px;
+      /* Tile box AND the map framing vars on one clock (see @property
+         above). The iframe recomputes its size/transform from the
+         interpolated vars every frame, so expand/collapse reads as a
+         continuous morph instead of jump-then-slide. Must repeat the
+         box props: this rule follows .home-tile in the sheet and
+         would otherwise override its transition for this element. */
+      transition:left .18s var(--ease-out),top .18s var(--ease-out),width .18s var(--ease-out),min-height .18s var(--ease-out),
+                 --nav-zoom .18s var(--ease-out),--crop-l .18s var(--ease-out),--crop-r .18s var(--ease-out),--crop-t .18s var(--ease-out),--crop-b .18s var(--ease-out);
     }
     /* TeslaNav is a full-screen app: render a virtual viewport bigger
        than the tile and show only the map's center, so the edge UI
@@ -745,9 +767,10 @@
       ) scale(var(--nav-zoom));
       transform-origin:top left;
       /* NOTE: no transition here — this browser sticks width/transform
-         transitions when the target changes via a custom property.
-         The tile's own 180ms resize still animates, and the iframe
-         tracks it every frame, so the morph stays smooth. */
+         transitions on var()-derived targets. Smoothness comes from
+         the registered --nav-zoom/--crop-* animating on the tile
+         (see @property above): the iframe just recomputes its
+         size/transform from the interpolated vars each frame. */
     }
     /* Expanded: the tile grows to fill the content area in place — one
        iframe instance, it never reloads. The layout engine's inline
