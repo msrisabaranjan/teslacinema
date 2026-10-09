@@ -34,21 +34,25 @@
 
   <style>
     :root{
+      /* --h is the single accent-hue knob (T logo → slider recolors it).
+         141 is the default Spotify green: #1DB954 = hsl(141 73% 42%),
+         #1ED760 ≈ hsl(141 75% 48%). Every UI green derives from it. */
+      --h:141;
       --bg:#0B0B0E;
       --bg-raised:#111114;
       --surface:#18181D;
       --surface-em:#22222A;
-      --surface-active:rgba(29,185,84,.14);
+      --surface-active:hsl(var(--h) 73% 42% / .14);
       --border:rgba(255,255,255,.08);
       --border-em:rgba(255,255,255,.16);
-      --accent:#1DB954;
-      --accent-soft:rgba(29,185,84,.16);
+      --accent:hsl(var(--h) 73% 42%);
+      --accent-soft:hsl(var(--h) 73% 42% / .16);
       --accent-2:#8B5CF6;
       --accent-3:#3B82F6;
       --text:#FFFFFF;
       --muted:rgba(255,255,255,.62);
       --muted2:rgba(255,255,255,.34);
-      --green:#1ED760;
+      --green:hsl(var(--h) 75% 48%);
       --red:#FF453A;
       --yellow:#FFD166;
       --ease-out:cubic-bezier(.16,.84,.44,1);
@@ -56,7 +60,7 @@
       --ease-smooth:cubic-bezier(.22,.61,.36,1);
       --ease-fluid:cubic-bezier(.4,0,.2,1);
       --ease-duo:cubic-bezier(.32,.72,0,1);
-      --accent-glow:0 10px 30px -8px rgba(29,185,84,.42),0 0 0 1px rgba(29,185,84,.28);
+      --accent-glow:0 10px 30px -8px hsl(var(--h) 73% 42% / .42),0 0 0 1px hsl(var(--h) 73% 42% / .28);
       --tile-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 -1px 0 rgba(0,0,0,.32) inset;
       --boot-delay:1.7s;
       --speed-glow:0;
@@ -77,7 +81,7 @@
       position:fixed;inset:-20%;
       z-index:-1;pointer-events:none;
       background:
-        radial-gradient(60% 50% at 18% 22%,rgba(29,185,84,.10),transparent 60%),
+        radial-gradient(60% 50% at 18% 22%,hsl(var(--h) 73% 42% /.10),transparent 60%),
         radial-gradient(50% 40% at 82% 78%,rgba(139,92,246,.08),transparent 65%),
         radial-gradient(40% 30% at 50% 50%,rgba(255,255,255,.02),transparent 70%);
       animation:ambientDrift 22s var(--ease-smooth) infinite alternate;
@@ -96,8 +100,8 @@
       z-index:-1;
       pointer-events:none;
       background:
-        radial-gradient(55% 45% at 50% 28%, rgba(29,185,84,.18), transparent 68%),
-        radial-gradient(35% 30% at 50% 70%, rgba(29,185,84,.08), transparent 70%);
+        radial-gradient(55% 45% at 50% 28%, hsl(var(--h) 73% 42% /.18), transparent 68%),
+        radial-gradient(35% 30% at 50% 70%, hsl(var(--h) 73% 42% /.08), transparent 70%);
       opacity:var(--speed-glow,0);
       transition:opacity 1.2s var(--ease-smooth);
     }
@@ -139,13 +143,13 @@
       width:7px;height:7px;border-radius:50%;
       background:var(--accent);
       margin-right:7px;
-      box-shadow:0 0 0 0 rgba(29,185,84,.55);
+      box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /.55);
       animation:livePulse 1.8s var(--ease-smooth) infinite;
     }
     @keyframes livePulse{
-      0%   {box-shadow:0 0 0 0 rgba(29,185,84,.55);transform:scale(1);}
-      70%  {box-shadow:0 0 0 7px rgba(29,185,84,0);transform:scale(1.12);}
-      100% {box-shadow:0 0 0 0 rgba(29,185,84,0);transform:scale(1);}
+      0%   {box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /.55);transform:scale(1);}
+      70%  {box-shadow:0 0 0 7px hsl(var(--h) 73% 42% /0);transform:scale(1.12);}
+      100% {box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /0);transform:scale(1);}
     }
     .ticker-mask{flex:1;overflow:hidden;position:relative;}
     .ticker-mask::before,.ticker-mask::after{
@@ -194,17 +198,19 @@
       width:36px;height:36px;background:var(--accent);border-radius:11px;
       display:flex;align-items:center;justify-content:center;
       font-weight:800;font-size:15px;color:#07110C;letter-spacing:-.02em;
-      box-shadow:0 0 0 0 rgba(29,185,84,.4),0 8px 20px rgba(29,185,84,.18);
+      box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /.4),0 8px 20px hsl(var(--h) 73% 42% /.18);
       animation:logoBreathe 4.5s var(--ease-smooth) infinite;
       flex-shrink:0;
+      cursor:pointer; /* tap → accent hue panel */
+      margin-bottom:10px; /* extra breathing room between logo and time */
     }
     @keyframes logoBreathe{
-      0%,100% {box-shadow:0 0 0 0 rgba(29,185,84,0),0 2px 8px rgba(29,185,84,.18);}
-      50%     {box-shadow:0 0 0 5px rgba(29,185,84,.06),0 8px 18px rgba(29,185,84,.32);}
+      0%,100% {box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /0),0 2px 8px hsl(var(--h) 73% 42% /.18);}
+      50%     {box-shadow:0 0 0 5px hsl(var(--h) 73% 42% /.06),0 8px 18px hsl(var(--h) 73% 42% /.32);}
     }
     #clock-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;}
     #clock{
-      font-size:15px;font-weight:300;letter-spacing:-.02em;line-height:1;
+      font-size:15px;font-weight:700;letter-spacing:-.02em;line-height:1;
       font-variant-numeric:tabular-nums;
       transition:color .3s var(--ease-smooth);
     }
@@ -251,6 +257,72 @@
     #fsBtn{
       position:fixed;bottom:16px;right:14px;z-index:600;
       animation:islandIn .7s var(--ease-out) calc(var(--boot-delay) + .45s) both;
+    }
+
+    /* ── ACCENT PANEL (tap the T logo → hue slider recolors every UI green) ── */
+    .accent-panel{
+      position:fixed;top:60px;right:82px;z-index:650;
+      width:232px;padding:14px 16px 12px;
+      background:rgba(15,15,19,.92);
+      backdrop-filter:blur(22px) saturate(1.5);
+      -webkit-backdrop-filter:blur(22px) saturate(1.5);
+      border:1px solid var(--border-em);
+      border-radius:16px;
+      box-shadow:0 18px 40px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.08);
+      opacity:0;visibility:hidden;transform:translateY(-6px) scale(.97);
+      transform-origin:top right;
+      transition:opacity .22s var(--ease-out),transform .26s var(--ease-spring),visibility .22s;
+    }
+    .accent-panel.open{opacity:1;visibility:visible;transform:none;}
+    .accent-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+    .accent-title{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);}
+    .accent-close{
+      width:24px;height:24px;border:none;border-radius:999px;background:transparent;
+      color:var(--muted2);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      transition:background .15s var(--ease-smooth),color .15s var(--ease-smooth);
+    }
+    .accent-close:hover{background:rgba(255,255,255,.08);color:#fff;}
+    .accent-close svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;}
+    .accent-hue{
+      -webkit-appearance:none;appearance:none;
+      width:100%;height:22px;background:transparent;cursor:pointer;margin:0;
+    }
+    .accent-hue::-webkit-slider-runnable-track{
+      height:10px;border-radius:999px;
+      background:linear-gradient(90deg,hsl(0 73% 42%),hsl(60 73% 42%),hsl(120 73% 42%),hsl(180 73% 42%),hsl(240 73% 42%),hsl(300 73% 42%),hsl(360 73% 42%));
+      border:1px solid rgba(255,255,255,.14);
+    }
+    .accent-hue::-moz-range-track{
+      height:10px;border-radius:999px;
+      background:linear-gradient(90deg,hsl(0 73% 42%),hsl(60 73% 42%),hsl(120 73% 42%),hsl(180 73% 42%),hsl(240 73% 42%),hsl(300 73% 42%),hsl(360 73% 42%));
+      border:1px solid rgba(255,255,255,.14);
+    }
+    .accent-hue::-webkit-slider-thumb{
+      -webkit-appearance:none;appearance:none;
+      width:18px;height:18px;border-radius:50%;margin-top:-5px;
+      background:var(--accent);
+      border:2px solid #fff;
+      box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 10px hsl(var(--h) 73% 42% /.55);
+    }
+    .accent-hue::-moz-range-thumb{
+      width:14px;height:14px;border-radius:50%;
+      background:var(--accent);
+      border:2px solid #fff;
+      box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 10px hsl(var(--h) 73% 42% /.55);
+    }
+    .accent-foot{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
+    .accent-hex{font-size:11px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.04em;}
+    .accent-reset{
+      border:1px solid var(--border-em);border-radius:999px;background:rgba(255,255,255,.04);
+      color:var(--muted);font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.06em;
+      padding:5px 12px;cursor:pointer;
+      transition:background .15s var(--ease-smooth),color .15s var(--ease-smooth),border-color .15s var(--ease-smooth);
+    }
+    .accent-reset:hover{background:rgba(255,255,255,.08);color:#fff;}
+    .accent-reset:active{background:var(--accent-soft);border-color:var(--accent);color:#fff;}
+    @media (max-width:640px){
+      .accent-panel{top:56px;right:74px;width:212px;}
     }
 
     /* Year progress: a ring with the days-left number inside it. */
@@ -339,8 +411,8 @@
     /* Drop ghost — the slot the dragged tile will snap to */
     .drop-ghost{
       position:absolute;z-index:6;
-      border:2px dashed rgba(29,185,84,.6);
-      background:rgba(29,185,84,.06);
+      border:2px dashed hsl(var(--h) 73% 42% /.6);
+      background:hsl(var(--h) 73% 42% /.06);
       border-radius:18px;
       pointer-events:none;
       opacity:0;transition:opacity .12s var(--ease-out);
@@ -417,7 +489,7 @@
       flex:0 0 260px;
       position:relative;overflow:hidden;
       background:
-        linear-gradient(160deg,rgba(29,185,84,.22),rgba(0,0,0,.35)),
+        linear-gradient(160deg,hsl(var(--h) 73% 42% /.22),rgba(0,0,0,.35)),
         var(--surface-em);
     }
     .news-img-wrap img{
@@ -469,9 +541,9 @@
       cursor:pointer;
     }
     .news-pip.on{
-      background:rgba(29,185,84,.25);
+      background:hsl(var(--h) 73% 42% /.25);
       width:40px;
-      box-shadow:0 0 10px rgba(29,185,84,.25);
+      box-shadow:0 0 10px hsl(var(--h) 73% 42% /.25);
     }
     .news-pip.on::after{
       content:'';display:block;height:100%;width:0;
@@ -523,8 +595,8 @@
       font-size:34px;font-weight:800;letter-spacing:.06em;
       color:rgba(255,255,255,.20);
       background:
-        radial-gradient(140px 90px at 72% 28%,rgba(29,185,84,.28),transparent 70%),
-        linear-gradient(160deg,rgba(29,185,84,.10),rgba(0,0,0,.42));
+        radial-gradient(140px 90px at 72% 28%,hsl(var(--h) 73% 42% /.28),transparent 70%),
+        linear-gradient(160deg,hsl(var(--h) 73% 42% /.10),rgba(0,0,0,.42));
     }
 
     /* ── AVATAR PANEL ── */
@@ -534,7 +606,7 @@
       border:1px solid var(--border);
       border-radius:18px;
       background:
-        linear-gradient(180deg,rgba(29,185,84,.08),transparent 42%),
+        linear-gradient(180deg,hsl(var(--h) 73% 42% /.08),transparent 42%),
         var(--surface);
       box-shadow:var(--tile-shadow);
       display:flex;
@@ -567,12 +639,12 @@
     .avatar-head-dot{
       width:8px;height:8px;border-radius:50%;
       background:var(--muted2);
-      box-shadow:0 0 0 0 rgba(29,185,84,0);
+      box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /0);
       transition:background .3s var(--ease-smooth),box-shadow .3s var(--ease-smooth);
     }
     .avatar-head-dot.ok{
       background:var(--accent);
-      box-shadow:0 0 12px rgba(29,185,84,.5);
+      box-shadow:0 0 12px hsl(var(--h) 73% 42% /.5);
       animation:ping 1.4s ease-out infinite;
     }
     .avatar-stage{
@@ -583,7 +655,7 @@
       padding:12px 12px 4px;
       position:relative;
       background:
-        radial-gradient(60% 50% at 50% 35%, rgba(29,185,84,.12), transparent 65%),
+        radial-gradient(60% 50% at 50% 35%, hsl(var(--h) 73% 42% /.12), transparent 65%),
         radial-gradient(50% 40% at 75% 75%, rgba(139,92,246,.08), transparent 70%),
         var(--surface-em);
       overflow:hidden;
@@ -628,11 +700,11 @@
     }
 
     .avatar-panel[data-speed="moving"] #avatarCanvas {
-      filter: drop-shadow(0 0 8px rgba(29, 185, 84, 0.25));
+      filter: drop-shadow(0 0 8px hsl(var(--h) 73% 42% / 0.25));
     }
 
     .avatar-panel[data-speed="fast"] #avatarCanvas {
-      filter: drop-shadow(0 0 14px rgba(29, 185, 84, 0.45));
+      filter: drop-shadow(0 0 14px hsl(var(--h) 73% 42% / 0.45));
     }
 
     .avatar-panel[data-weather="storm"] #avatarCanvas {
@@ -648,7 +720,7 @@
     }
 
     .avatar-panel[data-weather="evolve"] #avatarCanvas {
-      filter: drop-shadow(0 0 14px rgba(29, 185, 84, 0.65));
+      filter: drop-shadow(0 0 14px hsl(var(--h) 73% 42% / 0.65));
     }
 
     .avatar-stage.evolving {
@@ -656,9 +728,9 @@
     }
 
     @keyframes evolveFlash {
-      0%   { box-shadow: inset 0 0 0 0 rgba(29, 185, 84, 0); }
-      35%  { box-shadow: inset 0 0 34px 8px rgba(29, 185, 84, 0.45); }
-      100% { box-shadow: inset 0 0 0 0 rgba(29, 185, 84, 0); }
+      0%   { box-shadow: inset 0 0 0 0 hsl(var(--h) 73% 42% / 0); }
+      35%  { box-shadow: inset 0 0 34px 8px hsl(var(--h) 73% 42% / 0.45); }
+      100% { box-shadow: inset 0 0 0 0 hsl(var(--h) 73% 42% / 0); }
     }
 
     .avatar-panel[data-weather="hatch"] #avatarCanvas {
@@ -733,7 +805,9 @@
       border-radius:18px;
       overflow:hidden;
       background:var(--bg-raised);
-      min-height:330px;
+      /* Square tile: width is 340px (JS tileWidths) and min-height
+         matches — every child is absolute, so min-height IS the height. */
+      min-height:340px;
       /* Tile box AND the map framing vars on one clock (see @property
          above). The iframe recomputes its size/transform from the
          interpolated vars every frame, so expand/collapse reads as a
@@ -784,7 +858,11 @@
        iframe instance, it never reloads. The layout engine's inline
        left/top/width are overridden while .expanded. */
     .nav-section.expanded{
-      --nav-zoom:1;
+      /* 0.8×: the whole app (map + its UI) renders 20% smaller while
+         filling the content area. Crops stay 0 so the app's controls
+         remain in frame (top-left framing; the JS morph picks these
+         values up automatically). */
+      --nav-zoom:.8;
       --crop-l:0px;
       --crop-r:0px;
       --crop-t:0px;
@@ -849,7 +927,7 @@
       cursor:grab;
     }
     @media (max-width:720px){
-      .nav-section{min-height:280px;}
+      .nav-section{min-height:300px;}
     }
 
     /* ── NEWS POPUP ── */
@@ -881,7 +959,7 @@
     .news-pop-img{
       position:relative;flex:0 0 260px;min-height:190px;
       background:
-        linear-gradient(160deg,rgba(29,185,84,.22),rgba(0,0,0,.35)),
+        linear-gradient(160deg,hsl(var(--h) 73% 42% /.22),rgba(0,0,0,.35)),
         var(--surface-em);
       overflow:hidden;
     }
@@ -979,7 +1057,7 @@
     .sec-head::before{
       content:'';width:3px;height:16px;
       background:var(--accent);border-radius:999px;flex-shrink:0;
-      box-shadow:0 0 10px rgba(29,185,84,.45);
+      box-shadow:0 0 10px hsl(var(--h) 73% 42% /.45);
       animation:accentBarBreathe 3.5s var(--ease-smooth) infinite;
     }
     @keyframes accentBarBreathe{
@@ -1070,7 +1148,7 @@
     .card:active{
       transform:scale(0.955);
       background:var(--surface-active);
-      border-color:rgba(29,185,84,.55);
+      border-color:hsl(var(--h) 73% 42% /.55);
       box-shadow:var(--accent-glow),var(--tile-shadow);
     }
     .card-media{
@@ -1176,16 +1254,16 @@
       box-shadow:0 18px 34px rgba(0,0,0,.26),var(--tile-shadow);
     }
     .radio-card.playing{
-      border-color:rgba(29,185,84,.55);
+      border-color:hsl(var(--h) 73% 42% /.55);
       background:
-        radial-gradient(120% 80% at 50% 0%,rgba(29,185,84,.18),transparent 60%),
-        rgba(29,185,84,.06);
+        radial-gradient(120% 80% at 50% 0%,hsl(var(--h) 73% 42% /.18),transparent 60%),
+        hsl(var(--h) 73% 42% /.06);
       box-shadow:var(--accent-glow),var(--tile-shadow);
       animation:fadeUp .65s var(--ease-out) forwards,playingPulse 3.2s var(--ease-smooth) infinite;
     }
     @keyframes playingPulse{
-      0%,100% {box-shadow:0 6px 22px -8px rgba(29,185,84,.35),0 0 0 1px rgba(29,185,84,.28),var(--tile-shadow);}
-      50%     {box-shadow:0 10px 32px -6px rgba(29,185,84,.55),0 0 0 1px rgba(29,185,84,.45),var(--tile-shadow);}
+      0%,100% {box-shadow:0 6px 22px -8px hsl(var(--h) 73% 42% /.35),0 0 0 1px hsl(var(--h) 73% 42% /.28),var(--tile-shadow);}
+      50%     {box-shadow:0 10px 32px -6px hsl(var(--h) 73% 42% /.55),0 0 0 1px hsl(var(--h) 73% 42% /.45),var(--tile-shadow);}
     }
     .radio-card:active{transform:scale(0.955);}
     .radio-icon{
@@ -1435,8 +1513,8 @@
       to{opacity:1;transform:scale(1);filter:blur(0);}
     }
     @keyframes bootTGlow{
-      0%,100% {box-shadow:0 0 0 0 rgba(29,185,84,.4),0 8px 28px rgba(29,185,84,.32);}
-      50%     {box-shadow:0 0 0 16px rgba(29,185,84,0),0 14px 44px rgba(29,185,84,.55);}
+      0%,100% {box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /.4),0 8px 28px hsl(var(--h) 73% 42% /.32);}
+      50%     {box-shadow:0 0 0 16px hsl(var(--h) 73% 42% /0),0 14px 44px hsl(var(--h) 73% 42% /.55);}
     }
     .boot-name{
       font-size:13px;font-weight:700;letter-spacing:.45em;
@@ -1459,12 +1537,12 @@
     .boot-progress::after{
       content:'';position:absolute;left:0;top:0;bottom:0;width:100%;
       background:linear-gradient(90deg,
-        rgba(29,185,84,.4) 0%,
+        hsl(var(--h) 73% 42% /.4) 0%,
         var(--accent) 50%,
-        rgba(29,185,84,.6) 100%);
+        hsl(var(--h) 73% 42% /.6) 100%);
       transform-origin:left center;
       transform:scaleX(0);
-      box-shadow:0 0 10px rgba(29,185,84,.55);
+      box-shadow:0 0 10px hsl(var(--h) 73% 42% /.55);
       animation:bootProgFill .95s var(--ease-smooth) .9s forwards;
     }
     @keyframes bootProgShow{to{opacity:1;}}
@@ -1494,8 +1572,8 @@
       position:absolute;left:6px;right:6px;height:40px;top:8px;
       border-radius:12px;pointer-events:none;
       background:var(--accent-soft);
-      border:1px solid rgba(29,185,84,.5);
-      box-shadow:0 0 18px rgba(29,185,84,.35),inset 0 1px 0 rgba(255,255,255,.12);
+      border:1px solid hsl(var(--h) 73% 42% /.5);
+      box-shadow:0 0 18px hsl(var(--h) 73% 42% /.35),inset 0 1px 0 rgba(255,255,255,.12);
       transition:top .5s var(--ease-spring);
     }
     .rail-btn{
@@ -1577,6 +1655,7 @@
     .radio-card,
     .news-strip,
     .avatar-panel,
+    .nav-section,
     .news-pop-card{
       border-radius:8px;
     }
@@ -1598,14 +1677,14 @@
 
     .card:active,
     .radio-card.playing{
-      border-color:rgba(29,185,84,.45);
+      border-color:hsl(var(--h) 73% 42% /.45);
     }
 
     /* ── SPOTIFY-STYLE NEWS CARD ── */
     .news-strip{
       position:relative;
       background:
-        linear-gradient(135deg, rgba(29,185,84,.08), transparent 45%),
+        linear-gradient(135deg, hsl(var(--h) 73% 42% /.08), transparent 45%),
         #121212;
     }
 
@@ -1637,7 +1716,7 @@
       border-radius:50%;
       background:var(--accent);
       margin-right:6px;
-      box-shadow:0 0 10px rgba(29,185,84,.55);
+      box-shadow:0 0 10px hsl(var(--h) 73% 42% /.55);
     }
 
     .news-source{
@@ -1662,7 +1741,7 @@
     }
 
     .news-items{
-      height:262px;
+      height:224px;
     }
 
     .news-slide{
@@ -1680,7 +1759,7 @@
 
     .news-copy{
       background:#121212;
-      padding:20px 22px;
+      padding:17px 19px;
       justify-content:flex-start;
       gap:16px;
     }
@@ -1692,8 +1771,8 @@
     }
 
     .news-thumb{
-      width:52px;
-      height:52px;
+      width:46px;
+      height:46px;
       border-radius:6px;
       overflow:hidden;
       background:#1a1a1a;
@@ -1718,7 +1797,7 @@
       font-weight:800;
       letter-spacing:.04em;
       color:rgba(255,255,255,.30);
-      background:linear-gradient(160deg,rgba(29,185,84,.18),rgba(0,0,0,.35));
+      background:linear-gradient(160deg,hsl(var(--h) 73% 42% /.18),rgba(0,0,0,.35));
     }
 
     .news-eyebrow{
@@ -1747,7 +1826,7 @@
     }
 
     .news-title{
-      font-size:25px;
+      font-size:22px;
       line-height:1.15;
       letter-spacing:-.02em;
       max-width:100%;
@@ -1769,8 +1848,8 @@
     }
 
     .news-cta{
-      height:40px;
-      padding:0 18px;
+      height:36px;
+      padding:0 16px;
       border:none;
       border-radius:999px;
       background:var(--accent);
@@ -1793,8 +1872,8 @@
     }
 
     .news-more{
-      width:40px;
-      height:40px;
+      width:36px;
+      height:36px;
       border-radius:50%;
       border:1px solid var(--border);
       background:rgba(255,255,255,.04);
@@ -1836,8 +1915,8 @@
 
     .news-pip.on{
       width:28px;
-      background:rgba(29,185,84,.35);
-      box-shadow:0 0 10px rgba(29,185,84,.25);
+      background:hsl(var(--h) 73% 42% /.35);
+      box-shadow:0 0 10px hsl(var(--h) 73% 42% /.25);
     }
 
     .news-pip.on::after{
@@ -1853,7 +1932,7 @@
     }
 
     .news-skel-copy{
-      padding:20px 22px;
+      padding:17px 19px;
       gap:16px;
       justify-content:flex-start;
     }
@@ -1866,8 +1945,8 @@
     }
 
     .news-skel-thumb{
-      width:52px;
-      height:52px;
+      width:46px;
+      height:46px;
       border-radius:6px;
       background:rgba(255,255,255,.07);
       animation:pulse .9s ease infinite;
@@ -1882,20 +1961,20 @@
 
     @media (max-width:720px){
       .news-items{
-        height:232px;
+        height:204px;
       }
 
       .news-copy{
-        padding:16px;
+        padding:14px;
       }
 
       .news-title{
-        font-size:22px;
+        font-size:20px;
       }
 
       .news-thumb{
-        width:46px;
-        height:46px;
+        width:42px;
+        height:42px;
       }
 
       .news-eyebrow-title{
@@ -1907,13 +1986,13 @@
       }
 
       .news-cta{
-        height:40px;
+        height:36px;
         padding:0 14px;
       }
 
       .news-more{
-        width:40px;
-        height:40px;
+        width:36px;
+        height:36px;
       }
 
       .news-dots{
@@ -1929,11 +2008,11 @@
       }
 
       .news-title{
-        font-size:18px;
+        font-size:16px;
       }
 
       .news-items{
-        height:216px;
+        height:196px;
       }
     }
   </style>
@@ -1975,6 +2054,21 @@
         <text class="yr-arc-days" id="yrDays" x="24" y="24">—</text>
       </svg>
       <span class="yr-ring-cap">Days left</span>
+    </div>
+  </div>
+
+  <!-- ACCENT PANEL (toggled by tapping the T logo) -->
+  <div class="accent-panel" id="accentPanel" role="dialog" aria-label="Accent color">
+    <div class="accent-head">
+      <span class="accent-title">Accent</span>
+      <button class="accent-close" id="accentClose" type="button" aria-label="Close accent settings">
+        <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <input class="accent-hue" type="range" id="accentHue" min="0" max="360" value="141" step="1" aria-label="Accent hue"/>
+    <div class="accent-foot">
+      <span class="accent-hex" id="accentHex">#1DB954</span>
+      <button class="accent-reset" id="accentReset" type="button">Reset</button>
     </div>
   </div>
 
@@ -2278,6 +2372,11 @@
     fill.setAttribute('stroke-dasharray', circ.toFixed(2));
     fill.setAttribute('stroke-dashoffset', (circ * (1 - pct)).toFixed(2));
 
+    /* Year-progress status colors — deliberately FIXED (not the accent
+       hue): this is a "time left this year" gauge, green→yellow→red, so
+       the T-logo color slider must not tint it. The days number stays
+       white: setAttribute is a presentation attribute and loses to the
+       CSS .yr-arc-days{fill:#fff} rule, exactly as before. */
     const colour = pct < 0.5  ? '#1DB954'
                : pct < 0.75 ? '#FFD166'
                :               '#FF453A';
@@ -2291,6 +2390,66 @@
   const FS_URL   = 'https://www.youtube.com/redirect?q=' + encodeURIComponent(THIS_URL);
   document.getElementById('fsBtn').addEventListener('click', () => {
     window.location.href = FS_URL;
+  });
+
+  /* ── ACCENT HUE (tap the T logo → slider recolors every UI green) ──
+     One knob: --h on :root. Every accent/green in the sheet derives
+     from it as hsl(var(--h) S% L%). The choice persists in
+     localStorage and is restored before first paint (script is
+     parser-blocking at the end of <body>). */
+  const ACCENT_KEY = 'tcinema.accentHue';
+  const ACCENT_DEFAULT = 141; // Spotify green
+  const logoT       = document.querySelector('.logo-t');
+  const accentPanel = document.getElementById('accentPanel');
+  const accentHue   = document.getElementById('accentHue');
+  const accentHex   = document.getElementById('accentHex');
+  const accentReset = document.getElementById('accentReset');
+  const accentClose = document.getElementById('accentClose');
+
+  function hueToHex(h, s, l){
+    s /= 100; l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    const to2 = x => Math.round(255 * x).toString(16).padStart(2, '0');
+    return ('#' + to2(f(0)) + to2(f(8)) + to2(f(4))).toUpperCase();
+  }
+  function setAccentHue(h, persist){
+    h = Math.round(Number(h));
+    if(!Number.isFinite(h) || h < 0 || h > 360) h = ACCENT_DEFAULT;
+    document.documentElement.style.setProperty('--h', h);
+    if(accentHue) accentHue.value = h;
+    if(accentHex) accentHex.textContent = hueToHex(h, 73, 42);
+    if(persist){ try{ localStorage.setItem(ACCENT_KEY, String(h)); }catch(e){} }
+  }
+  (function restoreAccentHue(){
+    let saved = ACCENT_DEFAULT;
+    try{
+      const v = parseInt(localStorage.getItem(ACCENT_KEY), 10);
+      if(Number.isFinite(v) && v >= 0 && v <= 360) saved = v;
+    }catch(e){}
+    setAccentHue(saved, false);
+  })();
+  if(logoT){
+    logoT.title = 'T / Cinema — tap for accent color';
+    logoT.addEventListener('click', (e) => {
+      e.stopPropagation();
+      accentPanel.classList.toggle('open');
+    });
+  }
+  if(accentClose) accentClose.addEventListener('click', (e) => {
+    e.stopPropagation();
+    accentPanel.classList.remove('open');
+  });
+  if(accentHue)   accentHue.addEventListener('input', () => setAccentHue(accentHue.value, true));
+  if(accentReset) accentReset.addEventListener('click', () => setAccentHue(ACCENT_DEFAULT, true));
+  document.addEventListener('click', (e) => {
+    if(!accentPanel.classList.contains('open')) return;
+    if(e.target.closest('.accent-panel,.logo-t')) return;
+    accentPanel.classList.remove('open');
+  });
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape') accentPanel.classList.remove('open');
   });
 
   /* ── STOCK TICKER ── */
@@ -3110,7 +3269,7 @@
       genre:'Tap to open on YouTube',
       type:'link',
       url:'https://www.youtube.com/watch?v=jfKfPfyJRdk',
-      color:'#1DB954', text:'#07110C', initials:'LG'
+      color:'var(--accent)', text:'#07110C', initials:'LG'
     },
     {
       name:'Hasanabi',
@@ -3623,17 +3782,18 @@
     return homeTiles.filter(t => t.style.display !== 'none' && t.offsetParent !== null);
   }
 
-  /* Set size of a tile at the current area width. News keeps 760px (or
+  /* Set size of a tile at the current area width. News keeps 660px (or
      the full width); in the fully-default stack it yields just enough
-     to keep the avatar on its row instead of wrapping with a gap. */
+     to keep the avatar on its row instead of wrapping with a gap.
+     The map tile is a 340px square (CSS min-height matches). */
   function tileWidths(m, allAuto){
     const news = (allAuto && m.W - HOME_GUTTER - 200 >= 480)
-      ? Math.min(760, m.W - HOME_GUTTER - 200)
-      : Math.min(760, m.W);
+      ? Math.min(660, m.W - HOME_GUTTER - 200)
+      : Math.min(660, m.W);
     return {
       newsStrip:   news,
       avatarPanel: Math.min(200, m.W),
-      navSection:  Math.min(520, m.W)
+      navSection:  Math.min(340, m.W)
     };
   }
 
@@ -5533,8 +5693,11 @@
         const bx = (canvas.width - boxSize) / 2;
         const by = (canvas.height - boxSize) / 2;
 
-        ctx.fillStyle = 'rgba(29, 185, 84, 0.18)';
-        ctx.strokeStyle = 'rgba(29, 185, 84, 0.55)';
+        /* Follow the accent hue (T logo slider) — canvas colors can't use
+           var(), so read the live value off the root element. */
+        const accentHueNow = getComputedStyle(document.documentElement).getPropertyValue('--h').trim() || '141';
+        ctx.fillStyle = 'hsl(' + accentHueNow + ' 73% 42% / 0.18)';
+        ctx.strokeStyle = 'hsl(' + accentHueNow + ' 73% 42% / 0.55)';
         ctx.lineWidth = 2;
 
         if (ctx.roundRect) {
