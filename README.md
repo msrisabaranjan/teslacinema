@@ -19,3 +19,4 @@ Sites Added:
 - Spotify
 - Apple Tv
 - Soundcloud
+- TeslaNav (home-screen nav map widget)

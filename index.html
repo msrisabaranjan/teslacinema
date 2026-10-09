@@ -296,19 +296,21 @@
     }
     .home-tile{
       position:absolute;
-      transition:left .18s var(--ease-out),top .18s var(--ease-out),width .18s var(--ease-out);
+      transition:left .18s var(--ease-out),top .18s var(--ease-out),width .18s var(--ease-out),min-height .18s var(--ease-out);
     }
     /* .news-strip / .avatar-panel declare position:relative later in
        this sheet (for their absolutely-positioned inner chrome); the
        id rules win the cascade so the tiles stay out of the flow. */
-    #newsStrip,#avatarPanel,#calSection{position:absolute;}
-    #newsStrip.dragging,#avatarPanel.dragging,#calSection.dragging{position:fixed;}
+    #newsStrip,#avatarPanel,#calSection,#navSection{position:absolute;}
+    #newsStrip.dragging,#avatarPanel.dragging,#calSection.dragging,#navSection.dragging{position:fixed;}
     #pageHome.home-no-trans .home-tile{transition:none;}
     /* Tiles keep their set size — they move, they never stretch to fill. */
     #newsStrip{min-width:0;
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .15s) backwards;}
     #avatarPanel{
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .22s) backwards;}
+    #navSection{
+      animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .3s) backwards;}
     #calSection{margin:0;}
 
     /* arrange mode: jiggle + drag */
@@ -704,6 +706,119 @@
     }
     @media (max-width:520px){
       .avatar-panel{min-height:160px;}
+    }
+
+    /* ── NAV MAP TILE (live TeslaNav map — seamless, no chrome) ── */
+    .nav-section{
+      --nav-zoom:.7;
+      /* Collapsed: the app's edge UI is cropped out — map only.
+         Crop values are in the app's own px, measured from its layout
+         (github.com/R44VC0RP/teslanav.com, app/page.tsx):
+         l = bottom control row (brand + settings/feedback/satellite, ~385px)
+         r = zoom + theme cluster (~232px)
+         t = support button + compass (~90px)
+         b = control row height (~88px)
+         Retune if the upstream app's chrome changes. */
+      --crop-l:410px;
+      --crop-r:250px;
+      --crop-t:110px;
+      --crop-b:120px;
+      border:1px solid var(--border);
+      border-radius:18px;
+      overflow:hidden;
+      background:var(--bg-raised);
+      min-height:384px;
+    }
+    /* TeslaNav is a full-screen app: render a virtual viewport bigger
+       than the tile and show only the map's center, so the edge UI
+       falls outside the visible window (the map stays pannable).
+       Same family of trick as the chat panel's iframe scaling.
+       Tune: --nav-zoom (lower = smaller UI) and --crop-* (hide more). */
+    .nav-section iframe{
+      position:absolute;top:0;left:0;
+      width:calc((100% + var(--nav-zoom) * (var(--crop-l) + var(--crop-r))) / var(--nav-zoom));
+      height:calc((100% + var(--nav-zoom) * (var(--crop-t) + var(--crop-b))) / var(--nav-zoom));
+      border:none;display:block;
+      transform:translate(
+        calc(-1 * var(--nav-zoom) * var(--crop-l)),
+        calc(-1 * var(--nav-zoom) * var(--crop-t))
+      ) scale(var(--nav-zoom));
+      transform-origin:top left;
+      /* NOTE: no transition here — this browser sticks width/transform
+         transitions when the target changes via a custom property.
+         The tile's own 180ms resize still animates, and the iframe
+         tracks it every frame, so the morph stays smooth. */
+    }
+    /* Expanded: the tile grows to fill the content area in place — one
+       iframe instance, it never reloads. The layout engine's inline
+       left/top/width are overridden while .expanded. */
+    .nav-section.expanded{
+      --nav-zoom:1;
+      --crop-l:0px;
+      --crop-r:0px;
+      --crop-t:0px;
+      --crop-b:0px;
+      left:var(--hx) !important;
+      top:var(--hy) !important;
+      width:calc(100% - var(--hx) - var(--hxr)) !important;
+      min-height:calc(100% - var(--hy) - 156px) !important;
+      z-index:40 !important;
+    }
+    /* Corner control: hover-reveal on pointer devices, always tappable
+       on touch (the car). */
+    .nav-expand{
+      position:absolute;top:12px;right:12px;z-index:6;
+      width:34px;height:34px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(10,10,12,.66);
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      color:#fff;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      opacity:0;transform:scale(.85);
+      pointer-events:none;
+      transition:opacity .18s var(--ease-out),transform .22s var(--ease-spring),
+                 background .15s,border-color .15s;
+    }
+    .nav-section:hover .nav-expand,
+    .nav-section.expanded .nav-expand{
+      opacity:1;transform:scale(1);
+      pointer-events:auto;
+    }
+    @media (hover:none){
+      .nav-expand{opacity:.75;transform:scale(1);pointer-events:auto;}
+    }
+    .nav-expand:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.32);}
+    .nav-expand:active{transform:scale(.9);}
+    .nav-expand svg{
+      width:15px;height:15px;fill:none;stroke:currentColor;
+      stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+    }
+    .nav-expand .ic-collapse{display:none;}
+    .nav-section.expanded .ic-expand{display:none;}
+    .nav-section.expanded .ic-collapse{display:block;}
+    /* Transparent grab surface: the cross-origin iframe swallows every
+       pointer event, so without it the tile could never be held/dragged.
+       Collapsed: the layer is ALWAYS live — the 420ms hold that starts
+       arrange mode must reach the tile (the iframe would eat it).
+       Trade-off: the small map can't be panned while collapsed —
+       expand it to pan.
+       Expanded: the layer steps aside so the full-size map is fully
+       pannable; collapse it (corner button) to move the tile. */
+    .nav-drag-layer{
+      position:absolute;inset:0;z-index:5;
+      pointer-events:auto;
+      cursor:grab;
+    }
+    .nav-section.expanded .nav-drag-layer{
+      pointer-events:none;cursor:default;
+    }
+    #pageHome.arranging #navSection>.nav-drag-layer{
+      pointer-events:auto;
+      cursor:grab;
+    }
+    @media (max-width:720px){
+      .nav-section{min-height:300px;}
     }
 
     /* ── NEWS POPUP ── */
@@ -2108,6 +2223,17 @@
           <span class="avatar-info" id="avatarInfo">Waiting for GPS…</span>
         </div>
       </aside>
+
+    <!-- NAV MAP (home tile — hold to rearrange) — seamless live TeslaNav map -->
+    <div class="nav-section home-tile" id="navSection">
+      <iframe id="navFrame" src="https://teslanav.com/" title="TeslaNav live map"
+              allow="geolocation"></iframe>
+      <div class="nav-drag-layer" aria-hidden="true"></div>
+      <button class="nav-expand" id="navExpandBtn" type="button" aria-label="Expand map" title="Expand map">
+        <svg class="ic-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        <svg class="ic-collapse" viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+      </button>
+    </div>
 
     <!-- ARRANGE MODE — exit pill -->
     <button class="arrange-done" id="arrangeDone" aria-hidden="true">Done</button>
@@ -3807,7 +3933,8 @@
   const homeTiles = [
     document.getElementById('newsStrip'),
     document.getElementById('avatarPanel'),
-    document.getElementById('calSection')
+    document.getElementById('calSection'),
+    document.getElementById('navSection')
   ];
   const homeTileIds = homeTiles.map(t => t.id);
   const homePosById = {};    // id -> {x,y} user placement, content px
@@ -3863,7 +3990,8 @@
     return {
       newsStrip:   news,
       avatarPanel: Math.min(200, m.W),
-      calSection:  m.W
+      calSection:  m.W,
+      navSection:  Math.min(520, m.W)
     };
   }
 
@@ -3899,7 +4027,8 @@
       avatarPanel: (Wd.newsStrip + HOME_GUTTER + 200 <= m.W)
                       ? { x: Wd.newsStrip + HOME_GUTTER, y: 0 }
                       : { x: 0, y: hOf('newsStrip') + HOME_GUTTER },
-      calSection:  { x: 0, y: 0 }
+      calSection:  { x: 0, y: 0 },
+      navSection:  { x: 0, y: hOf('newsStrip') + HOME_GUTTER }
     };
     homeTileIds.forEach(id => {
       if(out[id]) return;
@@ -3976,6 +4105,9 @@
   function hideDropGhost(){ dropGhost.classList.remove('show'); }
 
   function enterHomeArrange(tile){
+    /* An expanded map can't be dragged in its grown state (its box is
+       CSS-overridden) — settle it back to its tile slot first. */
+    if(navSectionEl && navSectionEl.classList.contains('expanded')) setNavExpanded(false);
     homeArranging = true;
     document.body.classList.add('home-arranging');
     homePageEl.classList.add('arranging');
@@ -3994,6 +4126,23 @@
     homeTiles.forEach(t => t.classList.remove('jiggling'));
     arrangeDoneBtn.classList.remove('show');
     arrangeDoneBtn.setAttribute('aria-hidden', 'true');
+  }
+
+  /* Expand / collapse the nav map in place — one iframe instance, the
+     tile just grows to fill the content area (see .nav-section.expanded).
+     Collapsing hands the slot back to the layout engine. */
+  const navSectionEl = document.getElementById('navSection');
+  const navExpandBtn = document.getElementById('navExpandBtn');
+  function setNavExpanded(on){
+    if(!navSectionEl || !navExpandBtn) return;
+    navSectionEl.classList.toggle('expanded', on);
+    navExpandBtn.setAttribute('aria-label', on ? 'Shrink map' : 'Expand map');
+    navExpandBtn.title = on ? 'Shrink map' : 'Expand map';
+    if(!on) relayout();
+  }
+  if(navExpandBtn){
+    navExpandBtn.addEventListener('click', () =>
+      setNavExpanded(!navSectionEl.classList.contains('expanded')));
   }
 
   /* Put a tile back at its laid-out slot and animate the drop from its
