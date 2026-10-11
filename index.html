@@ -31,6 +31,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="vendor/gridstack.min.css"/>
 
   <style>
     :root{
@@ -127,6 +128,7 @@
       --row-gap:4px;
       --col-gap:8px;
       --list-pad:10px;
+      display:flex;flex-direction:column;
       border:1px solid var(--border);
       border-radius:18px;
       overflow:hidden;
@@ -160,10 +162,12 @@
       font-size:10px;font-weight:600;color:var(--muted2);
       font-variant-numeric:tabular-nums;
     }
-    /* Rows are absolutely positioned slots in a two-column grid;
-       JS assigns each a translate(x,y) for its rank and the CSS
-       transition animates re-ranking whenever data refreshes. */
-    .stock-list{position:relative;margin:6px 0 8px;padding:0 var(--list-pad);}
+    /* Rows are absolutely positioned slots; JS fits the list to the
+       tile (columns by width, row height by available space, worst
+       performers hidden when even that runs out) and assigns each a
+       translate(x,y) for its rank — the CSS transition animates
+       re-ranking whenever data refreshes. */
+    .stock-list{position:relative;flex:1 1 auto;min-height:0;margin:6px 0 8px;padding:0 var(--list-pad);}
     .stock-row{
       position:absolute;left:0;top:0;
       height:var(--row-h);
@@ -224,6 +228,13 @@
       .stock-tile{--row-h:46px;--row-gap:3px;}
       .stock-badge{width:32px;height:32px;font-size:8px;}
     }
+    /* Tight rows (small tile): shrink badge + type so rows never
+       collide — JS sets --row-h and toggles this class to fit. */
+    .stock-tile.tight .stock-badge{width:28px;height:28px;font-size:7.5px;}
+    .stock-tile.tight .stock-name{font-size:12px;}
+    .stock-tile.tight .stock-price-line{font-size:11px;}
+    .stock-tile.tight .sp-cur{font-size:8px;}
+    .stock-tile.tight .sp-chg{font-size:11px;}
 
     /* ── RIGHT ISLAND BAR (replaces the old top header) ──
        A borderless floating stack pinned to the top-right:
@@ -402,27 +413,40 @@
       to  {opacity:1;transform:translateY(0) scale(1);}
     }
 
-    /* Free placement: tiles are absolutely positioned inside the content
-       area (origin --hx/--hy, right margin --hxr). JS sets left/top/
-       width; positions survive resizes (clamped, never reflowed). */
+    /* Grid placement (Gridstack): the item shells carry the geometry
+       (absolute left/top/width/height, set inline by the library); the
+       .home-tile content fills its shell, inset by --gs-item-margin-*.
+       The grid box covers the content area (origin --hx/--hy, right
+       margin --hxr); JS keeps --cell-w/--cell-h in sync with the live
+       grid metrics for the placement overlay. */
     #pageHome{
       /* position:relative would override .page's absolute;inset:0 and
          collapse the page to its padding height — keep .page's box. */
       padding:0 0 140px 0;
       --hx:24px;--hy:16px;--hxr:104px;
     }
-    .home-tile{
+    #homeGrid{
       position:absolute;
-      transition:left .18s var(--ease-out),top .18s var(--ease-out),width .18s var(--ease-out),min-height .18s var(--ease-out);
+      top:var(--hy);left:var(--hx);right:var(--hxr);
     }
-    /* .news-strip / .avatar-panel declare position:relative later in
-       this sheet (for their absolutely-positioned inner chrome); the
-       id rules win the cascade so the tiles stay out of the flow. */
-    #newsStrip,#avatarPanel,#navSection{position:absolute;}
-    #newsStrip.dragging,#avatarPanel.dragging,#navSection.dragging{position:fixed;}
-    #pageHome.home-no-trans .home-tile{transition:none;}
-    /* Tiles keep their set size — they move, they never stretch to fill. */
-    #newsStrip{min-width:0;
+    /* Safety net: the engine normally writes inline calc() geometry on
+       each shell; if that is ever momentarily absent (drag-end style
+       restore, container var churn) the shell would collapse to a
+       point. Fall back to the per-item --gs-x/y/w/h vars the engine
+       always keeps, at the px cell pitch (--cell-w/--cell-h are set by
+       JS on #pageHome). Inline styles still win over this rule. */
+    .grid-stack>.grid-stack-item{
+      left:calc(var(--gs-x,0) * var(--cell-w,90px));
+      top:calc(var(--gs-y,0) * var(--cell-h,90px));
+      width:calc(var(--gs-w,1) * var(--cell-w,90px));
+      height:calc(var(--gs-h,1) * var(--cell-h,90px));
+    }
+    /* Tiles fill their cell — the shell dictates the size. (Same
+       selector as the vendored content rule, later in source order,
+       so it wins: the app's cards clip, they never scroll inside.) */
+    .grid-stack>.grid-stack-item>.grid-stack-item-content{overflow:hidden;}
+    .home-tile{min-width:0;}
+    #newsStrip{
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .15s) backwards;}
     #avatarPanel{
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .22s) backwards;}
@@ -431,26 +455,33 @@
     #stockTile{
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .38s) backwards;}
 
-    /* arrange mode: jiggle + drag */
+    /* arrange mode: drag grips + placement affordances */
     #pageHome.arranging{overflow:hidden;}
     #pageHome.arranging .home-tile{
       touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;
       outline:1px dashed rgba(255,255,255,.22);outline-offset:4px;
     }
     #pageHome.arranging .home-tile>*{pointer-events:none;}
+    #pageHome.arranging .tile-grip{pointer-events:auto;cursor:grab;}
     body.home-arranging{cursor:grabbing;}
     body.home-arranging *{user-select:none;-webkit-user-select:none;}
-    .home-tile.jiggling{animation:tileJiggle .3s ease-in-out infinite alternate;}
-    @keyframes tileJiggle{from{rotate:-.35deg;}to{rotate:.35deg;}}
-    .home-tile.dragging{
-      position:fixed;z-index:500;margin:0;
-      pointer-events:none;will-change:transform;cursor:grabbing;
-      box-shadow:0 24px 48px rgba(0,0,0,.5),var(--tile-shadow);
-      outline:1px dashed rgba(255,255,255,.55);outline-offset:6px;
+
+    /* Drag grip — Gridstack's drag handle (handle:'.tile-grip'),
+       revealed only while arranging. */
+    .tile-grip{
+      position:absolute;top:8px;left:50%;transform:translateX(-50%);
+      z-index:8;width:44px;height:20px;border-radius:999px;
+      display:none;align-items:center;justify-content:center;gap:4px;
+      background:rgba(10,10,12,.66);border:1px solid rgba(255,255,255,.24);
+      backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      cursor:grab;touch-action:none;
     }
+    .tile-grip i{width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.8);}
+    #pageHome.arranging .tile-grip{display:flex;}
+
     /* Light placement grid — visible only while arranging. Covers the
-       content area (lines start at the content origin so tile edges
-       sit on grid lines). */
+       content area; --cell-w/--cell-h are set by JS from the live grid
+       metrics so the lines sit on the cell edges. */
     #pageHome::after{
       content:'';position:absolute;
       top:var(--hy);left:var(--hx);right:var(--hxr);bottom:0;
@@ -458,20 +489,34 @@
       background-image:
         linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),
         linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
-      background-size:48px 48px;
+      background-size:var(--cell-w,96px) var(--cell-h,90px);
       opacity:0;transition:opacity .25s var(--ease-out);
     }
     #pageHome.arranging::after{opacity:1;}
-    /* Drop ghost — the slot the dragged tile will snap to */
-    .drop-ghost{
-      position:absolute;z-index:6;
-      border:2px dashed hsl(var(--h) 73% 42% /.6);
+
+    /* Gridstack chrome restyled to the app's look: the landing slot
+       (replaces the old drop ghost), the lifted tile, and the corner
+       resize handle. */
+    .grid-stack-placeholder>.placeholder-content{
       background:hsl(var(--h) 73% 42% /.06);
+      border:2px dashed hsl(var(--h) 73% 42% /.6);
       border-radius:18px;
-      pointer-events:none;
-      opacity:0;transition:opacity .12s var(--ease-out);
     }
-    .drop-ghost.show{opacity:1;}
+    .grid-stack-item.ui-draggable-dragging>.grid-stack-item-content{
+      box-shadow:0 24px 48px rgba(0,0,0,.5),var(--tile-shadow);
+      outline:1px dashed rgba(255,255,255,.55);outline-offset:6px;
+      opacity:1;
+    }
+    .grid-stack-item>.ui-resizable-se{
+      width:26px;height:26px;
+      bottom:calc(var(--gs-item-margin-bottom) + 4px);
+      right:calc(var(--gs-item-margin-right) + 4px);
+      background-image:none;transform:none;
+      border-right:2px solid rgba(255,255,255,.55);
+      border-bottom:2px solid rgba(255,255,255,.55);
+      border-bottom-right-radius:14px;
+      opacity:.75;
+    }
     .arrange-done{
       position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
       z-index:510;pointer-events:none;opacity:0;
@@ -485,7 +530,7 @@
     .arrange-done.show{opacity:1;pointer-events:auto;}
 
     .news-strip{
-      flex:1;
+      display:flex;flex-direction:column;
       min-width:0;
       margin:0;
       border:1px solid var(--border);
@@ -527,7 +572,10 @@
       transform:scale(.92);
     }
     .news-nav svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
-    .news-items{overflow:hidden;position:relative;height:140px;touch-action:pan-y;}
+    /* The items area flexes to fill whatever the header + dots leave,
+       so a grown tile never shows dead space and a shrunk tile just
+       gets tighter type (fitNewsTile scales it) instead of clipping. */
+    .news-items{overflow:hidden;position:relative;flex:1 1 auto;min-height:0;touch-action:pan-y;}
     .news-slide{
       position:absolute;inset:0;
       display:flex;align-items:stretch;
@@ -540,7 +588,7 @@
     .news-slide.exit-right{opacity:0;transform:translateX(28px);}
     .news-slide.from-left{transform:translateX(-28px);}
     .news-img-wrap{
-      flex:0 0 260px;
+      flex:0 0 var(--niw,260px);
       position:relative;overflow:hidden;
       background:
         linear-gradient(160deg,hsl(var(--h) 73% 42% /.22),rgba(0,0,0,.35)),
@@ -569,17 +617,21 @@
     .news-idx{color:var(--accent);font-variant-numeric:tabular-nums;letter-spacing:.04em;}
     .news-time{font-variant-numeric:tabular-nums;color:var(--muted2);text-transform:none;letter-spacing:0;font-weight:500;}
     .news-title{
-      font-size:20px;font-weight:700;line-height:1.22;letter-spacing:-.02em;
+      font-size:var(--nt,20px);font-weight:700;line-height:1.22;letter-spacing:-.02em;
       color:var(--text);
       display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
       overflow:hidden;
     }
     .news-desc{
-      font-size:13px;font-weight:400;line-height:1.45;
+      font-size:var(--nd,13px);font-weight:400;line-height:1.45;
       color:rgba(255,255,255,.56);
       display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
       overflow:hidden;
     }
+    /* Small tiles: drop the desc line / the image entirely rather than
+       let copy crush against the picture (fitNewsTile toggles these). */
+    .news-strip.no-desc .news-desc{display:none;}
+    .news-strip.no-img .news-img-wrap{display:none;}
     .news-dots{
       display:flex;gap:6px;padding:10px 14px;
       border-top:1px solid var(--border);align-items:center;
@@ -716,8 +768,10 @@
     }
     .avatar-sprite{
       width:150px;
-      height:150px;
+      height:auto;
+      aspect-ratio:1;
       max-width:100%;
+      max-height:100%;
       overflow:visible;
       display:block;
     }
@@ -747,7 +801,10 @@
     /* ── NEW SPRITE AVATAR ── */
     #avatarCanvas {
       width: 150px;
-      height: 150px;
+      height: auto;
+      aspect-ratio: 1;
+      max-width: 100%;
+      max-height: 100%;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
       background: transparent;
@@ -815,12 +872,12 @@
 
     @media (max-width:1100px){
       .avatar-panel{min-height:210px;}
-      .avatar-sprite,#avatarCanvas{width:130px;height:130px;}
+      .avatar-sprite,#avatarCanvas{width:130px;}
     }
     @media (max-width:720px){
       #pageHome{--hx:16px;--hy:14px;--hxr:100px;}
       .avatar-panel{min-height:190px;}
-      .avatar-sprite,#avatarCanvas{width:110px;height:110px;}
+      .avatar-sprite,#avatarCanvas{width:110px;}
     }
     @media (max-width:520px){
       .avatar-panel{min-height:160px;}
@@ -859,22 +916,17 @@
       border-radius:18px;
       overflow:hidden;
       background:var(--bg-raised);
-      /* Square tile: width is 340px (JS tileWidths) and min-height
-         matches — every child is absolute, so min-height IS the height. */
-      min-height:340px;
-      /* Tile box AND the map framing vars on one clock (see @property
-         above). The iframe recomputes its size/transform from the
-         interpolated vars every frame, so expand/collapse reads as a
-         continuous morph instead of jump-then-slide. Must repeat the
-         box props: this rule follows .home-tile in the sheet and
-         would otherwise override its transition for this element. */
-      transition:left .18s var(--ease-out),top .18s var(--ease-out),width .18s var(--ease-out),min-height .18s var(--ease-out),
-                 --nav-zoom .18s var(--ease-out),--crop-l .18s var(--ease-out),--crop-r .18s var(--ease-out),--crop-t .18s var(--ease-out),--crop-b .18s var(--ease-out);
+      /* The map framing vars ride the same 180ms clock as the shell
+         box (see @property above + setNavExpanded's JS pins). The box
+         itself is Gridstack's (the shell animates via
+         .grid-stack-animate); only the vars transition here. */
+      transition:--nav-zoom .18s var(--ease-out),--crop-l .18s var(--ease-out),--crop-r .18s var(--ease-out),--crop-t .18s var(--ease-out),--crop-b .18s var(--ease-out);
     }
-    /* While the JS morph (setNavExpanded) is running, the tile box and
+    /* While the JS morph (setNavExpanded) is running, the shell box and
        framing vars are pinned inline per frame — CSS transitions must
        stay out of the way so the two never fight over the same props. */
     .nav-section.nav-morphing{transition:none;}
+    #navItem.nav-morphing{transition:none!important;}
     /* The wrapper carries the zoom as a pure-GPU transform during the
        morph. The cross-origin map re-renders on every iframe resize,
        so resizing the iframe ~12 times mid-animation was what made the
@@ -908,9 +960,17 @@
          fallback for any path that toggles .expanded without the JS
          morph (the iframe then recomputes size/transform per frame). */
     }
-    /* Expanded: the tile grows to fill the content area in place — one
-       iframe instance, it never reloads. The layout engine's inline
-       left/top/width are overridden while .expanded. */
+    /* Expanded: the nav SHELL grows to fill the whole grid box in place —
+       one iframe instance, it never reloads. The grid slot itself is
+       untouched (the shell's inline left/top/width/height are overridden
+       while .expanded), so collapsing hands the original cell right back. */
+    #navItem.expanded{
+      left:0 !important;
+      top:0 !important;
+      width:100% !important;
+      height:100% !important;
+      z-index:40 !important;
+    }
     .nav-section.expanded{
       /* 0.8×: the whole app (map + its UI) renders 20% smaller while
          filling the content area. Crops stay 0 so the app's controls
@@ -921,11 +981,6 @@
       --crop-r:0px;
       --crop-t:0px;
       --crop-b:0px;
-      left:var(--hx) !important;
-      top:var(--hy) !important;
-      width:calc(100% - var(--hx) - var(--hxr)) !important;
-      min-height:calc(100% - var(--hy) - 156px) !important;
-      z-index:40 !important;
     }
     /* Corner control: hover-reveal on pointer devices, always tappable
        on touch (the car). */
@@ -979,9 +1034,6 @@
     #pageHome.arranging #navSection>.nav-drag-layer{
       pointer-events:auto;
       cursor:grab;
-    }
-    @media (max-width:720px){
-      .nav-section{min-height:300px;}
     }
 
     /* ── NEWS POPUP ── */
@@ -1795,16 +1847,12 @@
       pointer-events:auto;
     }
 
-    .news-items{
-      height:224px;
-    }
-
     .news-slide{
       background:#121212;
     }
 
     .news-img-wrap{
-      flex:0 0 44%;
+      flex:0 0 var(--niw,44%);
       background:#111;
     }
 
@@ -1814,7 +1862,7 @@
 
     .news-copy{
       background:#121212;
-      padding:17px 19px;
+      padding:var(--ncpt,17px) 19px var(--ncpb,17px);
       justify-content:flex-start;
       gap:16px;
     }
@@ -1881,7 +1929,7 @@
     }
 
     .news-title{
-      font-size:22px;
+      font-size:var(--nt,22px);
       line-height:1.15;
       letter-spacing:-.02em;
       max-width:100%;
@@ -1961,6 +2009,13 @@
       gap:4px;
     }
 
+    /* Small-tile fits chosen by fitNewsTile (JS) from the live tile
+       size: shrink the header pill, drop the CTA, clamp the title —
+       so copy never collides with the pill, the dots, or itself. */
+    .news-strip.pill-tight .news-updated{display:none;}
+    .news-strip.no-cta .news-cta{display:none;}
+    .news-strip.clamp2 .news-title{-webkit-line-clamp:2;}
+
     .news-pip{
       width:16px;
       height:3px;
@@ -2015,10 +2070,6 @@
     }
 
     @media (max-width:720px){
-      .news-items{
-        height:204px;
-      }
-
       .news-copy{
         padding:14px;
       }
@@ -2064,10 +2115,6 @@
 
       .news-title{
         font-size:16px;
-      }
-
-      .news-items{
-        height:196px;
       }
     }
   </style>
@@ -2128,8 +2175,16 @@
     <!-- ── PAGE · HOME ── -->
     <div class="page pos-active" id="pageHome">
 
+    <!-- HOME GRID (hold a tile to rearrange) — Gridstack: 12 cols,
+         90px rows, 9px item margin (18px gutter). The shells carry
+         the geometry (gs-* / inline left-top-width-height); the
+         .home-tile content fills its shell. -->
+    <div class="grid-stack" id="homeGrid">
+
     <!-- NEWS (home tile — hold to rearrange) -->
-    <div class="news-strip home-tile" id="newsStrip">
+    <div class="grid-stack-item" gs-id="newsStrip" gs-x="0" gs-y="0" gs-w="7" gs-h="4" gs-min-w="4" gs-min-h="3" gs-max-w="12" gs-max-h="5">
+      <div class="grid-stack-item-content news-strip home-tile" id="newsStrip">
+        <div class="tile-grip" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="news-header">
           <span class="news-label">Live</span>
           <span class="news-dot">·</span>
@@ -2164,13 +2219,16 @@
 
         <div class="news-dots" id="newsDots"></div>
       </div>
+    </div>
 
       <!--
         Avatar sprite art: PMDCollab — https://sprites.pmdcollab.org
         License: CC BY-NC 4.0 (https://creativecommons.org/licenses/by-nc/4.0/)
         Credit files: credits_red.txt, credits_starters.txt
       -->
-      <aside class="avatar-panel home-tile" id="avatarPanel" data-mood="cute" data-speed="parked">
+    <div class="grid-stack-item" gs-id="avatarPanel" gs-x="4" gs-y="4" gs-w="2" gs-h="3" gs-min-w="2" gs-min-h="3" gs-max-w="2" gs-max-h="3" gs-no-resize="true">
+      <aside class="grid-stack-item-content avatar-panel home-tile" id="avatarPanel" data-mood="cute" data-speed="parked">
+        <div class="tile-grip" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="avatar-panel-head">
           <span>Companion · <span id="avatarFormLabel">Egg</span></span>
           <span class="avatar-head-dot" id="avatarGpsDot"></span>
@@ -2185,12 +2243,17 @@
           <span class="avatar-info" id="avatarInfo">Waiting for GPS…</span>
         </div>
       </aside>
+    </div>
 
     <!-- NAV MAP (home tile — hold to rearrange) — seamless live TeslaNav map -->
-    <div class="nav-section home-tile" id="navSection">
-      <!-- wrapper carries the morph's zoom as a GPU transform (see
-           .nav-frame-wrap / setNavExpanded) while the iframe stays
-           frozen at a fixed size -->
+    <div class="grid-stack-item" id="navItem" gs-id="navSection" gs-x="0" gs-y="4" gs-w="4" gs-h="4" gs-min-w="3" gs-min-h="3" gs-max-w="5" gs-max-h="5">
+      <div class="grid-stack-item-content nav-section home-tile" id="navSection">
+        <!-- no .tile-grip: with no handle match Gridstack drags the whole
+             item, and the .nav-drag-layer above the iframe catches the
+             pointer — the map tile drags from anywhere, iOS-style -->
+        <!-- wrapper carries the morph's zoom as a GPU transform (see
+             .nav-frame-wrap / setNavExpanded) while the iframe stays
+             frozen at a fixed size -->
       <div class="nav-frame-wrap" id="navFrameWrap">
         <iframe id="navFrame" src="https://teslanav.com/" title="TeslaNav live map"
                 allow="geolocation"></iframe>
@@ -2199,12 +2262,15 @@
       <button class="nav-expand" id="navExpandBtn" type="button" aria-label="Expand map" title="Expand map">
         <svg class="ic-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
         <svg class="ic-collapse" viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
-      </button>
+        </button>
+      </div>
     </div>
 
     <!-- STOCKS (home tile — hold to rearrange) — live tickers,
          best performer auto-sorts to the top of the list -->
-    <div class="stock-tile home-tile" id="stockTile">
+    <div class="grid-stack-item" gs-id="stockTile" gs-x="7" gs-y="0" gs-w="5" gs-h="4" gs-min-w="3" gs-min-h="3" gs-max-w="6" gs-max-h="5">
+      <div class="grid-stack-item-content stock-tile home-tile" id="stockTile">
+        <div class="tile-grip" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="stock-head">
         <span class="stock-head-label">Markets</span>
         <span class="stock-status closed" id="stockStatus">
@@ -2214,7 +2280,10 @@
         </span>
       </div>
       <div class="stock-list" id="stockList"></div>
+      </div>
     </div>
+
+    </div><!-- /#homeGrid -->
 
     <!-- ARRANGE MODE — exit pill -->
     <button class="arrange-done" id="arrangeDone" aria-hidden="true">Done</button>
@@ -2331,6 +2400,7 @@
     <span class="chat-pill-label">Chat</span>
   </div>
 
+  <script src="vendor/gridstack-all.js"></script>
   <script>
   /* ── DATA ── */
   const STREAMING = [
@@ -2609,17 +2679,32 @@
 
   function renderStockTile(){
     const list = document.getElementById('stockList');
-    if(!list) return;
+    const tile = document.getElementById('stockTile');
+    if(!list || !tile) return;
 
     const cs     = getComputedStyle(list);
-    const rowH   = parseFloat(cs.getPropertyValue('--row-h'))    || 52;
     const gap    = parseFloat(cs.getPropertyValue('--row-gap'))  || 4;
     const colGap = parseFloat(cs.getPropertyValue('--col-gap'))  || 8;
     const pad    = parseFloat(cs.getPropertyValue('--list-pad')) || 10;
-    const step   = rowH + gap;
-    const colW   = (list.clientWidth - pad * 2 - colGap) / STOCK_COLS;
-    if(colW <= 60) return;   /* tile width not settled yet (pre-layout) */
-    list.style.height = (Math.ceil(ALL_SYMS.length / STOCK_COLS) * step - gap) + 'px';
+    const W      = list.clientWidth  - pad * 2;
+    const H      = list.clientHeight;
+    if(W <= 60 || H <= 40) return;   /* tile size not settled yet (pre-layout) */
+
+    /* Fit pass: two columns only when each can be ≥130px; shrink rows
+       to fit the tile (never below 36px); if even that doesn't fit,
+       hide the worst performers so what IS shown never overlaps. */
+    const cols = (W >= 2 * 130 + colGap) ? STOCK_COLS : 1;
+    let rowH = 52, visible = ALL_SYMS.length;
+    for(let n = ALL_SYMS.length; n >= 1; n--){
+      const rows = Math.ceil(n / cols);
+      const rh   = Math.min(52, (H - (rows - 1) * gap) / rows);
+      if(rh >= 36){ rowH = rh; visible = n; break; }
+    }
+    tile.style.setProperty('--row-h', rowH + 'px');
+    tile.classList.toggle('tight', rowH < 44);
+    const step = rowH + gap;
+    const colW = (W - (cols - 1) * colGap) / cols;
+
     /* Geometry changed (resize / breakpoint) — force every row to
        re-apply its slot transform at the new step/columns. */
     const geom = `${step}x${colW}`;
@@ -2651,6 +2736,9 @@
     sorted.forEach((sym, rank) => {
       const row = list.querySelector(`.stock-row[data-sym="${sym}"]`);
       if(!row) return;
+      const show = rank < visible;
+      row.style.display = show ? '' : 'none';
+      if(!show) return;
       const d    = stockData[sym];
       const up   = d.change >= 0;
       const sign = up ? '+' : '';
@@ -2662,14 +2750,53 @@
       row.classList.toggle('best', rank === 0);
       if(row.dataset.rank !== String(rank)){
         row.dataset.rank = String(rank);
-        const x = pad + (rank % STOCK_COLS) * (colW + colGap);
-        const y = Math.floor(rank / STOCK_COLS) * step;
+        const x = pad + (rank % cols) * (colW + colGap);
+        const y = Math.floor(rank / cols) * step;
         row.style.width = colW + 'px';
         row.style.transform = `translate(${x}px, ${y}px)`;
       }
     });
 
   }
+
+  /* News copy scales with the tile: title px and the image column are
+     CSS vars set from the live tile size; the floating header pill is
+     measured so the copy always starts below it when they would
+     collide, and small tiles drop the CTA / clamp the title instead
+     of letting content crush or overlap. */
+  function fitNewsTile(){
+    const strip = document.getElementById('newsStrip');
+    const items = document.getElementById('newsItems');
+    if(!strip || !items) return;
+    const w = strip.clientWidth, h = items.clientHeight;
+    if(w <= 40 || h <= 20) return;
+    strip.style.setProperty('--nt', Math.max(15, Math.min(22, Math.round(h * 0.088))) + 'px');
+    const imgFrac = w < 400 ? 0 : w < 620 ? .34 : .44;
+    strip.style.setProperty('--niw', (imgFrac * 100) + '%');
+    strip.classList.toggle('no-img', imgFrac === 0);
+    const pill = strip.querySelector('.news-header');
+    const pillW = pill ? pill.offsetWidth : 0, pillH = pill ? pill.offsetHeight : 0;
+    strip.style.setProperty('--ncpt', (12 + pillW > w * imgFrac + 19 ? pillH + 14 : 17) + 'px');
+    strip.style.setProperty('--ncpb', '24px');   /* clears the floating dots */
+    strip.classList.toggle('pill-tight', w < 560);
+    strip.classList.toggle('no-cta',  w * (1 - imgFrac) - 38 < 150);
+    strip.classList.toggle('clamp2',  h < 170);
+  }
+
+  /* Any tile geometry change (resize, breakpoint, restore) re-fits the
+     two content-driven tiles. rAF-debounced so a drag re-fits once per
+     frame, not once per event. */
+  let tileFitRaf = 0;
+  const tileFitRO = new ResizeObserver(() => {
+    if(tileFitRaf) return;
+    tileFitRaf = requestAnimationFrame(() => {
+      tileFitRaf = 0;
+      renderStockTile();
+      fitNewsTile();
+    });
+  });
+  tileFitRO.observe(document.getElementById('stockTile'));
+  tileFitRO.observe(document.getElementById('newsStrip'));
 
   /* ── Market status (US/Eastern, 9:30–16:00 Mon–Fri) ──
      LIVE while the session runs, otherwise a countdown to the
@@ -2720,6 +2847,7 @@
   updateStockStatus();
 
   renderStockTile();
+  fitNewsTile();
   refreshStocks();
   setInterval(refreshStocks, 90000);
 
@@ -2918,6 +3046,9 @@
 
   function openNewsPopup(item, index){
     if(!item) return;
+    /* Arrange mode: taps on the tile drag it around — never let a
+       stray tap open the summary popup mid-rearrange. */
+    if(document.body.classList.contains('home-arranging')) return;
     const pop  = document.getElementById('newsPop');
     const card = document.getElementById('newsPopCard');
     const imgW = document.getElementById('newsPopImg');
@@ -3053,6 +3184,7 @@
       more.setAttribute('aria-label', 'Open article');
       more.addEventListener('click', (e) => {
         e.stopPropagation();
+        if(document.body.classList.contains('home-arranging')) return;
         if(item.link) openUrl(item.link);
         else openNewsPopup(item, i);
       });
@@ -3829,24 +3961,25 @@
   })();
 
   /* ══════════════════════════════════════════
-     HOME TILES — free placement.
-     Tiles sit at absolute positions in the
-     home content area. Hold a tile to enter
-     arrange mode (jiggle + placement grid),
-     then drag it anywhere: it snaps to the
-     other tiles' edges (18px gutter) or to
-     the 48px grid. Placements persist; on
-     resize tiles keep their offsets and are
-     clamped into the new area — no reflow,
-     no gaps. Unplaced tiles keep the tight
-     default stack.
+     HOME TILES — Gridstack grid placement.
+     12-column grid, 90px rows, 9px item margin
+     (the old 18px gutter). Tiles snap to cells;
+     dragging pushes colliding tiles and the
+     grid compacts — overlap resolution and
+     reflow are the library's job now. Hold a
+     tile to enter arrange mode (grips
+     + placement grid), drag the grip (the map
+     tile drags from anywhere), resize from
+     the SE corner (proportional). Layout persists.
      Tap outside a tile, Done or Esc to exit.
      ══════════════════════════════════════════ */
   const homePageEl = pageEls[0];
   const arrangeDoneBtn = document.getElementById('arrangeDone');
-  const HOME_POS_KEY = 'tcal.homePos';
-  const HOME_GUTTER  = 18;   // gap when snapping a tile against another
-  const HOME_GRID    = 48;   // placement grid cell (matches the overlay)
+  const HOME_GRID_KEY = 'tcal.homeGrid.v1';
+  const HOME_POS_KEY  = 'tcal.homePos';   /* legacy pixel model, migrated once */
+  const GRID_COLS   = 12;
+  const GRID_ROW_H  = 90;    /* cell height px; cell width = container/12 */
+  const GRID_MARGIN = 9;     /* per side → 18px gutter between tiles */
   const homeTiles = [
     document.getElementById('newsStrip'),
     document.getElementById('avatarPanel'),
@@ -3854,221 +3987,157 @@
     document.getElementById('stockTile')
   ];
   const homeTileIds = homeTiles.map(t => t.id);
-  const homePosById = {};    // id -> {x,y} user placement, content px
-  const tileState   = {};    // id -> {x,y,w,h} last laid-out state
   let homeArranging = false;
-  let homeDrag = null;
   let holdTimer = null, holdInfo = null, holdPos = null;
-  let layoutRaf = 0;
 
-  /* Content area: origin (ox,oy) + usable box (W×H). The CSS custom
-     properties per breakpoint keep this in sync with the grid overlay. */
+  /* Content area metrics: the grid box (origin --hx/--hy, right margin
+     --hxr per breakpoint) and the live cell pitch for the overlay. */
+  const homeGridEl = document.getElementById('homeGrid');
   function homeMetrics(){
     const cs = getComputedStyle(homePageEl);
-    const ox = parseFloat(cs.getPropertyValue('--hx')) || 116;
+    const ox = parseFloat(cs.getPropertyValue('--hx')) || 24;
     const oy = parseFloat(cs.getPropertyValue('--hy')) || 16;
-    const or = parseFloat(cs.getPropertyValue('--hxr')) || 24;
-    /* The page's viewport offset (the fixed header). The dragged tile is
-       fixed to the viewport, so snap math must convert to page coords. */
-    const pr = homePageEl.getBoundingClientRect();
+    const or = parseFloat(cs.getPropertyValue('--hxr')) || 104;
     return {
-      ox, oy, pageX: pr.left, pageY: pr.top,
-      W: Math.max(60, homePageEl.clientWidth  - ox - or),
-      H: Math.max(120, homePageEl.clientHeight - oy - 140)
+      ox, oy,
+      W: Math.max(60, homePageEl.clientWidth - ox - or)
     };
   }
+  function syncGridOverlay(){
+    const m = homeMetrics();
+    homePageEl.style.setProperty('--cell-w', (m.W / GRID_COLS) + 'px');
+    homePageEl.style.setProperty('--cell-h', GRID_ROW_H + 'px');
+  }
 
-  /* Restore saved placements (silently ignore bad data). */
-  (function(){
+  /* ── The grid ──
+     staticGrid starts true: display-only until arrange mode. The drag
+     handle is the grip pill, so the news swipe, the map iframe and the
+     stock rows keep their own pointer behavior; the map tile has no
+     grip, so Gridstack falls back to whole-item dragging and its
+     .nav-drag-layer catches the pointer (the iframe would eat it). */
+  const grid = GridStack.init({
+    column: GRID_COLS,
+    cellHeight: GRID_ROW_H,
+    margin: GRID_MARGIN,
+    staticGrid: true,
+    animate: false,                     /* first paint: no slide-in */
+    handle: '.tile-grip',
+    draggable: { handle: '.tile-grip', appendTo: 'parent' },
+    resizable: { handles: 'se' },
+    alwaysShowResizeHandle: true   /* 'mobile' hides the handle on desktop
+                                      (autohide) and the drag-end hover
+                                      dance made it effectively unusable */
+  }, homeGridEl);
+
+  /* Restore the saved layout, migrating the legacy pixel model once. */
+  function migrateLegacyLayout(){
+    /* Old model: {id:{x,y}} content-px offsets, fixed tile widths.
+       Convert to cells so long-time installs keep their arrangement. */
     try{
       const saved = JSON.parse(localStorage.getItem(HOME_POS_KEY));
-      if(saved && typeof saved === 'object'){
-        homeTileIds.forEach(id => {
-          const p = saved[id];
-          if(p && isFinite(p.x) && isFinite(p.y)){
-            homePosById[id] = { x: p.x, y: p.y };
-          }
+      if(!saved || typeof saved !== 'object') return null;
+      const pitch = homeMetrics().W / GRID_COLS;
+      const widths = { newsStrip:660, avatarPanel:200, navSection:340, stockTile:440 };
+      const out = [];
+      homeTileIds.forEach(id => {
+        const p = saved[id];
+        if(!p || !isFinite(p.x) || !isFinite(p.y)) return;
+        const el = homeTiles.find(t => t.id === id);
+        out.push({
+          id,
+          x: Math.max(0, Math.min(GRID_COLS - 2, Math.round(p.x / pitch))),
+          y: Math.max(0, Math.round(p.y / GRID_ROW_H)),
+          w: Math.max(2, Math.min(GRID_COLS, Math.round((widths[id] || 200) / pitch))),
+          h: Math.max(2, Math.round(((el && el.offsetHeight) || 180) / GRID_ROW_H))
         });
-      }
+      });
+      return out.length ? out : null;
+    }catch(e){ return null; }
+  }
+  (function(){
+    let saved = null;
+    try{
+      const s = JSON.parse(localStorage.getItem(HOME_GRID_KEY));
+      if(Array.isArray(s) && s.length) saved = s;
     }catch(e){}
+    if(!saved) saved = migrateLegacyLayout();
+    if(!saved) return;
+    /* Always load the full set — ids missing from an older save fall
+       back to the DOM's default gs-* geometry. (save() omits w/h for
+       fixed-size items, so merge field by field, not item by item.) */
+    const byId = {};
+    saved.forEach(it => { if(it && it.id) byId[it.id] = it; });
+    const items = homeTileIds.map(id => {
+      const it  = byId[id];
+      const el  = homeGridEl.querySelector('[gs-id="' + id + '"]');
+      const num = a => { const v = parseInt(el.getAttribute(a), 10); return isFinite(v) ? v : 0; };
+      const g   = k => { const v = it && it[k]; return isFinite(v) ? v : num('gs-' + k); };
+      return { id, x: g('x'), y: g('y'), w: g('w') || 1, h: g('h') || 1 };
+    });
+    grid.load(items);
   })();
 
-  function homeVisibleTiles(){
-    return homeTiles.filter(t => t.style.display !== 'none' && t.offsetParent !== null);
-  }
-
-  /* Set size of a tile at the current area width. News keeps 660px (or
-     the full width); in the fully-default stack it yields just enough
-     to keep the avatar on its row instead of wrapping with a gap.
-     The map tile is a 340px square (CSS min-height matches). */
-  function tileWidths(m, allAuto){
-    const news = (allAuto && m.W - HOME_GUTTER - 200 >= 480)
-      ? Math.min(660, m.W - HOME_GUTTER - 200)
-      : Math.min(660, m.W);
-    return {
-      newsStrip:   news,
-      avatarPanel: Math.min(200, m.W),
-      navSection:  Math.min(340, m.W),
-      stockTile:   Math.min(440, m.W)
-    };
-  }
-
-  /* Compute the laid-out {x,y,w} of every tile. Placed tiles honor the
-     saved position (clamped into the area); the rest take the tight
-     default stack, pushed clear of any tile already laid out. */
-  function computeLayout(m){
-    const els = {};
-    homeTiles.forEach(t => { els[t.id] = t; });
-    const hOf  = id => els[id].offsetHeight || 0;
-    const allAuto = !homeTileIds.some(id => homePosById[id]);
-    const Wd = tileWidths(m, allAuto);
-
-    const out = {};
-    const rectOf = id => { const o = out[id]; return { x: o.x, y: o.y, w: o.w, h: hOf(id) }; };
-    const overlaps = (a, b) =>
-      a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-
-    /* 1) placed tiles, clamped into the content area */
-    homeTileIds.forEach(id => {
-      const p = homePosById[id];
-      if(!p) return;
-      out[id] = {
-        x: Math.max(0, Math.min(p.x, Math.max(0, m.W - Wd[id]))),
-        y: Math.max(0, Math.min(p.y, Math.max(0, m.H - hOf(id)))),
-        w: Wd[id]
-      };
-    });
-
-    /* 2) auto tiles: tight default stack, pushed below any overlap */
-    const defaultPos = {
-      newsStrip:   { x: 0, y: 0 },
-      avatarPanel: (Wd.newsStrip + HOME_GUTTER + 200 <= m.W)
-                      ? { x: Wd.newsStrip + HOME_GUTTER, y: 0 }
-                      : { x: 0, y: hOf('newsStrip') + HOME_GUTTER },
-      navSection:  { x: 0, y: hOf('newsStrip') + HOME_GUTTER }
-    };
-    /* Stock tile parks at the right end of the top row when it fits —
-       that leaves the news/avatar/map stack exactly as it was; on
-       narrower areas it goes right of the map and the overlap push
-       resolves any collision. */
-    defaultPos.stockTile =
-      (Wd.newsStrip + HOME_GUTTER + Wd.avatarPanel + HOME_GUTTER + Wd.stockTile <= m.W)
-        ? { x: Wd.newsStrip + HOME_GUTTER + Wd.avatarPanel + HOME_GUTTER, y: 0 }
-        : { x: Wd.navSection + HOME_GUTTER, y: hOf('newsStrip') + HOME_GUTTER };
-    homeTileIds.forEach(id => {
-      if(out[id]) return;
-      const p = { x: defaultPos[id].x, y: defaultPos[id].y };
-      let guard = 0;
-      for(;;){
-        const r = { x: p.x, y: p.y, w: Wd[id], h: hOf(id) };
-        let pushed = false;
-        for(const k in out){
-          if(overlaps(r, rectOf(k))){
-            p.y = Math.max(p.y, out[k].y + hOf(k) + HOME_GUTTER);
-            pushed = true;
-          }
-        }
-        if(!pushed || guard++ > 8) break;
-      }
-      out[id] = { x: p.x, y: p.y, w: Wd[id] };
-    });
-
-    /* 3) final clamp; the clamp can create an overlap, so push once more */
-    homeTileIds.forEach(id => {
-      const o = out[id];
-      o.x = Math.max(0, Math.min(o.x, Math.max(0, m.W - o.w)));
-      o.y = Math.max(0, Math.min(o.y, Math.max(0, m.H - hOf(id))));
-      const r = { x: o.x, y: o.y, w: o.w, h: hOf(id) };
-      for(const k in out){
-        if(k === id) continue;
-        if(overlaps(r, rectOf(k))) o.y = out[k].y + hOf(k) + HOME_GUTTER;
-      }
-    });
-    return out;
-  }
-
-  /* Apply the current layout to the DOM. */
-  function applyLayout(){
-    const m = homeMetrics();
-    const pos = computeLayout(m);
-    homeTiles.forEach(t => {
-      const p = pos[t.id];
-      if(!p) return;
-      /* h is needed by the snap candidates ("one gutter below this tile"). */
-      tileState[t.id] = { x: p.x, y: p.y, w: p.w, h: t.offsetHeight || 0 };
-      t.style.left  = (m.ox + p.x) + 'px';
-      t.style.top   = (m.oy + p.y) + 'px';
-      t.style.width = p.w + 'px';
-    });
-    /* The stocks rows slot into two columns of this tile — re-place
-       them whenever its width lands or changes (initial paint,
-       resize, news growth). No-op when nothing moved. */
+  /* Persist after every move/resize (debounced — 'change' is the one
+     event v14 fires for both). Re-slot the stock rows into the tile's
+     new width while we're here. */
+  let saveTimer = 0;
+  grid.on('change', () => {
     renderStockTile();
-  }
+    fitNewsTile();
+    if(saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try{
+        /* Geometry only — save() also serializes each node's content
+           HTML, and load() would re-inject that stale markup (killing
+           the live DOM + its listeners) on the next boot. */
+        const items = grid.save().map(n => ({id:n.id, x:n.x, y:n.y, w:n.w, h:n.h}));
+        localStorage.setItem(HOME_GRID_KEY, JSON.stringify(items));
+        localStorage.removeItem(HOME_POS_KEY);
+      }catch(e){}
+    }, 250);
+  });
 
-  /* Debounced re-layout (window resize, news content growing).
-     Absolute tiles never reflow each other. */
-  function relayout(){
-    if(layoutRaf || homeDrag) return;
-    layoutRaf = requestAnimationFrame(() => {
-      layoutRaf = 0;
-      applyLayout();
-    });
-  }
+  /* First paint settled — let later moves slide. */
+  requestAnimationFrame(() => requestAnimationFrame(() => grid.setAnimation(true)));
+  syncGridOverlay();
 
-  /* Drop ghost — dashed outline of where the dragged tile will land. */
-  const dropGhost = document.createElement('div');
-  dropGhost.className = 'drop-ghost';
-  dropGhost.setAttribute('aria-hidden','true');
-  homePageEl.appendChild(dropGhost);
-
-  function positionDropGhost(d){
-    const m = homeMetrics();
-    dropGhost.style.left   = (m.ox + d.snapped.x) + 'px';
-    dropGhost.style.top    = (m.oy + d.snapped.y) + 'px';
-    dropGhost.style.width  = d.w + 'px';
-    dropGhost.style.height = d.h + 'px';
-    dropGhost.classList.add('show');
-  }
-
-  function hideDropGhost(){ dropGhost.classList.remove('show'); }
-
+  /* ── arrange mode ── */
   function enterHomeArrange(tile){
     /* An expanded map can't be dragged in its grown state (its box is
-       CSS-overridden) — settle it back to its tile slot first. */
+       CSS-overridden) — settle it back to its grid slot first. */
     if(navSectionEl && navSectionEl.classList.contains('expanded')) setNavExpanded(false);
     homeArranging = true;
     document.body.classList.add('home-arranging');
     homePageEl.classList.add('arranging');
-    homeVisibleTiles().forEach(t => { if(t !== tile) t.classList.add('jiggling'); });
     arrangeDoneBtn.classList.add('show');
     arrangeDoneBtn.setAttribute('aria-hidden', 'false');
+    grid.setStatic(false);
     try{ if(navigator.vibrate) navigator.vibrate(15); }catch(e){}
   }
 
   function exitHomeArrange(){
     if(!homeArranging) return;
-    cancelHomeDrag();
     homeArranging = false;
+    grid.setStatic(true);
     document.body.classList.remove('home-arranging');
     homePageEl.classList.remove('arranging');
-    homeTiles.forEach(t => t.classList.remove('jiggling'));
     arrangeDoneBtn.classList.remove('show');
     arrangeDoneBtn.setAttribute('aria-hidden', 'true');
   }
 
   /* Expand / collapse the nav map in place — one iframe instance, the
-     tile just grows to fill the content area (see .nav-section.expanded).
-     Collapsing hands the slot back to the layout engine.
+     SHELL grows to fill the grid box (see #navItem.expanded). The grid
+     slot itself is untouched, so collapsing hands the cell right back.
      The cross-origin map re-renders on every iframe resize, so the
      morph never resizes the iframe: it stays frozen at its current
-     size while the tile box + a .nav-frame-wrap transform carry the
+     size while the shell box + a .nav-frame-wrap transform carry the
      whole motion (layout + compositor only). Only when the morph
      finishes does the iframe swap to its target geometry — one
      re-render, at matched on-screen zoom and framing, so it reads as
      a frame, not a jump. The CSS var transitions above remain as a
      fallback for paths that toggle .expanded without this driver. */
   const navSectionEl = document.getElementById('navSection');
+  const navItemEl    = document.getElementById('navItem');
   const navExpandBtn = document.getElementById('navExpandBtn');
   const navWrapEl    = document.getElementById('navFrameWrap');
   const navFrameEl   = document.getElementById('navFrame');
@@ -4079,7 +4148,7 @@
   let navMorphCleanup = 0;                    // rAF that re-enables CSS transitions
 
   /* cubic-bezier(.16,.84,.44,1) — the page's --ease-out in JS, so the
-     tile box and the wrapper transform share one exact clock. */
+     shell box and the wrapper transform share one exact clock. */
   function navEase(x){
     if(x <= 0) return 0;
     if(x >= 1) return 1;
@@ -4105,18 +4174,11 @@
   }
 
   function setNavExpanded(on){
-    if(!navSectionEl || !navExpandBtn || !navWrapEl || !navFrameEl) return;
-    const tile = navSectionEl;
-    if(tile.classList.contains('expanded') === on){
-      /* Same state (e.g. arrange mode re-settling a collapsed tile) —
-         just refresh the slot values. */
-      if(!on) relayout();
-      return;
-    }
+    if(!navSectionEl || !navItemEl || !navExpandBtn || !navWrapEl || !navFrameEl) return;
+    const tile = navSectionEl, shell = navItemEl;
+    if(tile.classList.contains('expanded') === on) return;
     navExpandBtn.setAttribute('aria-label', on ? 'Shrink map' : 'Expand map');
     navExpandBtn.title = on ? 'Shrink map' : 'Expand map';
-
-    const m = homeMetrics();
 
     /* Re-aim mid-morph: cancel the running clock. The frozen rendering
        stays frozen (no map re-render) and the new morph starts from
@@ -4125,11 +4187,13 @@
     if(navMorphCleanup) cancelAnimationFrame(navMorphCleanup);
 
     /* Current box, read BEFORE the class flips below (a style recalc
-       after the flip would already report the target box). */
-    const rect = tile.getBoundingClientRect();
+       after the flip would already report the target box), in the grid
+       container's space — the shell's offsetParent. */
+    const rect  = shell.getBoundingClientRect();
+    const cRect = homeGridEl.getBoundingClientRect();
     const from = {
-      x: rect.left - m.pageX,
-      y: rect.top  - m.pageY,
+      x: rect.left - cRect.left,
+      y: rect.top  - cRect.top,
       w: rect.width,
       h: rect.height
     };
@@ -4152,45 +4216,44 @@
       navFrameEl.style.height = cfw.height;
     }
 
-    /* Class = destination (icon + drag layer reflect the target). Its
-       box !important values and var values are overridden by the pins
-       below — all within this task, before the next paint. */
+    /* Classes = destination (icon + drag layer reflect the target; the
+       shell class carries the grown box). Their !important values are
+       overridden by the pins below — all within this task, before the
+       next paint. */
     tile.classList.add('nav-morphing');
+    shell.classList.add('nav-morphing');
     tile.classList.toggle('expanded', on);
+    shell.classList.toggle('expanded', on);
 
-    /* Target rest box + framing, straight off the computed style
-       (the class holds them). */
-    const cs = getComputedStyle(tile);
-    let toH = parseFloat(cs.minHeight);
-    if(!isFinite(toH)){
-      /* The expanded min-height is calc(100% - var(--hy) - 156px): a
-         computed value that keeps its % (it resolves against the page
-         at use time), so resolve it here by hand. A NaN pin would be
-         an invalid no-op and silently keep the old pin in place. */
-      toH = homePageEl.clientHeight - m.oy - 156;
-    }
+    /* Target rest box + framing, straight off the computed styles (the
+       classes hold them). The shell's 100% box resolves against the
+       grid container, so the computed values are px. */
+    const cs  = getComputedStyle(shell);
+    const csC = getComputedStyle(tile);
     const to = {
-      x: parseFloat(cs.left),
-      y: parseFloat(cs.top),
+      x: parseFloat(cs.left) || 0,
+      y: parseFloat(cs.top)  || 0,
       w: parseFloat(cs.width),
-      h: toH
+      h: parseFloat(cs.height)
     };
-    const K  = parseFloat(cs.getPropertyValue('--nav-zoom')) || 1;
-    const Ox = -K * (parseFloat(cs.getPropertyValue('--crop-l')) || 0);
-    const Oy = -K * (parseFloat(cs.getPropertyValue('--crop-t')) || 0);
+    const K  = parseFloat(csC.getPropertyValue('--nav-zoom')) || 1;
+    const Ox = -K * (parseFloat(csC.getPropertyValue('--crop-l')) || 0);
+    const Oy = -K * (parseFloat(csC.getPropertyValue('--crop-t')) || 0);
 
-    /* Pin the box at the CURRENT position (inline !important beats the
-       .expanded !important rules) and the framing vars at the frozen
-       rendering's values, so the iframe's own transform matches what
-       it is actually rendering. */
-    const pin = (p, v, imp) => tile.style.setProperty(p, v, imp ? 'important' : '');
+    /* Pin the shell box at the CURRENT position (inline !important
+       beats the .expanded !important rules and Gridstack's inline
+       geometry) and the framing vars at the frozen rendering's values,
+       so the iframe's own transform matches what it is actually
+       rendering. */
+    const pin  = (p, v, imp) => shell.style.setProperty(p, v, imp ? 'important' : '');
+    const pinC = (p, v) => tile.style.setProperty(p, v, '');
     pin('left', from.x + 'px', true);
     pin('top', from.y + 'px', true);
     pin('width', from.w + 'px', true);
-    pin('min-height', from.h + 'px', true);
-    pin('--nav-zoom', String(navRender.r));
-    pin('--crop-l', (-navRender.ox / navRender.r) + 'px');
-    pin('--crop-t', (-navRender.oy / navRender.r) + 'px');
+    pin('height', from.h + 'px', true);
+    pinC('--nav-zoom', String(navRender.r));
+    pinC('--crop-l', (-navRender.ox / navRender.r) + 'px');
+    pinC('--crop-t', (-navRender.oy / navRender.r) + 'px');
 
     /* Wrapper transform: from = what is on screen now, to = the
        transform that makes the frozen rendering (r*app + o) present
@@ -4208,7 +4271,7 @@
       pin('left', (f.x + (tg.x - f.x) * p) + 'px', true);
       pin('top', (f.y + (tg.y - f.y) * p) + 'px', true);
       pin('width', (f.w + (tg.w - f.w) * p) + 'px', true);
-      pin('min-height', (f.h + (tg.h - f.h) * p) + 'px', true);
+      pin('height', (f.h + (tg.h - f.h) * p) + 'px', true);
       navWrapT = {
         tx: fw.tx + (tw.tx - fw.tx) * p,
         ty: fw.ty + (tw.ty - fw.ty) * p,
@@ -4229,9 +4292,11 @@
      map re-render of the morph (same on-screen zoom and framing, so
      it reads as a frame, not a jump; the frozen rendering can fall a
      few px short of the new window at one edge for this single frame)
-     — then hand control back to the CSS and the layout engine. */
+     — then hand control back to the CSS and to Gridstack: the pins
+     were the shell's only !important geometry, so removing them
+     reveals Gridstack's inline cell values again. */
   function finishNavMorph(){
-    const tile = navSectionEl;
+    const tile = navSectionEl, shell = navItemEl;
     navMorph = null;
     navRender = null;
     navWrapT = { tx: 0, ty: 0, s: 1 };
@@ -4241,10 +4306,26 @@
     tile.style.removeProperty('--nav-zoom');
     tile.style.removeProperty('--crop-l');
     tile.style.removeProperty('--crop-t');
-    tile.style.removeProperty('left');
-    tile.style.removeProperty('top');
-    tile.style.removeProperty('width');
-    tile.style.removeProperty('min-height');
+    /* Gridstack v14 positions shells with inline left/top/width/height
+       calc() strings — the --gs-* vars it also writes are NOT consumed by
+       the vendored CSS — so merely removing our pins would wipe the
+       engine's geometry too (the shell would fall back to one cell).
+       Hand the box back by re-running the engine's own position writer
+       on the live node; the manual branch mirrors its exact output. */
+    const n = shell.gridstackNode;
+    if(n && grid.engine._writePosAttr) grid.engine._writePosAttr(shell, n);
+    else if(n){
+      const st = shell.style;
+      st.top    = n.y ? (n.y === 1 ? 'var(--gs-cell-height)' : 'calc(' + n.y + ' * var(--gs-cell-height))') : '';
+      st.left   = n.x ? (n.x === 1 ? 'var(--gs-column-width)' : 'calc(' + n.x + ' * var(--gs-column-width))') : '';
+      st.width  = n.w > 1 ? 'calc(' + n.w + ' * var(--gs-column-width))' : '';
+      st.height = n.h > 1 ? 'calc(' + n.h + ' * var(--gs-cell-height))' : '';
+    }else{
+      shell.style.removeProperty('left');
+      shell.style.removeProperty('top');
+      shell.style.removeProperty('width');
+      shell.style.removeProperty('height');
+    }
     /* Keep the CSS transitions disabled for one more frame: the var
        pins just snapped to the class values (transition:none → the
        fallback @property transition cannot start on that jump). Only
@@ -4252,12 +4333,10 @@
        no pending change, there is nothing left to animate. */
     navMorphCleanup = requestAnimationFrame(() => {
       tile.classList.remove('nav-morphing');
+      shell.classList.remove('nav-morphing');
       navMorphCleanup = 0;
     });
-    /* Refresh the slot inline values (hidden while expanded,
-       authoritative while collapsed) so the next collapse starts
-       from a fresh layout. */
-    applyLayout();
+    navLastFrame = null;   /* the iframe swap reflow re-measures it */
   }
 
   if(navExpandBtn){
@@ -4265,167 +4344,72 @@
       setNavExpanded(!navSectionEl.classList.contains('expanded')));
   }
 
-  /* Put a tile back at its laid-out slot and animate the drop from its
-     floating position (FLIP). fromX/fromY are viewport coords. The slot
-     left/top/width must already be applied (applyLayout ran first). */
-  function settleHomeTile(tile, fromX, fromY){
-    tile.style.transition = 'none';
-    homePageEl.appendChild(tile);
-    tile.classList.remove('dragging');
-    tile.style.height = '';
-    const slot = tile.getBoundingClientRect();
-    const dx = fromX - slot.left;
-    const dy = fromY - slot.top;
-    if(Math.abs(dx) < 1 && Math.abs(dy) < 1){
-      /* In place — still clear the lifted transform (it carries the
-         1.03 scale-up and would linger on the tile). */
-      tile.style.transition = '';
-      tile.style.transform  = '';
-      return;
-    }
-    tile.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(1.03)';
-    void tile.offsetWidth;
-    tile.style.transition = 'transform .26s var(--ease-smooth)';
-    tile.style.transform  = '';
-    setTimeout(() => { tile.style.transition = ''; tile.style.transform = ''; }, 320);
-  }
-
-  function beginHomeDrag(tile, x, y, pid){
-    const rect = tile.getBoundingClientRect();
-    const st = tileState[tile.id] || { x: 0, y: 0, w: rect.width, h: rect.height };
-    homeDrag = {
-      tile, id: tile.id,
-      baseX: rect.left, baseY: rect.top,
-      offX: x - rect.left, offY: y - rect.top,
-      lastX: x, lastY: y,
-      w: rect.width, h: rect.height,
-      snapped: { x: st.x, y: st.y },
-      pid: pid,
-      raf: 0, moved: false
-    };
-    tile.classList.remove('jiggling');
-    tile.classList.add('dragging');
-    tile.style.left = rect.left + 'px';
-    tile.style.top  = rect.top + 'px';
-    tile.style.width  = rect.width + 'px';
-    tile.style.height = rect.height + 'px';
-    tile.style.transform = 'translate(0px,0px) scale(1.03)';
-    /* Re-inserting a node restarts its CSS animations — kill the one-shot
-       boot reveal now or the lifted tile would flash invisible (opacity:0
-       during the reveal delay) while it follows the pointer. */
-    tile.style.animation = 'none';
-    /* Move to <body>: fixed to the viewport (the page's will-change
-       transform would make it a containing block). The other tiles are
-       absolutely positioned, so they stay exactly where they are. */
-    document.body.appendChild(tile);
-    document.addEventListener('pointermove', onHomeDragMove);
-    document.addEventListener('pointerup', onHomeDragEnd);
-    document.addEventListener('pointercancel', onHomeDragCancel);
-    positionDropGhost(homeDrag);
-  }
-
-  function detachHomeDragListeners(){
-    document.removeEventListener('pointermove', onHomeDragMove);
-    document.removeEventListener('pointerup', onHomeDragEnd);
-    document.removeEventListener('pointercancel', onHomeDragCancel);
-  }
-
-  function cancelHomeDrag(){
-    const d = homeDrag;
-    if(!d) return;
-    homeDrag = null;
-    detachHomeDragListeners();
-    if(d.raf) cancelAnimationFrame(d.raf);
-    hideDropGhost();
-    /* Settle from where the tile actually is (its floating position),
-       not from the lift point — a cancelled drag may have moved the
-       tile far away, and the FLIP must fly it back from there. */
-    const floating = d.tile.getBoundingClientRect();
-    applyLayout();
-    settleHomeTile(d.tile, floating.left, floating.top);
-  }
-
-  function onHomeDragMove(e){
-    const d = homeDrag;
-    /* Only the pointer that lifted the tile drives the drag. */
-    if(!d || e.pointerId !== d.pid) return;
-    e.preventDefault();
-    d.lastX = e.clientX;
-    d.lastY = e.clientY;
-    d.moved = true;
-    if(d.raf) return;
-    d.raf = requestAnimationFrame(() => {
-      const dd = homeDrag;
-      if(!dd) return;
-      dd.raf = 0;
-      dd.tile.style.transform =
-        'translate(' + (dd.lastX - dd.offX - dd.baseX) + 'px,' +
-                      (dd.lastY - dd.offY - dd.baseY) + 'px) scale(1.03)';
-      const m = homeMetrics();
-      dd.snapped = snapHomePos(
-        dd.lastX - dd.offX - m.pageX - m.ox,
-        dd.lastY - dd.offY - m.pageY - m.oy,
-        dd.w, dd.h, m, dd.id);
-      positionDropGhost(dd);
-    });
-  }
-
-  function onHomeDragEnd(e){
-    const d = homeDrag;
-    if(!d || e.pointerId !== d.pid) return;
-    homeDrag = null;
-    detachHomeDragListeners();
-    if(d.raf) cancelAnimationFrame(d.raf);
-    const floating = d.tile.getBoundingClientRect();
-    if(d.moved){
-      homePosById[d.id] = { x: d.snapped.x, y: d.snapped.y };
-      try{ localStorage.setItem(HOME_POS_KEY, JSON.stringify(homePosById)); }catch(err){}
-    }
-    applyLayout();
-    settleHomeTile(d.tile, floating.left, floating.top);
-    /* Let the ghost stay until the tile has flown into place. */
-    setTimeout(hideDropGhost, 280);
-    if(homeArranging) d.tile.classList.add('jiggling');
-  }
-
-  function onHomeDragCancel(e){
-    if(!homeDrag || e.pointerId !== homeDrag.pid) return;
-    cancelHomeDrag();
-  }
-
-  /* Snap a raw top-left (content px) for a w×h tile: prefer the
-     content edges and the other tiles' edges (aligned, or one gutter
-     apart — that's how tiles end up close together), else fall back to
-     the 48px placement grid. */
-  function snapHomePos(x, y, w, h, m, dragId){
-    const xs = [0, Math.max(0, m.W - w)];
-    const ys = [0, Math.max(0, m.H - h)];
-    homeTiles.forEach(t => {
-      if(t.id === dragId || t.style.display === 'none') return;
-      const s = tileState[t.id];
-      if(!s) return;
-      xs.push(s.x, s.x + s.w + HOME_GUTTER, s.x - w - HOME_GUTTER);
-      ys.push(s.y, s.y + s.h + HOME_GUTTER, s.y - h - HOME_GUTTER);
-    });
-    const pick = (raw, cands) => {
-      let best = null, bd = 14;
-      for(const c of cands){
-        const d = Math.abs(c - raw);
-        if(d < bd){ bd = d; best = c; }
-      }
-      return best === null ? Math.round(raw / HOME_GRID) * HOME_GRID : Math.round(best);
-    };
-    const sx = pick(x, xs);
-    const sy = pick(y, ys);
+  /* Resize freeze: dragging the SE handle changes the tile every frame,
+     and the 100%-based iframe would re-render the cross-origin map per
+     frame. Pin the iframe at its last settled box and scale the frozen
+     rendering to the new size; one re-render when the drag settles.
+     (The expand/collapse morph has its own freeze — navRender — and
+     takes precedence.) */
+  let navLastFrame = null;   // settled iframe layout box { w, h, cw, r, ox, oy }
+  let navFreeze    = null;   // active resize freeze (same shape)
+  let navFreezeT   = 0;
+  function settledFrameBox(){
+    const cs  = getComputedStyle(navFrameEl);
+    const cs0 = getComputedStyle(navSectionEl);
+    const r0  = parseFloat(cs0.getPropertyValue('--nav-zoom')) || 1;
     return {
-      x: Math.max(0, Math.min(sx, Math.max(0, m.W - w))),
-      y: Math.max(0, Math.min(sy, Math.max(0, m.H - h)))
+      w:  parseFloat(cs.width) || 0,
+      h:  parseFloat(cs.height) || 0,
+      cw: navSectionEl.clientWidth,
+      r:  r0,
+      ox: -r0 * (parseFloat(cs0.getPropertyValue('--crop-l')) || 0),
+      oy: -r0 * (parseFloat(cs0.getPropertyValue('--crop-t')) || 0)
     };
+  }
+  function settleNavResize(){
+    if(!navFreeze) return;
+    navFreeze = null;
+    navFrameEl.style.width = '';
+    navFrameEl.style.height = '';
+    navSectionEl.style.removeProperty('--nav-zoom');
+    navSectionEl.style.removeProperty('--crop-l');
+    navSectionEl.style.removeProperty('--crop-t');
+    navWrapEl.style.transform = '';
+    navWrapT = { tx: 0, ty: 0, s: 1 };
+    navLastFrame = null;   /* the unfreeze reflow re-measures it */
+  }
+  if('ResizeObserver' in window && navSectionEl && navFrameEl){
+    const navRO = new ResizeObserver(() => {
+      if(navMorph || navRender) return;        /* the morph owns the iframe */
+      if(!homeArranging){
+        settleNavResize();
+        navLastFrame = settledFrameBox();      /* settled: remember the box */
+        return;
+      }
+      /* arranging: pin at the last settled box (first tick) or keep the
+         pin and just rescale the frozen render (later ticks). */
+      const base = navFreeze || navLastFrame || settledFrameBox();
+      if(!navFreeze){
+        navFreeze = base;
+        navFrameEl.style.width  = base.w + 'px';
+        navFrameEl.style.height = base.h + 'px';
+        navSectionEl.style.setProperty('--nav-zoom', String(base.r));
+        navSectionEl.style.setProperty('--crop-l', (-base.ox / base.r) + 'px');
+        navSectionEl.style.setProperty('--crop-t', (-base.oy / base.r) + 'px');
+      }
+      const s = navSectionEl.clientWidth / (base.cw || navSectionEl.clientWidth);
+      navWrapT = { tx: 0, ty: 0, s };
+      navWrapEl.style.transform = 'scale(' + s + ')';
+      clearTimeout(navFreezeT);
+      navFreezeT = setTimeout(settleNavResize, 220);
+    });
+    navRO.observe(navSectionEl);
   }
 
   /* Hold detection: press still for 420ms to enter arrange mode.
      Any movement (>12px) or release cancels, so scrolling, the news
-     swipe and plain taps all keep working. */
+     swipe and plain taps all keep working. Once arranging, Gridstack
+     drives the drag from the grip / map layer — no manual drag code. */
   function clearHold(){
     if(holdTimer){ clearTimeout(holdTimer); holdTimer = null; }
     holdInfo = null;
@@ -4453,19 +4437,9 @@
       if(e.pointerType === 'mouse' && e.button !== 0) return;
       /* Buttons / inputs keep their own behavior. */
       if(e.target.closest('button,input,a,select,textarea,label')) return;
-      if(homeDrag){
-        /* A different pointer arrived while a drag is still active:
-           that drag's pointer never released (the button was probably
-           let go outside the window). Drop the stale drag so the UI
-           can't stay frozen. */
-        if(e.pointerId === homeDrag.pid) return;
-        cancelHomeDrag();
-      }
-      if(homeArranging){
-        e.preventDefault();
-        beginHomeDrag(tile, e.clientX, e.clientY, e.pointerId);
-        return;
-      }
+      /* Arranging: Gridstack owns the pointers (grip drag, corner
+         resize) — a hold here would only fight it. */
+      if(homeArranging) return;
       holdInfo = { tile, x: e.clientX, y: e.clientY, pid: e.pointerId };
       holdPos  = { x: e.clientX, y: e.clientY };
       /* A second pointer starting its own hold supersedes the first one —
@@ -4475,22 +4449,23 @@
       document.addEventListener('pointerup', onHoldEnd);
       document.addEventListener('pointercancel', onHoldEnd);
       holdTimer = setTimeout(() => {
-        const info = holdInfo, pos = holdPos, pid = info ? info.pid : 0;
+        const info = holdInfo;
         holdTimer = null;
         document.removeEventListener('pointermove', onHoldMove);
         document.removeEventListener('pointerup', onHoldEnd);
         document.removeEventListener('pointercancel', onHoldEnd);
         if(!info) return;
         enterHomeArrange(info.tile);
-        beginHomeDrag(info.tile, pos.x, pos.y, pid);
       }, 420);
     });
   });
 
-  /* Tap outside a tile (on empty page area) to exit arrange mode. */
+  /* Tap outside a tile (on empty page area) to exit arrange mode.
+     The resize handles live on the shell, outside .home-tile — they
+     count as inside or grabbing one would kick out of arrange mode. */
   homePageEl.addEventListener('pointerdown', (e) => {
     if(!homeArranging) return;
-    if(e.target.closest('.home-tile,.arrange-done')) return;
+    if(e.target.closest('.home-tile,.grid-stack-placeholder,.arrange-done,.ui-resizable-handle')) return;
     exitHomeArrange();
   });
 
@@ -4499,26 +4474,12 @@
     if(e.key === 'Escape' && homeArranging) exitHomeArrange();
   });
 
-  /* First paint: place tiles synchronously (no transition flash), then
-     re-enable transitions so resizes and content changes slide. */
-  homePageEl.classList.add('home-no-trans');
-  applyLayout();
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    homePageEl.classList.remove('home-no-trans');
-  }));
-
-  /* Re-layout when the window resizes or a tile's content changes
-     (news feed loading). Tiles are absolutely positioned, so nothing
-     reflows — placed tiles just clamp into the new area and keep
-     their offsets (and their gaps). */
-  window.addEventListener('resize', relayout);
-  /* If the window loses focus mid-drag (Alt-Tab, a popup) the pointerup
-     may never arrive — settle the tile instead of leaving it floating. */
-  window.addEventListener('blur', () => { if(homeDrag) cancelHomeDrag(); });
-  if('ResizeObserver' in window){
-    const homeRO = new ResizeObserver(() => relayout());
-    homeTiles.forEach(t => homeRO.observe(t));
-  }
+  /* Window resize: Gridstack re-measures the container itself; keep the
+     overlay pitch and the stock columns in sync. */
+  window.addEventListener('resize', () => {
+    syncGridOverlay();
+    renderStockTile();
+  });
   </script>
 
   <script>
@@ -4547,6 +4508,23 @@
     if(!avatarPanel || !canvas) return;
 
     const ctx = canvas.getContext('2d');
+
+    /* Keep the canvas buffer matched to the rendered box (× dpr): the
+       tile is narrower than the sprite's 150px CSS box, and a fixed
+       buffer stretched into that squashed box made the egg look
+       distorted. Square CSS + buffer-matched redraws keep it crisp. */
+    function sizeCanvas(){
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if(w < 20 || h < 20) return;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+      if(canvas.width !== bw || canvas.height !== bh){
+        canvas.width = bw; canvas.height = bh;
+      }
+    }
+    sizeCanvas();
+    if('ResizeObserver' in window) new ResizeObserver(sizeCanvas).observe(canvas);
+    window.addEventListener('resize', sizeCanvas);
     const moodLabel = document.getElementById('avatarMoodLabel');
     const infoLabel = document.getElementById('avatarInfo');
     const gpsDot = document.getElementById('avatarGpsDot');
@@ -5760,7 +5738,11 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
 
-      const scale = Math.min(120 / meta.h, 135 / meta.w, 3);
+      /* Sprite fills ~80/90% of the buffer — same ratios the original
+         fixed 150px canvas used (120/150, 135/150), so it looks
+         identical at default size and stays proportional at any tile
+         width. */
+      const scale = Math.min(canvas.height * 0.8 / meta.h, canvas.width * 0.9 / meta.w, 3);
       const dw = meta.w * scale;
       const dh = meta.h * scale;
 
@@ -5817,7 +5799,7 @@
           dh
         );
       } else {
-        const boxSize = 90;
+        const boxSize = Math.min(canvas.width, canvas.height) * 0.6;
         const bx = (canvas.width - boxSize) / 2;
         const by = (canvas.height - boxSize) / 2;
 
@@ -5839,7 +5821,7 @@
         }
 
         ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-        ctx.font = '10px Inter, sans-serif';
+        ctx.font = Math.max(9, Math.round(canvas.width * 0.067)) + 'px Inter, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(current.name, canvas.width / 2, canvas.height / 2 + 3);
       }
