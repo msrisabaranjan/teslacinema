@@ -419,6 +419,18 @@
       position:absolute;
       top:var(--hy);left:var(--hx);right:var(--hxr);
     }
+    /* Safety net: the engine normally writes inline calc() geometry on
+       each shell; if that is ever momentarily absent (drag-end style
+       restore, container var churn) the shell would collapse to a
+       point. Fall back to the per-item --gs-x/y/w/h vars the engine
+       always keeps, at the px cell pitch (--cell-w/--cell-h are set by
+       JS on #pageHome). Inline styles still win over this rule. */
+    .grid-stack>.grid-stack-item{
+      left:calc(var(--gs-x,0) * var(--cell-w,90px));
+      top:calc(var(--gs-y,0) * var(--cell-h,90px));
+      width:calc(var(--gs-w,1) * var(--cell-w,90px));
+      height:calc(var(--gs-h,1) * var(--cell-h,90px));
+    }
     /* Tiles fill their cell — the shell dictates the size. (Same
        selector as the vendored content rule, later in source order,
        so it wins: the app's cards clip, they never scroll inside.) */
@@ -433,7 +445,7 @@
     #stockTile{
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .38s) backwards;}
 
-    /* arrange mode: jiggle + drag grips */
+    /* arrange mode: drag grips + placement affordances */
     #pageHome.arranging{overflow:hidden;}
     #pageHome.arranging .home-tile{
       touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;
@@ -443,12 +455,6 @@
     #pageHome.arranging .tile-grip{pointer-events:auto;cursor:grab;}
     body.home-arranging{cursor:grabbing;}
     body.home-arranging *{user-select:none;-webkit-user-select:none;}
-    /* ID-scoped: the reveal rules below (#newsStrip…) are ID-level, a
-       plain class rule would lose the animation shorthand to them. */
-    #pageHome.arranging .home-tile.jiggling{animation:tileJiggle .3s ease-in-out infinite alternate;}
-    @keyframes tileJiggle{from{rotate:-.35deg;}to{rotate:.35deg;}}
-    /* The tile under the pointer stops wobbling while it's lifted. */
-    #pageHome.arranging .grid-stack-item.ui-draggable-dragging>.home-tile{animation:none;}
 
     /* Drag grip — Gridstack's drag handle (handle:'.tile-grip'),
        revealed only while arranging. */
@@ -2203,7 +2209,7 @@
         License: CC BY-NC 4.0 (https://creativecommons.org/licenses/by-nc/4.0/)
         Credit files: credits_red.txt, credits_starters.txt
       -->
-    <div class="grid-stack-item" gs-id="avatarPanel" gs-x="4" gs-y="4" gs-w="2" gs-h="3" gs-min-w="2" gs-min-h="3" gs-max-w="2" gs-max-h="3">
+    <div class="grid-stack-item" gs-id="avatarPanel" gs-x="4" gs-y="4" gs-w="2" gs-h="3" gs-min-w="2" gs-min-h="3" gs-max-w="2" gs-max-h="3" gs-no-resize="true">
       <aside class="grid-stack-item-content avatar-panel home-tile" id="avatarPanel" data-mood="cute" data-speed="parked">
         <div class="tile-grip" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="avatar-panel-head">
@@ -3882,10 +3888,10 @@
      dragging pushes colliding tiles and the
      grid compacts — overlap resolution and
      reflow are the library's job now. Hold a
-     tile to enter arrange mode (jiggle + grips
+     tile to enter arrange mode (grips
      + placement grid), drag the grip (the map
      tile drags from anywhere), resize from
-     the SE corner. Layout persists.
+     the SE corner (proportional). Layout persists.
      Tap outside a tile, Done or Esc to exit.
      ══════════════════════════════════════════ */
   const homePageEl = pageEls[0];
@@ -3939,7 +3945,9 @@
     handle: '.tile-grip',
     draggable: { handle: '.tile-grip', appendTo: 'parent' },
     resizable: { handles: 'se' },
-    alwaysShowResizeHandle: 'mobile'
+    alwaysShowResizeHandle: true   /* 'mobile' hides the handle on desktop
+                                      (autohide) and the drag-end hover
+                                      dance made it effectively unusable */
   }, homeGridEl);
 
   /* Restore the saved layout, migrating the legacy pixel model once. */
@@ -4013,6 +4021,47 @@
   requestAnimationFrame(() => requestAnimationFrame(() => grid.setAnimation(true)));
   syncGridOverlay();
 
+  /* ── proportional resize ──
+     Gridstack's SE-handle resize computes w and h from the cursor
+     independently, so tiles stretch out of shape. The DD resizable's
+     _constrainSize() is the single choke point every mousemove passes
+     through (raw px rect in, clamped rect out), so we wrap it: height
+     is re-derived from the clamped width using the tile's aspect at
+     resize start, bounded by the same min/max px the library enforces.
+     The engine still cell-snaps the final w/h afterwards. Installed
+     once, on the first arrange (instances only exist after setStatic). */
+  let aspectHooked = false;
+  function lockResizeAspect(){
+    if(aspectHooked) return;
+    /* The DD resizable instance lives on the element's DD wrapper
+       (el.ddElement.ddResizable), not on the engine node. */
+    const inst = grid.engine.nodes
+      .map(n => n.el.ddElement && n.el.ddElement.ddResizable).find(Boolean);
+    if(!inst) return;
+    const proto = Object.getPrototypeOf(inst);
+    if(typeof proto._constrainSize !== 'function') return;
+    aspectHooked = true;
+    const orig = proto._constrainSize;
+    proto._constrainSize = function(w, h, moveLeft, moveUp){
+      const r = orig.call(this, w, h, moveLeft, moveUp);
+      const o = this.originalRect;
+      if(!o || !o.width || !o.height) return r;
+      const A = o.width / o.height;
+      const opt = this.option, sc = this.rectScale || {x:1, y:1};
+      const maxW = (moveLeft ? opt.maxWidthMoveLeft : opt.maxWidth) || Infinity;
+      const maxH = (moveUp   ? opt.maxHeightMoveUp  : opt.maxHeight) || Infinity;
+      const minW = (opt.minWidth  || 0) / (sc.x || 1);
+      const minH = (opt.minHeight || 0) / (sc.y || 1);
+      let nw = r.width, nh = nw / A;
+      if(nh > maxH){ nh = maxH; nw = nh * A; }
+      if(minH && nh < minH){ nh = minH; nw = nh * A; }
+      if(nw > maxW){ nw = maxW; nh = nw / A; }
+      if(minW && nw < minW){ nw = minW; nh = nw / A; }
+      r.width = nw; r.height = nh;
+      return r;
+    };
+  }
+
   /* ── arrange mode ── */
   function enterHomeArrange(tile){
     /* An expanded map can't be dragged in its grown state (its box is
@@ -4021,10 +4070,10 @@
     homeArranging = true;
     document.body.classList.add('home-arranging');
     homePageEl.classList.add('arranging');
-    homeTiles.forEach(t => { if(t !== tile) t.classList.add('jiggling'); });
     arrangeDoneBtn.classList.add('show');
     arrangeDoneBtn.setAttribute('aria-hidden', 'false');
     grid.setStatic(false);
+    lockResizeAspect();
     try{ if(navigator.vibrate) navigator.vibrate(15); }catch(e){}
   }
 
@@ -4034,7 +4083,6 @@
     grid.setStatic(true);
     document.body.classList.remove('home-arranging');
     homePageEl.classList.remove('arranging');
-    homeTiles.forEach(t => t.classList.remove('jiggling'));
     arrangeDoneBtn.classList.remove('show');
     arrangeDoneBtn.setAttribute('aria-hidden', 'true');
   }
