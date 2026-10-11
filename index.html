@@ -3046,6 +3046,9 @@
 
   function openNewsPopup(item, index){
     if(!item) return;
+    /* Arrange mode: taps on the tile drag it around — never let a
+       stray tap open the summary popup mid-rearrange. */
+    if(document.body.classList.contains('home-arranging')) return;
     const pop  = document.getElementById('newsPop');
     const card = document.getElementById('newsPopCard');
     const imgW = document.getElementById('newsPopImg');
@@ -3181,6 +3184,7 @@
       more.setAttribute('aria-label', 'Open article');
       more.addEventListener('click', (e) => {
         e.stopPropagation();
+        if(document.body.classList.contains('home-arranging')) return;
         if(item.link) openUrl(item.link);
         else openNewsPopup(item, i);
       });
