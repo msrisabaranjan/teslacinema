@@ -4009,6 +4009,17 @@
     homePageEl.style.setProperty('--cell-h', GRID_ROW_H + 'px');
   }
 
+  /* Rows that fit inside the visible content area: grid top offset +
+     R*cell + (R+1)*margin must stay within the page box. Used as the
+     grid's maxRow, so no tile can ever be placed or dragged below the
+     visible area (columns are already bounded by the 12-col width). */
+  function homeMaxRow(){
+    const pageR = homePageEl.getBoundingClientRect();
+    const gridTop = homeGridEl.getBoundingClientRect().top - pageR.top;
+    const avail = pageR.height - gridTop - GRID_MARGIN;   /* bottom breathing room */
+    return Math.max(3, Math.floor(avail / (GRID_ROW_H + GRID_MARGIN)));
+  }
+
   /* ── The grid ──
      staticGrid starts true: display-only until arrange mode. The drag
      handle is the grip pill, so the news swipe, the map iframe and the
@@ -4019,6 +4030,7 @@
     column: GRID_COLS,
     cellHeight: GRID_ROW_H,
     margin: GRID_MARGIN,
+    maxRow: homeMaxRow(),               /* tiles stay on-screen */
     staticGrid: true,
     animate: false,                     /* first paint: no slide-in */
     handle: '.tile-grip',
@@ -4475,9 +4487,14 @@
   });
 
   /* Window resize: Gridstack re-measures the container itself; keep the
-     overlay pitch and the stock columns in sync. */
+     overlay pitch, the on-screen row bound and the stock columns in sync. */
   window.addEventListener('resize', () => {
     syncGridOverlay();
+    const mr = homeMaxRow();
+    if(mr !== grid.opts.maxRow){
+      grid.opts.maxRow = mr;
+      grid.updateContainerDimensions();
+    }
     renderStockTile();
   });
   </script>
