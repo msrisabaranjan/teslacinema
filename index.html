@@ -4092,47 +4092,6 @@
   requestAnimationFrame(() => requestAnimationFrame(() => grid.setAnimation(true)));
   syncGridOverlay();
 
-  /* ── proportional resize ──
-     Gridstack's SE-handle resize computes w and h from the cursor
-     independently, so tiles stretch out of shape. The DD resizable's
-     _constrainSize() is the single choke point every mousemove passes
-     through (raw px rect in, clamped rect out), so we wrap it: height
-     is re-derived from the clamped width using the tile's aspect at
-     resize start, bounded by the same min/max px the library enforces.
-     The engine still cell-snaps the final w/h afterwards. Installed
-     once, on the first arrange (instances only exist after setStatic). */
-  let aspectHooked = false;
-  function lockResizeAspect(){
-    if(aspectHooked) return;
-    /* The DD resizable instance lives on the element's DD wrapper
-       (el.ddElement.ddResizable), not on the engine node. */
-    const inst = grid.engine.nodes
-      .map(n => n.el.ddElement && n.el.ddElement.ddResizable).find(Boolean);
-    if(!inst) return;
-    const proto = Object.getPrototypeOf(inst);
-    if(typeof proto._constrainSize !== 'function') return;
-    aspectHooked = true;
-    const orig = proto._constrainSize;
-    proto._constrainSize = function(w, h, moveLeft, moveUp){
-      const r = orig.call(this, w, h, moveLeft, moveUp);
-      const o = this.originalRect;
-      if(!o || !o.width || !o.height) return r;
-      const A = o.width / o.height;
-      const opt = this.option, sc = this.rectScale || {x:1, y:1};
-      const maxW = (moveLeft ? opt.maxWidthMoveLeft : opt.maxWidth) || Infinity;
-      const maxH = (moveUp   ? opt.maxHeightMoveUp  : opt.maxHeight) || Infinity;
-      const minW = (opt.minWidth  || 0) / (sc.x || 1);
-      const minH = (opt.minHeight || 0) / (sc.y || 1);
-      let nw = r.width, nh = nw / A;
-      if(nh > maxH){ nh = maxH; nw = nh * A; }
-      if(minH && nh < minH){ nh = minH; nw = nh * A; }
-      if(nw > maxW){ nw = maxW; nh = nw / A; }
-      if(minW && nw < minW){ nw = minW; nh = nw / A; }
-      r.width = nw; r.height = nh;
-      return r;
-    };
-  }
-
   /* ── arrange mode ── */
   function enterHomeArrange(tile){
     /* An expanded map can't be dragged in its grown state (its box is
@@ -4144,7 +4103,6 @@
     arrangeDoneBtn.classList.add('show');
     arrangeDoneBtn.setAttribute('aria-hidden', 'false');
     grid.setStatic(false);
-    lockResizeAspect();
     try{ if(navigator.vibrate) navigator.vibrate(15); }catch(e){}
   }
 
