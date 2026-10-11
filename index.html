@@ -768,8 +768,10 @@
     }
     .avatar-sprite{
       width:150px;
-      height:150px;
+      height:auto;
+      aspect-ratio:1;
       max-width:100%;
+      max-height:100%;
       overflow:visible;
       display:block;
     }
@@ -799,7 +801,10 @@
     /* ── NEW SPRITE AVATAR ── */
     #avatarCanvas {
       width: 150px;
-      height: 150px;
+      height: auto;
+      aspect-ratio: 1;
+      max-width: 100%;
+      max-height: 100%;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
       background: transparent;
@@ -867,12 +872,12 @@
 
     @media (max-width:1100px){
       .avatar-panel{min-height:210px;}
-      .avatar-sprite,#avatarCanvas{width:130px;height:130px;}
+      .avatar-sprite,#avatarCanvas{width:130px;}
     }
     @media (max-width:720px){
       #pageHome{--hx:16px;--hy:14px;--hxr:100px;}
       .avatar-panel{min-height:190px;}
-      .avatar-sprite,#avatarCanvas{width:110px;height:110px;}
+      .avatar-sprite,#avatarCanvas{width:110px;}
     }
     @media (max-width:520px){
       .avatar-panel{min-height:160px;}
@@ -4499,6 +4504,23 @@
     if(!avatarPanel || !canvas) return;
 
     const ctx = canvas.getContext('2d');
+
+    /* Keep the canvas buffer matched to the rendered box (× dpr): the
+       tile is narrower than the sprite's 150px CSS box, and a fixed
+       buffer stretched into that squashed box made the egg look
+       distorted. Square CSS + buffer-matched redraws keep it crisp. */
+    function sizeCanvas(){
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if(w < 20 || h < 20) return;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const bw = Math.round(w * dpr), bh = Math.round(h * dpr);
+      if(canvas.width !== bw || canvas.height !== bh){
+        canvas.width = bw; canvas.height = bh;
+      }
+    }
+    sizeCanvas();
+    if('ResizeObserver' in window) new ResizeObserver(sizeCanvas).observe(canvas);
+    window.addEventListener('resize', sizeCanvas);
     const moodLabel = document.getElementById('avatarMoodLabel');
     const infoLabel = document.getElementById('avatarInfo');
     const gpsDot = document.getElementById('avatarGpsDot');
@@ -5712,7 +5734,11 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = false;
 
-      const scale = Math.min(120 / meta.h, 135 / meta.w, 3);
+      /* Sprite fills ~80/90% of the buffer — same ratios the original
+         fixed 150px canvas used (120/150, 135/150), so it looks
+         identical at default size and stays proportional at any tile
+         width. */
+      const scale = Math.min(canvas.height * 0.8 / meta.h, canvas.width * 0.9 / meta.w, 3);
       const dw = meta.w * scale;
       const dh = meta.h * scale;
 
@@ -5769,7 +5795,7 @@
           dh
         );
       } else {
-        const boxSize = 90;
+        const boxSize = Math.min(canvas.width, canvas.height) * 0.6;
         const bx = (canvas.width - boxSize) / 2;
         const by = (canvas.height - boxSize) / 2;
 
@@ -5791,7 +5817,7 @@
         }
 
         ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-        ctx.font = '10px Inter, sans-serif';
+        ctx.font = Math.max(9, Math.round(canvas.width * 0.067)) + 'px Inter, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(current.name, canvas.width / 2, canvas.height / 2 + 3);
       }
