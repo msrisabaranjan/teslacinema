@@ -4422,10 +4422,12 @@
     });
   });
 
-  /* Tap outside a tile (on empty page area) to exit arrange mode. */
+  /* Tap outside a tile (on empty page area) to exit arrange mode.
+     The resize handles live on the shell, outside .home-tile — they
+     count as inside or grabbing one would kick out of arrange mode. */
   homePageEl.addEventListener('pointerdown', (e) => {
     if(!homeArranging) return;
-    if(e.target.closest('.home-tile,.grid-stack-placeholder,.arrange-done')) return;
+    if(e.target.closest('.home-tile,.grid-stack-placeholder,.arrange-done,.ui-resizable-handle')) return;
     exitHomeArrange();
   });
 
