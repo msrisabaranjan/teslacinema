@@ -218,7 +218,7 @@
       margin-top:2px;
       font-size:12px;font-weight:600;color:var(--muted);
       font-variant-numeric:tabular-nums;
-      white-space:nowrap;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     }
     .sp-cur{font-size:9px;font-weight:700;letter-spacing:.04em;color:var(--muted2);margin:0 4px 0 2px;}
     .sp-chg{font-size:12px;font-weight:800;}
@@ -421,25 +421,39 @@
        grid metrics for the placement overlay. */
     #pageHome{
       /* position:relative would override .page's absolute;inset:0 and
-         collapse the page to its padding height — keep .page's box. */
+         collapse the page to its padding height — keep .page's box.
+         No scrolling: fitHomeGrid() scales the row pitch so every
+         occupied row stays inside the viewport. */
       padding:0 0 140px 0;
+      overflow:hidden;
       --hx:24px;--hy:16px;--hxr:104px;
     }
     #homeGrid{
       position:absolute;
       top:var(--hy);left:var(--hx);right:var(--hxr);
+      /* Gridstack sizes the container to the occupied rows, but its
+         droppable rect IS the container box — a tile dragged below it
+         is treated as "left the grid" and snaps back. fitHomeGrid()
+         stretches the box (px min-height — the engine parseHeight()s
+         it, so no calc() here) over the whole usable area so the
+         empty rows under the layout stay reachable for drags/resizes. */
     }
     /* Safety net: the engine normally writes inline calc() geometry on
        each shell; if that is ever momentarily absent (drag-end style
        restore, container var churn) the shell would collapse to a
        point. Fall back to the per-item --gs-x/y/w/h vars the engine
        always keeps, at the px cell pitch (--cell-w/--cell-h are set by
-       JS on #pageHome). Inline styles still win over this rule. */
+       JS on #pageHome). Inline styles still win over this rule.
+       NOTE: left needs the same :not(.grid-stack-rtl) selector the
+       vendored left:0 rule uses — a plain 2-class selector loses that
+       specificity fight and the shell collapses to the left edge. */
     .grid-stack>.grid-stack-item{
-      left:calc(var(--gs-x,0) * var(--cell-w,90px));
       top:calc(var(--gs-y,0) * var(--cell-h,90px));
       width:calc(var(--gs-w,1) * var(--cell-w,90px));
       height:calc(var(--gs-h,1) * var(--cell-h,90px));
+    }
+    .grid-stack:not(.grid-stack-rtl)>.grid-stack-item{
+      left:calc(var(--gs-x,0) * var(--cell-w,90px));
     }
     /* Tiles fill their cell — the shell dictates the size. (Same
        selector as the vendored content rule, later in source order,
@@ -484,7 +498,7 @@
        metrics so the lines sit on the cell edges. */
     #pageHome::after{
       content:'';position:absolute;
-      top:var(--hy);left:var(--hx);right:var(--hxr);bottom:0;
+      top:var(--hy);left:var(--hx);right:var(--hxr);bottom:var(--hb,140px);
       pointer-events:none;z-index:5;
       background-image:
         linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),
@@ -518,15 +532,45 @@
       opacity:.75;
     }
     .arrange-done{
-      position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
-      z-index:510;pointer-events:none;opacity:0;
-      border:1px solid var(--border);border-radius:999px;
-      padding:9px 18px;background:rgba(255,255,255,.08);
-      color:#fff;font-size:12px;font-weight:700;letter-spacing:.08em;
+      /* Right edge, centered in the vertical gap between the page rail
+         (bottom edge at 50% + 76px) and the fullscreen button (top edge
+         52px up) — midpoint = 25% of viewport height minus half the
+         gap; translateY(50%) centers the button on that point.
+         "DONE" spelled vertically; frosted glass + corner radius match
+         the rail, muted→bright text and press feedback match fs-btn.
+         36px wide = fs-btn diameter; flex centers the letter stack.
+         z above gridstack's .ui-draggable-dragging (10000) so dragged
+         tiles pass UNDER it. */
+      position:fixed;right:14px;bottom:calc(25% - 12px);
+      transform:translateY(50%);
+      z-index:10001;pointer-events:none;opacity:0;
+      width:36px;box-sizing:border-box;
+      display:flex;align-items:center;justify-content:center;
+      border:1px solid rgba(255,255,255,.10);border-radius:20px;
+      padding:14px 0;
+      background:rgba(20,20,26,.32);
+      backdrop-filter:blur(12px) saturate(1.2);
+      -webkit-backdrop-filter:blur(12px) saturate(1.2);
+      box-shadow:0 10px 26px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.06);
+      color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.14em;
       text-transform:uppercase;cursor:pointer;
-      transition:opacity .18s var(--ease-out),background .18s;
+      writing-mode:vertical-rl;text-orientation:upright;
+      transition:
+        background .25s var(--ease-smooth),
+        border-color .25s var(--ease-smooth),
+        color .25s var(--ease-smooth),
+        transform .35s var(--ease-spring),
+        opacity .18s var(--ease-out);
     }
-    .arrange-done:hover{background:rgba(255,255,255,.14);}
+    .arrange-done:hover{
+      color:var(--text);
+      border-color:rgba(255,255,255,.28);
+      background:rgba(255,255,255,.07);
+    }
+    .arrange-done:active{
+      background:var(--accent-soft);border-color:var(--accent);color:#fff;
+      transform:translateY(50%) scale(.92);
+    }
     .arrange-done.show{opacity:1;pointer-events:auto;}
 
     .news-strip{
@@ -767,7 +811,8 @@
       overflow:hidden;
     }
     .avatar-sprite{
-      width:150px;
+      /* fluid: grows with the resizable tile, capped so pixel art stays crisp */
+      width:min(100%,240px);
       height:auto;
       aspect-ratio:1;
       max-width:100%;
@@ -800,7 +845,7 @@
 
     /* ── NEW SPRITE AVATAR ── */
     #avatarCanvas {
-      width: 150px;
+      width: min(100%, 240px);
       height: auto;
       aspect-ratio: 1;
       max-width: 100%;
@@ -872,12 +917,12 @@
 
     @media (max-width:1100px){
       .avatar-panel{min-height:210px;}
-      .avatar-sprite,#avatarCanvas{width:130px;}
+      .avatar-sprite,#avatarCanvas{width:min(100%,160px);}
     }
     @media (max-width:720px){
       #pageHome{--hx:16px;--hy:14px;--hxr:100px;}
       .avatar-panel{min-height:190px;}
-      .avatar-sprite,#avatarCanvas{width:110px;}
+      .avatar-sprite,#avatarCanvas{width:min(100%,130px);}
     }
     @media (max-width:520px){
       .avatar-panel{min-height:160px;}
@@ -2185,7 +2230,7 @@
     <div class="grid-stack" id="homeGrid">
 
     <!-- NEWS (home tile — hold to rearrange) -->
-    <div class="grid-stack-item" gs-id="newsStrip" gs-x="0" gs-y="0" gs-w="7" gs-h="4" gs-min-w="4" gs-min-h="3" gs-max-w="12" gs-max-h="5">
+    <div class="grid-stack-item" gs-id="newsStrip" gs-x="0" gs-y="0" gs-w="7" gs-h="4" gs-min-w="4" gs-min-h="2" gs-max-w="12" gs-max-h="5">
       <div class="grid-stack-item-content news-strip home-tile" id="newsStrip">
         <div class="tile-grip" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="news-header">
@@ -2229,11 +2274,11 @@
         License: CC BY-NC 4.0 (https://creativecommons.org/licenses/by-nc/4.0/)
         Credit files: credits_red.txt, credits_starters.txt
       -->
-    <div class="grid-stack-item" gs-id="avatarPanel" gs-x="4" gs-y="4" gs-w="2" gs-h="3" gs-min-w="2" gs-min-h="3" gs-max-w="2" gs-max-h="3" gs-no-resize="true">
+    <div class="grid-stack-item" gs-id="avatarPanel" gs-x="4" gs-y="4" gs-w="2" gs-h="3" gs-min-w="2" gs-min-h="2" gs-max-w="4" gs-max-h="5">
       <aside class="grid-stack-item-content avatar-panel home-tile" id="avatarPanel" data-mood="cute" data-speed="parked">
         <div class="tile-grip" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="avatar-panel-head">
-          <span>Companion · <span id="avatarFormLabel">Egg</span></span>
+          <span id="avatarFormLabel">Egg</span>
           <span class="avatar-head-dot" id="avatarGpsDot"></span>
         </div>
 
@@ -2249,7 +2294,7 @@
     </div>
 
     <!-- NAV MAP (home tile — hold to rearrange) — seamless live TeslaNav map -->
-    <div class="grid-stack-item" id="navItem" gs-id="navSection" gs-x="0" gs-y="4" gs-w="4" gs-h="4" gs-min-w="3" gs-min-h="3" gs-max-w="5" gs-max-h="5">
+    <div class="grid-stack-item" id="navItem" gs-id="navSection" gs-x="0" gs-y="4" gs-w="4" gs-h="4" gs-min-w="3" gs-min-h="2" gs-max-w="5" gs-max-h="5">
       <div class="grid-stack-item-content nav-section home-tile" id="navSection">
         <!-- no .tile-grip: with no handle match Gridstack drags the whole
              item, and the .nav-drag-layer above the iframe catches the
@@ -2271,7 +2316,7 @@
 
     <!-- STOCKS (home tile — hold to rearrange) — live tickers,
          best performer auto-sorts to the top of the list -->
-    <div class="grid-stack-item" gs-id="stockTile" gs-x="7" gs-y="0" gs-w="5" gs-h="4" gs-min-w="3" gs-min-h="3" gs-max-w="6" gs-max-h="5">
+    <div class="grid-stack-item" gs-id="stockTile" gs-x="7" gs-y="0" gs-w="5" gs-h="4" gs-min-w="3" gs-min-h="2" gs-max-w="6" gs-max-h="5">
       <div class="grid-stack-item-content stock-tile home-tile" id="stockTile">
         <div class="tile-grip" aria-hidden="true"><i></i><i></i><i></i></div>
       <div class="stock-head">
@@ -2287,10 +2332,12 @@
     </div>
 
     </div><!-- /#homeGrid -->
-
-    <!-- ARRANGE MODE — exit pill -->
-    <button class="arrange-done" id="arrangeDone" aria-hidden="true">Done</button>
     </div>
+
+    <!-- ARRANGE MODE — exit pill. Lives at body level (not inside
+         #pageHome, whose transform would capture position:fixed) so it
+         aligns with the rail/fs-btn and stacks over dragged tiles. -->
+    <button class="arrange-done" id="arrangeDone" aria-hidden="true">Done</button>
 
     <!-- ── PAGE · STREAMS ── -->
     <div class="page pos-below" id="pageStreams">
@@ -2693,10 +2740,12 @@
     const H      = list.clientHeight;
     if(W <= 60 || H <= 40) return;   /* tile size not settled yet (pre-layout) */
 
-    /* Fit pass: two columns only when each can be ≥130px; shrink rows
-       to fit the tile (never below 36px); if even that doesn't fit,
-       hide the worst performers so what IS shown never overlaps. */
-    const cols = (W >= 2 * 130 + colGap) ? STOCK_COLS : 1;
+    /* Fit pass: two columns only when each can hold a full row —
+       ~70px of rank/badge overhead plus a ~112px price line — else
+       one column; shrink rows to fit the tile (never below 36px);
+       if even that doesn't fit, hide the worst performers so what
+       IS shown never overlaps. */
+    const cols = (W >= 2 * 185 + colGap) ? STOCK_COLS : 1;
     let rowH = 52, visible = ALL_SYMS.length;
     for(let n = ALL_SYMS.length; n >= 1; n--){
       const rows = Math.ceil(n / cols);
@@ -4009,7 +4058,54 @@
   function syncGridOverlay(){
     const m = homeMetrics();
     homePageEl.style.setProperty('--cell-w', (m.W / GRID_COLS) + 'px');
-    homePageEl.style.setProperty('--cell-h', GRID_ROW_H + 'px');
+    /* live pitch — fitHomeGrid() may have scaled the row height away
+       from the GRID_ROW_H default, and the overlay must sit on the
+       real cell edges */
+    const ch = parseFloat(grid.opts.cellHeight) || GRID_ROW_H;
+    homePageEl.style.setProperty('--cell-h', ch + 'px');
+  }
+
+  /* Home never scrolls: scale the cell pitch so every occupied row
+     fits the visible area. The bottom reserve (--hb) mirrors the
+     now-playing bar's lane when it's up and collapses to a small
+     gutter when it's down — it feeds fitHomeGrid(), the grid
+     container's min-height, and the placement overlay, so the
+     droppable area and the drawn boxes always match. Gridstack
+     drives all item geometry from --gs-cell-height, so one setter
+     call re-fits the whole layout; tiles still resize freely — the
+     cells just shrink to keep everything on-screen. */
+  const npBarEl = document.getElementById('nowPlaying');
+  function homeBottomReserve(){
+    return (npBarEl && npBarEl.classList.contains('visible')) ? 140 : 24;
+  }
+  function fitHomeGrid(){
+    const cs = getComputedStyle(homePageEl);
+    const oy = parseFloat(cs.getPropertyValue('--hy')) || 16;
+    const reserve = homeBottomReserve();
+    homePageEl.style.setProperty('--hb', reserve + 'px');
+    const rows = Math.max(1, grid.getRow());
+    const avail = homePageEl.clientHeight - oy - reserve;
+    /* Never stretch past the design pitch — rows only shrink to fit,
+       so placement boxes stay near-square instead of turning into
+       tall rectangles when few rows are occupied. The leftover
+       bottom space stays droppable (container min-height covers it). */
+    const cell = Math.max(40, Math.min(GRID_ROW_H, Math.floor(avail / rows)));
+    /* Stretch the droppable box to the usable area (px, not calc() —
+       the engine parseHeight()s the container's min-height). */
+    homeGridEl.style.minHeight = avail + 'px';
+    grid.cellHeight(cell);
+    syncGridOverlay();
+  }
+  /* The bar shows/hides from the player code — refit when its class
+     flips so tiles claim the freed strip (or duck under the bar). */
+  if(npBarEl){
+    let npWasVisible = npBarEl.classList.contains('visible');
+    new MutationObserver(() => {
+      const v = npBarEl.classList.contains('visible');
+      if(v === npWasVisible) return;
+      npWasVisible = v;
+      fitHomeGrid();
+    }).observe(npBarEl, {attributes:true, attributeFilter:['class']});
   }
 
   /* ── The grid ──
@@ -4023,6 +4119,9 @@
     cellHeight: GRID_ROW_H,
     margin: GRID_MARGIN,
     staticGrid: true,
+    float: true,                        /* free placement: tiles stay where
+                                           dropped — no vertical compaction
+                                           yanking them back over empty rows */
     animate: false,                     /* first paint: no slide-in */
     handle: '.tile-grip',
     draggable: { handle: '.tile-grip', appendTo: 'parent' },
@@ -4087,13 +4186,15 @@
   grid.on('change', () => {
     renderStockTile();
     fitNewsTile();
+    fitHomeGrid();
     if(saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       try{
-        /* Geometry only — save() also serializes each node's content
-           HTML, and load() would re-inject that stale markup (killing
-           the live DOM + its listeners) on the next boot. */
-        const items = grid.save().map(n => ({id:n.id, x:n.x, y:n.y, w:n.w, h:n.h}));
+        /* Geometry only, read from the live engine nodes — save()
+           strips w/h when they equal minW/minH (its "implicit"
+           optimization), which would make a tile snapped to its
+           minimum reload at the DOM default and collide. */
+        const items = grid.engine.nodes.map(n => ({id:n.id, x:n.x, y:n.y, w:n.w, h:n.h}));
         localStorage.setItem(HOME_GRID_KEY, JSON.stringify(items));
         localStorage.removeItem(HOME_POS_KEY);
       }catch(e){}
@@ -4102,7 +4203,7 @@
 
   /* First paint settled — let later moves slide. */
   requestAnimationFrame(() => requestAnimationFrame(() => grid.setAnimation(true)));
-  syncGridOverlay();
+  fitHomeGrid();
 
   /* ── arrange mode ── */
   function enterHomeArrange(tile){
@@ -4478,9 +4579,9 @@
   });
 
   /* Window resize: Gridstack re-measures the container itself; keep the
-     overlay pitch and the stock columns in sync. */
+     overlay pitch, the on-screen fit and the stock columns in sync. */
   window.addEventListener('resize', () => {
-    syncGridOverlay();
+    fitHomeGrid();
     renderStockTile();
   });
   </script>
