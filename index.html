@@ -468,6 +468,8 @@
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .3s) backwards;}
     #stockTile{
       animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .38s) backwards;}
+    #streamWidget{
+      animation:cardReveal .7s var(--ease-out) calc(var(--boot-delay) + .46s) backwards;}
 
     /* arrange mode: drag grips + placement affordances */
     #pageHome.arranging{overflow:hidden;}
@@ -1159,6 +1161,203 @@
       font-size:11px;color:var(--muted2);
     }
 
+    /* ── STREAM WIDGET (Twitch / YouTube category tiles) ── */
+    .stream-tile{
+      display:flex;flex-direction:column;
+      border:1px solid var(--border);
+      border-radius:18px;
+      overflow:hidden;
+      background:
+        linear-gradient(180deg,hsl(var(--h) 73% 42% /.08),transparent 42%),
+        var(--surface);
+      box-shadow:var(--tile-shadow);
+    }
+    .sw-head{
+      display:flex;align-items:center;gap:8px;
+      padding:8px 12px 8px 14px;border-bottom:1px solid var(--border);
+    }
+    /* Category pills (All / Twitch / YouTube) — mock's chip row */
+    .sw-pills{display:flex;align-items:center;gap:6px;min-width:0;}
+    .sw-pill{
+      appearance:none;border:none;cursor:pointer;
+      height:26px;padding:0 12px;border-radius:999px;
+      background:transparent;color:var(--muted);
+      font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.01em;
+      white-space:nowrap;
+      transition:background .25s var(--ease-smooth),color .25s var(--ease-smooth),transform .3s var(--ease-spring);
+    }
+    .sw-pill:hover{color:var(--text);}
+    .sw-pill:active{transform:scale(.94);}
+    .sw-pill.active{background:#fff;color:#111;}
+    .sw-updated{
+      margin-left:auto;
+      font-size:10px;font-weight:600;color:var(--muted2);
+      font-variant-numeric:tabular-nums;white-space:nowrap;
+    }
+    .stream-tile.sw-narrow .sw-updated{display:none;}
+    /* 2-col card grid (mock's layout); auto-fill keeps 1 col on
+       narrow tiles. fitStreamWidget() hides cards past capacity. */
+    .sw-grid{
+      position:relative;flex:1 1 auto;min-height:0;
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+      grid-auto-rows:minmax(56px,1fr);
+      gap:6px;padding:8px 10px 10px;
+    }
+    .sw-card{
+      appearance:none;border:none;cursor:pointer;
+      display:flex;align-items:center;gap:9px;
+      min-width:0;min-height:0;padding:6px;border-radius:8px;
+      background:rgba(255,255,255,.025);
+      text-align:left;font-family:inherit;color:var(--text);
+      transition:background .3s var(--ease-smooth),transform .3s var(--ease-spring);
+      animation:cardReveal .5s var(--ease-out) backwards;
+    }
+    .sw-card:hover{background:rgba(255,255,255,.06);}
+    .sw-card:active{transform:scale(.97);}
+    .sw-thumb{
+      position:relative;flex-shrink:0;
+      width:64px;height:36px;border-radius:6px;
+      overflow:hidden;background:var(--surface-em);
+    }
+    .sw-thumb img{
+      width:100%;height:100%;object-fit:cover;display:block;
+      transition:opacity .3s var(--ease-smooth);
+    }
+    .sw-thumb img.bad{opacity:0;}
+    /* placeholder thumbs (YouTube stubs): brand-tinted gradient */
+    .sw-thumb.stub::after{
+      content:'';position:absolute;inset:0;
+      background:linear-gradient(150deg,hsl(263 70% 55% /.35),transparent 60%),var(--surface-em);
+    }
+    .sw-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+    .sw-title{
+      font-size:12px;font-weight:600;line-height:1.25;letter-spacing:-.01em;
+      color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .sw-meta{
+      display:flex;align-items:center;gap:8px;min-width:0;
+      font-size:10px;font-weight:600;color:var(--muted);
+    }
+    .sw-name{
+      min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .sw-views{
+      margin-left:auto;flex-shrink:0;
+      display:inline-flex;align-items:center;gap:4px;
+      color:var(--muted2);font-variant-numeric:tabular-nums;
+    }
+    .sw-views svg{width:9px;height:9px;fill:var(--accent-2);}
+    .sw-views.live{color:var(--red);}
+    .sw-views.live svg{fill:var(--red);}
+    .sw-soon{
+      flex-shrink:0;font-size:8px;font-weight:800;letter-spacing:.08em;
+      text-transform:uppercase;color:var(--muted2);
+    }
+    /* loading skeletons (same family as the news tile's) */
+    .sw-skel{
+      display:flex;align-items:center;gap:9px;padding:6px;border-radius:8px;
+    }
+    .sw-skel-thumb{
+      width:64px;height:36px;border-radius:6px;flex-shrink:0;
+      background:var(--surface-em);
+      animation:pulse .9s ease infinite;
+    }
+    .sw-skel-lines{flex:1;display:flex;flex-direction:column;gap:5px;min-width:0;}
+    .sw-skel-bar{
+      height:9px;border-radius:5px;background:var(--surface-em);
+      animation:pulse .9s ease infinite;
+    }
+    .sw-empty{
+      grid-column:1/-1;align-self:center;text-align:center;
+      font-size:12px;font-weight:600;color:var(--muted2);
+    }
+
+    /* ── STREAM POPUP (player + chat side by side) ── */
+    .sw-pop{
+      /* above the page rail (600) + island bar (650) — the modal
+         dims the chrome instead of colliding with it. */
+      position:fixed;inset:0;z-index:700;
+      display:flex;align-items:center;justify-content:center;
+      padding:20px;
+      background:rgba(0,0,0,.76);
+      -webkit-backdrop-filter:blur(14px);
+      backdrop-filter:blur(14px);
+      opacity:0;visibility:hidden;pointer-events:none;
+      transition:opacity .32s var(--ease-smooth),visibility .32s var(--ease-smooth);
+    }
+    .sw-pop.open{opacity:1;visibility:visible;pointer-events:auto;}
+    .sw-pop-card{
+      width:min(1180px,100%);
+      height:min(88vh,820px);
+      background:#121216;
+      border:1px solid var(--border-em);
+      border-radius:22px;
+      overflow:hidden;
+      display:flex;flex-direction:column;
+      box-shadow:0 30px 80px rgba(0,0,0,.58),var(--tile-shadow);
+      transform:translateY(18px) scale(.96);
+      opacity:.7;
+      transition:transform .42s var(--ease-spring),opacity .32s var(--ease-out);
+    }
+    .sw-pop.open .sw-pop-card{transform:none;opacity:1;}
+    .sw-pop-head{
+      display:flex;align-items:center;gap:12px;
+      padding:12px 16px;border-bottom:1px solid var(--border);
+      flex-shrink:0;min-width:0;
+    }
+    .sw-pop-live{
+      display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
+      font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--red);
+    }
+    .sw-pop-live i{
+      width:7px;height:7px;border-radius:50%;background:var(--red);
+      animation:swRedPulse 1.8s var(--ease-smooth) infinite;
+    }
+    @keyframes swRedPulse{
+      0%   {box-shadow:0 0 0 0 rgba(255,69,58,.55);transform:scale(1);}
+      70%  {box-shadow:0 0 0 7px rgba(255,69,58,0);transform:scale(1.12);}
+      100% {box-shadow:0 0 0 0 rgba(255,69,58,0);transform:scale(1);}
+    }
+    .sw-pop-title{
+      min-width:0;flex:1;
+      font-size:15px;font-weight:700;color:#fff;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .sw-pop-views{
+      flex-shrink:0;display:inline-flex;align-items:center;gap:5px;
+      font-size:12px;font-weight:700;color:var(--muted);
+      font-variant-numeric:tabular-nums;
+    }
+    .sw-pop-views svg{width:12px;height:12px;fill:var(--red);}
+    .sw-pop-close{
+      appearance:none;border:none;cursor:pointer;flex-shrink:0;
+      width:36px;height:36px;border-radius:50%;
+      background:rgba(255,255,255,.07);color:#fff;
+      display:flex;align-items:center;justify-content:center;
+      transition:background .25s var(--ease-smooth),transform .3s var(--ease-spring);
+    }
+    .sw-pop-close:hover{background:rgba(255,255,255,.14);}
+    .sw-pop-close:active{transform:scale(.9);}
+    .sw-pop-close svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;}
+    .sw-pop-body{
+      flex:1 1 auto;min-height:0;
+      display:flex;gap:1px;background:var(--border);
+    }
+    .sw-pop-player{
+      flex:1.8 1 0;min-width:0;background:#000;
+      display:flex;align-items:center;justify-content:center;
+    }
+    .sw-pop-player iframe{width:100%;height:100%;border:0;display:block;}
+    .sw-pop-chat{
+      flex:1 1 0;min-width:260px;background:#0e0e12;
+    }
+    .sw-pop-chat iframe{width:100%;height:100%;border:0;display:block;}
+    @media (max-width:860px){
+      .sw-pop-body{flex-direction:column;}
+      .sw-pop-chat{min-width:0;min-height:220px;}
+    }
+
     /* ── SECTIONS ── */
     /* Page viewport: three stacked full-screen pages (home / streams / filler) */
     main.page-viewport{
@@ -1811,6 +2010,8 @@
     .avatar-panel,
     .nav-section,
     .stock-tile,
+    .stream-tile,
+    .sw-pop-card,
     .news-pop-card{
       border-radius:8px;
     }
@@ -2331,6 +2532,24 @@
       </div>
     </div>
 
+    <!-- STREAM WIDGET (home tile — hold to rearrange) — Twitch/YouTube
+         category pills + live stream cards; tap a card for the
+         player+chat popup -->
+    <div class="grid-stack-item" gs-id="streamWidget" gs-x="8" gs-y="4" gs-w="4" gs-h="3" gs-min-w="3" gs-min-h="2" gs-max-w="6" gs-max-h="5">
+      <div class="grid-stack-item-content stream-tile home-tile" id="streamWidget">
+        <div class="tile-grip" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="sw-head">
+          <div class="sw-pills" role="tablist" aria-label="Stream categories">
+            <button class="sw-pill active" type="button" role="tab" aria-selected="true" data-cat="all">All</button>
+            <button class="sw-pill" type="button" role="tab" aria-selected="false" data-cat="twitch">Twitch</button>
+            <button class="sw-pill" type="button" role="tab" aria-selected="false" data-cat="youtube">YouTube</button>
+          </div>
+          <span class="sw-updated" id="swUpdated"></span>
+        </div>
+        <div class="sw-grid" id="swGrid"></div>
+      </div>
+    </div>
+
     </div><!-- /#homeGrid -->
     </div>
 
@@ -2404,6 +2623,35 @@
         </div>
       </div>
     </article>
+  </div>
+
+  <!-- STREAM POPUP (global overlay) — Twitch player + chat side by side -->
+  <div class="sw-pop" id="swPop" aria-hidden="true">
+    <div class="sw-pop-card" role="dialog" aria-modal="true" aria-labelledby="swPopTitle">
+      <header class="sw-pop-head">
+        <span class="sw-pop-live"><i></i>LIVE</span>
+        <span class="sw-pop-title" id="swPopTitle"></span>
+        <span class="sw-pop-views" id="swPopViews">
+          <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.7 7.6 1 12c1.7 4.4 6 7.5 11 7.5s9.3-3.1 11-7.5c-1.7-4.4-6-7.5-11-7.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
+          <span id="swPopViewCount"></span>
+        </span>
+        <button class="sw-pop-close" id="swPopClose" type="button" aria-label="Close stream" title="Close">
+          <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </header>
+      <div class="sw-pop-body">
+        <div class="sw-pop-player">
+          <iframe id="swPlayerFrame" title="Twitch stream"
+                  allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                  allowfullscreen></iframe>
+        </div>
+        <div class="sw-pop-chat">
+          <iframe id="swChatFrame" title="Twitch chat"
+                  allow="autoplay; scripts"
+                  sandbox="allow-scripts allow-same-origin allow-popups allow-modals allow-storage-access-by-user-activation"></iframe>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- NOW PLAYING -->
@@ -4014,6 +4262,259 @@
   })();
 
   /* ══════════════════════════════════════════
+     STREAM WIDGET — Twitch / YouTube category
+     tiles + player/chat popup.
+     Data: teslurk.com/browse's own Helix endpoint
+     (/api/helix?path=/streams?game_id=509658…) —
+     teslurk sends no CORS headers, so requests
+     route through the news module's public proxy
+     chain, with r.jina.ai appended as a fallback.
+     YouTube: placeholder tiles until a source is
+     wired. Tap a live card → popup with the
+     official Twitch embed + chat side by side.
+     ══════════════════════════════════════════ */
+  const SW_GAME_ID    = '509658';   // Just Chatting (teslurk.com/browse/509658)
+  const SW_LIMIT      = 4;
+  const SW_REFRESH_MS = 5 * 60 * 1000;
+  const SW_API = 'https://teslurk.com/api/helix?path=' +
+    encodeURIComponent(`/streams?game_id=${SW_GAME_ID}&first=${SW_LIMIT}`);
+  const SW_PROXY_KEY  = 'tcinema.swProxy';
+  const swGrid        = document.getElementById('swGrid');
+  const swUpdated     = document.getElementById('swUpdated');
+  const swPop         = document.getElementById('swPop');
+  const swPopTitle    = document.getElementById('swPopTitle');
+  const swPopViews    = document.getElementById('swPopViewCount');
+  const swPlayerFrame = document.getElementById('swPlayerFrame');
+  const swChatFrame   = document.getElementById('swChatFrame');
+
+  /* YouTube category — stubs until a data source is picked */
+  const SW_YT_STUBS = [
+    {title:'Tesla Live Cam — 24/7',       name:'YouTube'},
+    {title:'EV News & Reviews',           name:'YouTube'},
+    {title:'Road Trip Radio — Live',      name:'YouTube'},
+    {title:'Supercharger Roadside Cam',   name:'YouTube'},
+  ];
+
+  let swTwitch  = [];      // live cards from gql
+  let swCat     = 'all';   // all | twitch | youtube
+  let swLoading = false;
+  let swFail    = 0;
+  let swPopupOpen = false;
+
+  const swEyeSvg = '<svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.7 7.6 1 12c1.7 4.4 6 7.5 11 7.5s9.3-3.1 11-7.5c-1.7-4.4-6-7.5-11-7.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>';
+
+  /* teslurk has no CORS headers → borrow the news module's proxy
+     chain. jina leads: it's the only one that reliably answers from
+     the browser today (allorigins 522s, corsproxy wants a key), and
+     it wraps JSON in a markdown page, so we slice to the bare
+     object before parsing. */
+  const SW_PROXIES = [
+    {name:'jina', make:u => 'https://r.jina.ai/' + u},
+    ...NEWS_PROXIES,
+  ];
+  function swProxyOrder(){
+    const order = SW_PROXIES.map((_, i) => i);
+    try{
+      const pref = parseInt(localStorage.getItem(SW_PROXY_KEY) || '', 10);
+      if(!Number.isNaN(pref) && SW_PROXIES[pref]){
+        order.splice(order.indexOf(pref), 1);
+        order.unshift(pref);
+      }
+    }catch(e){}
+    return order;
+  }
+
+  async function fetchTopStreams(){
+    if(swLoading) return;
+    swLoading = true;
+    for(const idx of swProxyOrder()){
+      const p = SW_PROXIES[idx];
+      try{
+        const res = await fetch(p.make(SW_API), {signal: AbortSignal.timeout(10000), cache:'no-store'});
+        if(!res.ok) throw new Error('HTTP ' + res.status);
+        let text = p.unwrap ? await p.unwrap(res) : await res.text();
+        const brace = text.indexOf('{');
+        if(brace < 0) throw new Error('not JSON');
+        const j = JSON.parse(text.slice(brace));
+        const rows = Array.isArray(j.data) ? j.data : [];
+        if(!rows.length) throw new Error('no streams');
+        // proxies may mangle the nested first=4 param — Helix returns
+        // rows sorted by viewers, so just take the top SW_LIMIT.
+        swTwitch = rows.slice(0, SW_LIMIT).map(s => ({
+          cat:'twitch', id:s.id, login: s.user_login || '',
+          name:    s.user_name  || s.user_login || '',
+          title:   s.title      || '',
+          viewers: s.viewer_count || 0,
+          thumb: (s.thumbnail_url || '')
+            .replace('{width}', '240').replace('{height}', '135')
+        })).filter(s => s.login);
+        try{ localStorage.setItem(SW_PROXY_KEY, String(idx)); }catch(e){}
+        swFail = 0;
+        if(swUpdated)
+          swUpdated.textContent = 'updated ' +
+            new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+        break;
+      }catch(err){ swFail++; }
+    }
+    swLoading = false;
+    renderStreamWidget();
+  }
+
+  function swCards(){
+    const twitch = (swCat === 'youtube') ? [] : swTwitch;
+    const yt     = (swCat === 'twitch')  ? [] : SW_YT_STUBS.map((s,i) =>
+      ({cat:'youtube', id:'yt'+i, stub:true, title:s.title, name:s.name}));
+    return [...twitch, ...yt];
+  }
+
+  function renderStreamWidget(){
+    if(!swGrid) return;
+    swGrid.innerHTML = '';
+
+    /* Loading skeletons (Twitch half empty while the first fetch runs) */
+    if(!swTwitch.length && swLoading && swCat !== 'youtube'){
+      for(let i=0;i<SW_LIMIT;i++){
+        const sk = document.createElement('div');
+        sk.className = 'sw-skel';
+        sk.innerHTML = '<div class="sw-skel-thumb"></div>' +
+          '<div class="sw-skel-lines"><div class="sw-skel-bar" style="width:85%"></div>' +
+          '<div class="sw-skel-bar" style="width:45%;animation-delay:.15s"></div></div>';
+        swGrid.appendChild(sk);
+      }
+      return;
+    }
+
+    const cards = swCards();
+    if(!cards.length){
+      const empty = document.createElement('div');
+      empty.className = 'sw-empty';
+      empty.textContent = swFail ? 'Couldn\'t reach teslurk — retrying…'
+                                 : 'No live streams right now';
+      swGrid.appendChild(empty);
+      return;
+    }
+
+    cards.forEach((s,i) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'sw-card';
+      card.style.animationDelay = (i*60) + 'ms';
+
+      const thumb = document.createElement('div');
+      thumb.className = 'sw-thumb' + (s.stub ? ' stub' : '');
+      if(s.thumb){
+        const img = document.createElement('img');
+        img.src = s.thumb; img.alt = ''; img.loading = 'lazy';
+        img.addEventListener('error', () => img.classList.add('bad'));
+        thumb.appendChild(img);
+      }
+
+      const info = document.createElement('div');
+      info.className = 'sw-info';
+      const t = document.createElement('div');
+      t.className = 'sw-title';
+      t.textContent = s.title || '(untitled)';
+      const meta = document.createElement('div');
+      meta.className = 'sw-meta';
+      const nm = document.createElement('span');
+      nm.className = 'sw-name';
+      nm.textContent = s.name;
+      meta.appendChild(nm);
+      if(!s.stub){
+        const vw = document.createElement('span');
+        vw.className = 'sw-views live';
+        vw.innerHTML = swEyeSvg + '<span>' + (s.viewers||0).toLocaleString('en-US') + '</span>';
+        meta.appendChild(vw);
+      }else{
+        const soon = document.createElement('span');
+        soon.className = 'sw-soon';
+        soon.textContent = 'soon';
+        meta.appendChild(soon);
+      }
+      info.appendChild(t);
+      info.appendChild(meta);
+
+      card.appendChild(thumb);
+      card.appendChild(info);
+      card.addEventListener('click', () => openStreamPopup(s));
+      swGrid.appendChild(card);
+    });
+    fitStreamWidget();
+  }
+
+  /* The app's tiles clip, they never scroll — hide cards that fall
+     past the tile's bottom edge (runs on render + every resize). */
+  function fitStreamWidget(){
+    if(!swGrid) return;
+    /* Narrow tiles: drop the timestamp before it collides with the pills. */
+    const tile = document.getElementById('streamWidget');
+    if(tile) tile.classList.toggle('sw-narrow', tile.clientWidth < 360);
+    const cards = [...swGrid.querySelectorAll('.sw-card')];
+    if(!cards.length) return;
+    cards.forEach(c => c.style.display = '');
+    const h = swGrid.clientHeight;
+    let visible = 0;
+    for(const c of cards){
+      if(c.offsetTop + c.offsetHeight > h + 1) break;
+      visible++;
+    }
+    cards.forEach((c,i) => { if(i >= visible) c.style.display = 'none'; });
+  }
+
+  /* ── popup: official Twitch embed + chat, side by side ── */
+  function openStreamPopup(s){
+    /* Arrange mode: taps drag the tile — never open mid-rearrange. */
+    if(document.body.classList.contains('home-arranging')) return;
+    if(s.stub || !s.login) return;   // YouTube stubs: nothing to play yet
+    swPopupOpen = true;
+    swPopTitle.textContent = (s.name || '') + ' — ' + (s.title || '');
+    swPopViews.textContent = (s.viewers || 0).toLocaleString('en-US');
+    /* parent must match the serving host — dynamic so localhost
+       previews and msrisabaranjan.github.io both embed cleanly. */
+    const parent = encodeURIComponent(location.hostname);
+    const ch     = encodeURIComponent(s.login);
+    swPlayerFrame.src = `https://player.twitch.tv/?channel=${ch}&parent=${parent}&muted=true&autoplay=true`;
+    setTimeout(() => {
+      if(swPopupOpen)
+        swChatFrame.src = `https://www.twitch.tv/embed/${ch}/chat?parent=${parent}&darkpopout`;
+    }, 420);
+    swPop.classList.add('open');
+    swPop.setAttribute('aria-hidden','false');
+  }
+  function closeStreamPopup(){
+    if(!swPopupOpen) return;
+    swPopupOpen = false;
+    swPop.classList.remove('open');
+    swPop.setAttribute('aria-hidden','true');
+    swPlayerFrame.src = '';
+    setTimeout(() => { swChatFrame.src = ''; }, 380);
+  }
+  document.getElementById('swPopClose').addEventListener('click', closeStreamPopup);
+  swPop.addEventListener('click', e => { if(e.target === swPop) closeStreamPopup(); });
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape' && swPopupOpen) closeStreamPopup();
+  });
+
+  /* ── category pills ── */
+  document.querySelectorAll('.sw-pill').forEach(p => {
+    p.addEventListener('click', () => {
+      if(p.dataset.cat === swCat) return;
+      swCat = p.dataset.cat;
+      document.querySelectorAll('.sw-pill').forEach(q => {
+        const on = q === p;
+        q.classList.toggle('active', on);
+        q.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      renderStreamWidget();
+      if(swCat !== 'youtube' && !swTwitch.length && !swLoading) fetchTopStreams();
+    });
+  });
+
+  renderStreamWidget();
+  fetchTopStreams();
+  setInterval(fetchTopStreams, SW_REFRESH_MS);
+
+  /* ══════════════════════════════════════════
      HOME TILES — Gridstack grid placement.
      12-column grid, 90px rows, 9px item margin
      (the old 18px gutter). Tiles snap to cells;
@@ -4037,7 +4538,8 @@
     document.getElementById('newsStrip'),
     document.getElementById('avatarPanel'),
     document.getElementById('navSection'),
-    document.getElementById('stockTile')
+    document.getElementById('stockTile'),
+    document.getElementById('streamWidget')
   ];
   const homeTileIds = homeTiles.map(t => t.id);
   let homeArranging = false;
@@ -4187,6 +4689,7 @@
   grid.on('change', () => {
     renderStockTile();
     fitNewsTile();
+    fitStreamWidget();
     fitHomeGrid();
     if(saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
@@ -4584,6 +5087,7 @@
   window.addEventListener('resize', () => {
     fitHomeGrid();
     renderStockTile();
+    fitStreamWidget();
   });
   </script>
 
