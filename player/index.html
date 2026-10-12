@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>TCinema Player</title>
+<style>
+  /* Tesla-friendly: dark, big touch targets, no hover-only affordances */
+  :root{
+    --bg:#0b0f0c; --panel:#141a15; --line:#26302a;
+    --text:#e8f0ea; --dim:#8fa396; --accent:#4ade80;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;overflow:hidden;}
+  #stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;}
+  #screen{width:100%;height:100%;object-fit:contain;display:block;}
+
+  /* top bar — auto-hides 4s after last touch, reappears on tap */
+  #bar{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;gap:10px;align-items:center;
+    padding:14px 16px;background:linear-gradient(#0b0f0cee,#0b0f0c00);
+    transition:transform .35s ease, opacity .35s ease;}
+  #bar.hidden{transform:translateY(-110%);opacity:0;pointer-events:none;}
+  #q{flex:1;min-width:0;font-size:18px;padding:12px 14px;border-radius:10px;
+    border:1px solid var(--line);background:var(--panel);color:var(--text);}
+  button{font-size:18px;padding:12px 18px;border-radius:10px;border:1px solid var(--line);
+    background:var(--panel);color:var(--text);cursor:pointer;}
+  button.go{background:var(--accent);color:#06210f;border-color:var(--accent);font-weight:700;}
+  select{font-size:17px;padding:11px 10px;border-radius:10px;border:1px solid var(--line);
+    background:var(--panel);color:var(--text);}
+
+  #status{position:fixed;left:0;right:0;bottom:0;z-index:9;padding:12px 16px;
+    font-size:16px;color:var(--dim);background:linear-gradient(#0b0f0c00,#0b0f0cdd);
+    transition:opacity .35s ease;}
+  #status.hidden{opacity:0;}
+  #status b{color:var(--accent);font-weight:600;}
+
+  /* landing / help screen */
+  #landing{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    background:var(--bg);overflow:auto;}
+  #landing.gone{display:none;}
+  .card{max-width:640px;margin:40px auto;padding:28px;border:1px solid var(--line);
+    border-radius:16px;background:var(--panel);}
+  .card h1{margin:0 0 6px;font-size:26px;}
+  .card h1 span{color:var(--accent);}
+  .card p{color:var(--dim);font-size:16px;line-height:1.5;margin:10px 0;}
+  .card code{background:#0b0f0c;padding:2px 6px;border-radius:6px;font-size:14px;color:var(--accent);}
+  .row{display:flex;gap:10px;margin-top:16px;}
+  .row input{flex:1;font-size:18px;padding:12px 14px;border-radius:10px;border:1px solid var(--line);
+    background:var(--bg);color:var(--text);}
+  .hint{font-size:14px;color:var(--dim);margin-top:14px;}
+  .hint a{color:var(--accent);}
+  #proxyRow{margin-top:14px;}
+  #proxyRow input{width:100%;font-size:15px;padding:10px 12px;border-radius:10px;
+    border:1px solid var(--line);background:var(--bg);color:var(--text);}
+  #proxyRow label{display:block;font-size:14px;color:var(--dim);margin-bottom:6px;}
+  #err{color:#f87171;font-size:15px;margin-top:10px;min-height:1.2em;}
+</style>
+</head>
+<body>
+
+<div id="stage"><canvas id="screen"></canvas></div>
+
+<div id="bar" class="hidden">
+  <input id="q" type="text" placeholder="channel / url" enterkeyhint="go"/>
+  <button class="go" id="goBtn">Go</button>
+  <select id="quality" title="Quality"></select>
+  <button id="muteBtn">🔊</button>
+  <button id="homeBtn">☰</button>
+</div>
+<div id="status" class="hidden"></div>
+
+<div id="landing">
+  <div class="card">
+    <h1>TCinema <span>Player</span></h1>
+    <p>Canvas-HLS playback for the Tesla browser — YouTube, Twitch &amp; Kick.
+       No <code>&lt;video&gt;</code>, no MSE: MPEG-TS/fMP4 → WebCodecs → canvas,
+       the same approach teslaplay and teslurk use to survive Drive throttling.</p>
+    <div class="row">
+      <input id="q0" type="text" placeholder="e.g. shroud · kick.com/xqc · youtu.be/jfKfPfyJRdk" enterkeyhint="go"/>
+      <button class="go" id="go0">Play</button>
+    </div>
+    <div id="err"></div>
+    <div id="proxyRow">
+      <label>Relay worker (needed for YouTube + Kick fallback) — <code>https://…workers.dev</code></label>
+      <input id="proxy" type="text" placeholder="https://tcinema-relay.your-name.workers.dev"/>
+    </div>
+    <div class="hint">Quick picks:
+      <a href="#" data-k="lofigirl">lofigirl</a> ·
+      <a href="#" data-k="monstercat">monstercat</a> ·
+      <a href="#" data-k="xqc">xqc (kick)</a>
+    </div>
+  </div>
+</div>
+
+<script src="engine.js"></script>
+<script src="resolve.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const bar = $('bar'), statusEl = $('status'), landing = $('landing');
+const canvas = $('screen');
+
+if (!CanvasHlsPlayer.supported()) {
+  $('err').textContent = 'This browser lacks WebCodecs (VideoDecoder). Update the Tesla browser or use a recent Chromium.';
+  $('go0').disabled = true;
+}
+
+const player = new CanvasHlsPlayer(canvas, {
+  onStatus: msg => { statusEl.textContent = msg; statusEl.classList.remove('hidden'); },
+});
+window.player = player; // debug/automation handle
+
+/* proxy setting persistence */
+$('proxy').value = localStorage.getItem('tcinema:proxy') || '';
+$('proxy').addEventListener('change', () => {
+  localStorage.setItem('tcinema:proxy', $('proxy').value.trim());
+  location.reload();
+});
+
+let hideTimer = null;
+function pokeBar(){
+  bar.classList.remove('hidden'); statusEl.classList.remove('hidden');
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => { bar.classList.add('hidden'); statusEl.classList.add('hidden'); }, 4000);
+  player.resumeAudio(); // any gesture unlocks the autoplay-suspended AudioContext
+}
+document.addEventListener('pointerdown', pokeBar);
+document.addEventListener('keydown', pokeBar);
+
+let muted = false;
+$('muteBtn').addEventListener('click', () => {
+  muted = !muted; player.setMuted(muted);
+  $('muteBtn').textContent = muted ? '🔇' : '🔊';
+});
+$('homeBtn').addEventListener('click', () => { player.stop(); landing.classList.remove('gone'); });
+
+function fillQuality(){
+  const sel = $('quality');
+  sel.innerHTML = '';
+  player.qualityList().forEach(q => {
+    const o = document.createElement('option');
+    o.value = q.idx; o.textContent = q.label;
+    if (q.idx === player.variantIdx) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+$('quality').addEventListener('change', e => player.setQuality(+e.target.value));
+
+async function play(input){
+  $('err').textContent = '';
+  try {
+    const r = await resolve(input);
+    landing.classList.add('gone');
+    pokeBar();
+    statusEl.textContent = 'Starting ' + r.platform + '…';
+    /* Routing (verified against live endpoints):
+       - usher + playlist.ttvnw.net return 403 when a browser Origin header
+         is present → ALL m3u8 fetches go through the relay (raw=1, no URI
+         rewriting; the engine resolves URLs itself). Segments send ACAO: *
+         and are NOT Origin-checked → fetched directly. (Same split as
+         teslurk: /api/proxy for playlists, direct for segments.)
+       - googlevideo (YouTube) URLs are IP-bound to whoever requested them
+         → everything goes through the relay. */
+    const viaRelay = r.masterViaRelay || r.relayAll;
+    if (viaRelay && !PROXY) throw new Error(r.platform + ' needs the relay worker — set it in Settings');
+    player.opts.fetchPlaylist = viaRelay
+      ? u => fetch(relayUrl(u), { cache: 'no-store' }).then(rr => {
+            if (rr.status === 404) throw new Error('Channel is offline or the stream ended');
+            if (!rr.ok) throw new Error('Relay returned HTTP ' + rr.status);
+            return rr.text();
+          })
+      : null;
+    player.opts.relayAll = !!r.relayAll;
+    player.opts.relay = relayUrl;
+    if (r.mode === 'yt-live') {
+      // YouTube live (2026): no m3u8 — engine polls googlevideo byte-ranges
+      // through the relay (URLs are IP-bound to the worker that resolved)
+      player.opts.refetchYt = h => resolveYoutube(r.key, h);
+      await player.loadYtLive(r);
+    } else {
+      await player.load(r.url);
+    }
+    player.startRenderLoop();
+    fillQuality();
+  } catch (e) {
+    $('err').textContent = e.message;
+    statusEl.textContent = '';
+  }
+}
+
+$('go0').addEventListener('click', () => play($('q0').value));
+$('q0').addEventListener('keydown', e => { if (e.key === 'Enter') play($('q0').value); });
+$('goBtn').addEventListener('click', () => play($('q').value));
+$('q').addEventListener('keydown', e => { if (e.key === 'Enter') play($('q').value); });
+document.querySelectorAll('[data-k]').forEach(a => a.addEventListener('click', e => {
+  e.preventDefault();
+  const k = a.dataset.k;
+  play(k === 'xqc' ? 'kick.com/xqc' : k);
+}));
+
+/* deep link: player/index.html?ch=shroud or ?url=<m3u8> */
+const params = new URLSearchParams(location.search);
+const deep = params.get('ch') || params.get('url');
+if (deep) { $('q0').value = deep; play(deep); }
+</script>
+</body>
+</html>
