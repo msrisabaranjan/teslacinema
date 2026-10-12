@@ -76,3 +76,9 @@ one stream, but a mid-stream IP change kills the URLs (they re-resolve).
 Same as teslaplay/teslurk: this only plays streams the platforms already
 serve to browsers; it bypasses no DRM. Platform ToS still apply — keep it
 for personal use.
+
+## Research archive
+
+`research/NOTES.md` preserves the full REA findings (protocol details,
+client matrix, gotchas); `research/probes/` + `research/local-relay.mjs`
+are the live-verification scripts, `research/screenshots/` the evidence.
