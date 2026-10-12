@@ -4929,6 +4929,15 @@
     const SPEED_DECAY_TAU  = 2;     // s — how fast the speed eases to 0 once decaying
     const ANIM_DEBOUNCE_MS = 1200;  // a mood change must hold this long before it plays
 
+    /* Provider staleness. The in-car browser can keep calling back while
+       replaying the same cached coordinates: speed stays live, displacement
+       goes to zero, and "driven today" freezes until you minimize the browser
+       and come back. These three knobs detect that and work around it. */
+    const INTEGRATE_MIN_KMH = 5;      // under ~3 mph the car isn't rolling — nothing to integrate
+    const STALE_FIX_MS      = 15000;  // ms without the position actually moving (while rolling) ⇒ stale
+    const REARM_MS          = 20000;  // hard ceiling on how long a watch may stay armed
+    const REF_HOLD_MAX_SEC  = 2;      // s — longest a distance reference waits without displacement
+
     /* Hidden test hooks: ?test_miles=12 & test_speed=120
        ?test_drive additionally accrues ~75 mi/h of distance so form
        transitions (e.g. the egg hatching) can be watched live.
@@ -5045,7 +5054,11 @@
     }
     let sessionDate = todayKey();
     let watchId = null;
-    let lastFixArrivedAt = 0;
+    let prevFix = state.last;     // immediately previous fix — the interval mph is measured over
+    let lastFixArrivedAt = 0;   // any callback, stale replay or not — watch liveness
+    let lastFreshFixAt   = 0;   // last callback whose position actually moved
+    let lastFixStamp     = 0;   // pos.timestamp of the previous fix (0 = provider omits it)
+    let integrating      = false; // current miles came from the speed signal, not from displacement
     let watchArmedAt = 0;
     let evolveTarget = -1;      // form we're loading/transitioning into
     let evolveAnimName = 'Idle';
@@ -5403,27 +5416,31 @@
 
     function onGeo(pos){
       const c = pos.coords;
-      const now = pos.timestamp || Date.now();
+      const arrivedAt = Date.now();
+      const stamp = Number(pos.timestamp) || 0;
+
+      /* A provider replaying a cached fix keeps pos.timestamp frozen, and using
+         it as the clock would freeze dtSec — and with it, distance. Arrival time
+         takes over whenever the stamp doesn't advance. */
+      const now = (stamp && stamp !== lastFixStamp) ? stamp : arrivedAt;
 
       if (!Number.isFinite(c.latitude) || !Number.isFinite(c.longitude)) return;
 
-      lastFixArrivedAt = Date.now();
+      lastFixArrivedAt = arrivedAt;
       state.hasFix = true;
       state.gpsOk = true;
 
-      if (state.last) {
-        const dtSec  = (now - state.last.t) / 1000;
-        const distKm = haversineKm(state.last.lat, state.last.lon, c.latitude, c.longitude);
-
-        // Accumulate session distance (jitter + spike gated).
-        if (dtSec >= 0.25 && distKm >= MIN_MOVE_KM) {
-          const implied = (distKm / dtSec) * 3600;
-          if (implied <= MAX_KMH) state.totalMiles += distKm / KM_PER_MILE;
-        }
+      /* ── SPEED ── measured against the immediately previous fix, as it has
+         always been. mph reads right in the car, so the maths stays put; the
+         reference is only held until the interval is long enough to measure,
+         which is what made a fast-callback provider display 0 mph. */
+      if (prevFix) {
+        const sdtSec  = (now - prevFix.t) / 1000;
+        const sDistKm = haversineKm(prevFix.lat, prevFix.lon, c.latitude, c.longitude);
 
         // Smoothed speed: time-constant EMA over a gated raw speed.
-        if (dtSec >= 0.5) {
-          const distSpeed = (distKm / dtSec) * 3600;
+        if (sdtSec >= 0.5) {
+          const distSpeed = (sDistKm / sdtSec) * 3600;
           const devSpeed  = (Number.isFinite(c.speed) && c.speed >= 0) ? c.speed * 3.6 : null;
 
           let raw;
@@ -5432,7 +5449,7 @@
           else raw = 0;
 
           // Tiny displacement while (nearly) stopped ⇒ treat as parked, kills jitter spikes.
-          if (distKm < 0.005 && (devSpeed === null || devSpeed < 7.2)) raw = 0;
+          if (sDistKm < 0.005 && (devSpeed === null || devSpeed < 7.2)) raw = 0;
           if (raw < 1) raw = 0;
 
           // raw === 0 means "no reliable displacement this fix" (jitter or spike),
@@ -5441,16 +5458,61 @@
           if (raw > 0) {
             state.lastMove = now;
             const tau   = raw > state.smoothSpeed ? TAU_UP : TAU_DOWN;
-            const alpha = 1 - Math.exp(-dtSec / tau);
+            const alpha = 1 - Math.exp(-sdtSec / tau);
             state.smoothSpeed = state.smoothSpeed * (1 - alpha) + raw * alpha;
           }
+
+          prevFix = { lat: c.latitude, lon: c.longitude, t: now };
         }
       } else {
+        prevFix = { lat: c.latitude, lon: c.longitude, t: now };
+      }
+
+      /* ── DISTANCE ── the odometer holds its reference fix until the interval is
+         worth measuring, which is what the in-car provider was starving. */
+      if (state.last) {
+        const dtSec  = (now - state.last.t) / 1000;
+        const distKm = haversineKm(state.last.lat, state.last.lon, c.latitude, c.longitude);
+        const implied = dtSec > 0 ? (distKm / dtSec) * 3600 : Infinity;
+        const moved   = dtSec >= 0.25 && distKm >= MIN_MOVE_KM && implied <= MAX_KMH;
+        let accounted = false;   // this interval contributed miles (either source)
+
+        // Accumulate session distance (jitter + spike gated).
+        if (dtSec >= 0.25) {
+          if (moved) {
+            /* The position really moved, so the provider is alive. If the miles
+               just before this came from the speed signal, this displacement is
+               the catch-up of distance already counted — don't count it twice. */
+            if (!integrating) state.totalMiles += distKm / KM_PER_MILE;
+            integrating = false;
+            lastFreshFixAt = arrivedAt;
+            accounted = true;
+          } else if (dtSec <= 60 && state.smoothSpeed >= INTEGRATE_MIN_KMH &&
+                     arrivedAt - lastFreshFixAt > STALE_FIX_MS) {
+            /* Displacement rejected: jitter, a spike, or a provider replaying the
+               same coordinates while the car rolls. The speed signal is live
+               (it's what mph is drawn from), so integrate it across the interval
+               instead of losing the miles. One source per interval, never both. */
+            state.totalMiles += (state.smoothSpeed * dtSec / 3600) / KM_PER_MILE;
+            integrating = true;
+            accounted = true;
+          }
+        }
+
+        /* Advance the reference fix only once the interval has actually been
+           measured: either it contributed miles, or it has run long enough that
+           waiting more won't clear the jitter gate. Overwriting it on every
+           callback throws away the displacement of every shorter interval, so a
+           fast-callback provider accrues nothing at all; leaving it behind after
+           an interval was counted would count that interval twice. */
+        if (accounted || dtSec >= REF_HOLD_MAX_SEC) state.last = { lat: c.latitude, lon: c.longitude, t: now };
+      } else {
         state.last = { lat: c.latitude, lon: c.longitude, t: now };
+        lastFreshFixAt = arrivedAt;
         fetchAvatarWeather(c.latitude, c.longitude);
       }
 
-      state.last = { lat: c.latitude, lon: c.longitude, t: now };
+      lastFixStamp = stamp;
       saveAvatarSession(false);
       updateAvatar();
     }
@@ -5463,8 +5525,9 @@
     const GEO_OPTIONS = { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 };
 
     /* Re-arm the location provider. The in-car browser's geolocation watch can
-       stall while the page sits open, so clearWatch + watchPosition re-primes
-       it (the same effect minimizing/reopening the page used to have). */
+       stall outright, or keep calling back with the same cached coordinates;
+       clearWatch + watchPosition re-primes it either way (the same effect
+       minimizing/reopening the page has). */
     function registerWatch(){
       if (TEST_MODE || !('geolocation' in navigator)) return;
       if (watchId !== null) {
@@ -5474,33 +5537,40 @@
       watchArmedAt = Date.now();
     }
 
-    /* Stall watchdog: no fix for ~30s (since the last fix or the last arm,
-       whichever is newer) while the page is visible ⇒ re-arm. */
-    function startWatchdog(){
-      setInterval(() => {
-        if (document.visibilityState !== 'visible') return;
-        const ref = Math.max(lastFixArrivedAt, watchArmedAt);
-        if (ref && Date.now() - ref > 30000) registerWatch();
-      }, 10000);
+    /* Is the provider replaying the same coordinates? A watch that keeps
+       calling back without the position ever moving is the in-car failure mode:
+       speed stays live, displacement goes to zero, distance freezes.
+       A parked car legitimately reports the same spot all day, so staleness
+       only means something while the speed signal says we're rolling. */
+    function providerIsStale(){
+      if (state.smoothSpeed < INTEGRATE_MIN_KMH) return false;
+      if (!lastFreshFixAt) return false;
+      return Date.now() - lastFreshFixAt > STALE_FIX_MS;
     }
 
-    /* Poll fallback: the in-car browser can stop delivering watchPosition
-       callbacks while the page sits in the foreground — and it may also
-       misreport visibilityState, so the watchdog above can't be the only
-       rescue. A fresh one-shot getCurrentPosition re-primes the provider
-       (same effect as switching apps and back); the fix flows through the
-       same onGeo pipeline, so distance/speed keep accumulating. Duplicate
-       fixes are harmless: accumulation is displacement-gated. Only fires
-       while the watch has gone quiet, so healthy watches stay untouched. */
+    /* Watchdog: re-arm when the watch went silent, when it is alive but stale,
+       or when it has simply been armed too long — that last one is the blunt
+       version of minimizing and restoring the browser, and it costs nothing.
+       Not gated on visibilityState: the in-car browser misreports it. */
+    function startWatchdog(){
+      setInterval(() => {
+        const now = Date.now();
+        const silent  = now - Math.max(lastFixArrivedAt, watchArmedAt) > 30000;
+        const overdue = state.smoothSpeed >= INTEGRATE_MIN_KMH && now - watchArmedAt > REARM_MS;
+        if (silent || overdue || providerIsStale()) registerWatch();
+      }, 5000);
+    }
+
+    /* Poll fallback: a fresh one-shot getCurrentPosition re-primes the provider
+       (same effect as switching apps and back); the fix flows through the same
+       onGeo pipeline, so distance/speed keep accumulating. Fires when the watch
+       has gone quiet *or* when it is delivering stale coordinates — watching for
+       silence alone misses the in-car case, because the callbacks never stop. */
     function startPollFallback(){
       let pollInFlight = false;
       setInterval(() => {
         if (pollInFlight) return;
-        const ref = Math.max(lastFixArrivedAt, watchArmedAt);
-        if (Date.now() - ref < 10000) return;   // watch still delivering
-        /* The watch itself has been quiet for half a minute ⇒ re-arm it
-           too (the visibility-gated watchdog may never run in-car). */
-        if (Date.now() - watchArmedAt > 30000) registerWatch();
+        if (Date.now() - lastFixArrivedAt < 10000 && !providerIsStale()) return;
         pollInFlight = true;
         navigator.geolocation.getCurrentPosition(
           p => { pollInFlight = false; onGeo(p); },
@@ -5512,17 +5582,22 @@
       }, 6000);
     }
 
-    /* Re-arm on return (if the watch went stale while hidden) and persist
-       the session when leaving the page or it gets hidden/killed. */
+    /* Re-arm on return (the watch can go silent *or* start replaying cached
+       coordinates while hidden) and persist the session when leaving the page
+       or it gets hidden/killed. */
     function startVisibilityWatch(){
+      function rearmIfQuiet(){
+        const ref = Math.max(lastFixArrivedAt, watchArmedAt);
+        if ((ref && Date.now() - ref > 20000) || providerIsStale()) registerWatch();
+      }
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          const ref = Math.max(lastFixArrivedAt, watchArmedAt);
-          if (ref && Date.now() - ref > 20000) registerWatch();
-        } else {
-          saveAvatarSession(true);
-        }
+        if (document.visibilityState === 'visible') rearmIfQuiet();
+        else saveAvatarSession(true);
       });
+      /* The in-car browser doesn't always flip visibilityState when you switch
+         apps and come back, but it does hand the page focus again. */
+      window.addEventListener('focus', rearmIfQuiet);
+      window.addEventListener('pageshow', rearmIfQuiet);
       window.addEventListener('pagehide', () => saveAvatarSession(true));
     }
 
@@ -5535,6 +5610,9 @@
           sessionDate = todayKey();
           state.totalMiles = 0;
           state.last = null;
+          prevFix = null;
+          integrating = false;
+          lastFreshFixAt = 0;
           formIdx = 0;
           pathIdx = -1; // back to the egg — the line is re-rolled at hatch
           saveAvatarSession(true);
