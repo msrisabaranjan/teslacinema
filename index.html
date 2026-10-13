@@ -632,8 +632,9 @@
     }
     /* Multi-card carousel: the active story sits large on the left,
        the next two peek beside it — several stories visible at once.
-       Click a side card to bring it forward. fitNewsTile() collapses
-       to a single full-bleed card (no-side) on narrow tiles. */
+       Click a side card to bring it forward. fitNewsTile() steps down
+       to featured + one peek (peek-1) on medium tiles and only drops
+       to a single full-bleed card (no-side) on tiny ones. */
     .news-slide{
       position:absolute;top:0;bottom:0;left:0;width:100%;
       opacity:0;visibility:hidden;
@@ -665,7 +666,11 @@
       transition:opacity .5s var(--ease-smooth),transform .6s var(--ease-spring),
         left .6s var(--ease-spring),width .6s var(--ease-spring),visibility 0s;
     }
-    /* narrow tiles: one full-bleed story, no side cards */
+    /* medium tiles: featured + one peek card */
+    .news-strip.peek-1 .news-slide.pos-0{left:0;width:64%;}
+    .news-strip.peek-1 .news-slide.pos-1{left:68%;width:32%;}
+    .news-strip.peek-1 .news-slide.pos-2{opacity:0;pointer-events:none;}
+    /* tiny tiles: one full-bleed story, no side cards */
     .news-strip.no-side .news-slide.pos-0{left:0;width:100%;}
     .news-strip.no-side .news-slide.pos-1,
     .news-strip.no-side .news-slide.pos-2{opacity:0;pointer-events:none;}
@@ -797,6 +802,7 @@
       width:calc(54% - var(--npad) * 2);
       z-index:3;display:flex;align-items:center;gap:5px;pointer-events:none;
     }
+    .news-strip.peek-1 .news-progress{width:calc(64% - var(--npad) * 2);}
     .news-strip.no-side .news-progress{width:calc(100% - var(--npad) * 2);}
     .news-pip{
       flex:1 1 0;min-width:0;height:3px;border-radius:999px;
@@ -3100,23 +3106,25 @@
 
   /* News copy scales with the tile: the featured card is always
      full-bleed, so fitNewsTile only tunes the overlay — padding, title
-     px, desc px, title clamp — shows the two peek cards when there's
-     room, and drops the desc / CTA / arrows / progress when the tile
-     gets too short for them to stack without crushing. */
+     px, desc px, title clamp — keeps two peek cards on wide tiles, one
+     peek card on medium tiles, and only drops to a single card on tiny
+     ones; desc / CTA / arrows / progress go when they'd crush. */
   function fitNewsTile(){
     const strip = document.getElementById('newsStrip');
     if(!strip) return;
     const w = strip.clientWidth, h = strip.clientHeight;
     if(w <= 40 || h <= 20) return;
-    const side = w >= 560;                       // room for the two peek cards
-    const aw   = side ? w * 0.54 : w;            // featured card width
+    const three = w >= 560;                       // featured + two peeks
+    const one   = !three && w >= 300;             // featured + one peek
+    const aw    = three ? w * 0.54 : one ? w * 0.64 : w;  // featured width
     const pad = Math.max(12, Math.min(22, Math.round(Math.min(w * 0.05, h * 0.10))));
     strip.style.setProperty('--npad', pad + 'px');
     strip.style.setProperty('--nt',
       aw < 420 ? '16px' : h < 170 ? '17px' : h < 240 ? '19px' : h < 310 ? '22px' : '25px');
     strip.style.setProperty('--ncpt', h < 280 ? '12px' : '13px');
     strip.style.setProperty('--ntl', h >= 360 && aw >= 560 ? '3' : '2');
-    strip.classList.toggle('no-side',    !side);
+    strip.classList.toggle('peek-1',   one);
+    strip.classList.toggle('no-side',  !three && !one);
     strip.classList.toggle('no-desc',    h < 210 || aw < 330);
     strip.classList.toggle('no-cta',     h < 250 || aw < 300);
     strip.classList.toggle('no-nav',     w < 320);
