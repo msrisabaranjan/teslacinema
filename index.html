@@ -630,6 +630,11 @@
       position:absolute;inset:0;
       touch-action:pan-y;
     }
+    /* while a touch-drag is in flight the cards follow the finger
+       directly instead of running their snap transition */
+    .news-strip.news-dragging .news-slide{
+      transition:opacity .5s var(--ease-smooth),visibility 0s;
+    }
     /* Multi-card carousel: the active story sits large on the left,
        the next two peek beside it — several stories visible at once.
        Click a side card to bring it forward. fitNewsTile() steps down
@@ -3794,21 +3799,54 @@
       if(e.key === 'Escape') closeNewsPopup();
     });
 
-    let touchX = null;
+    /* Touch / pen drag: the deck follows the finger while sliding and
+       snaps to the nearest story on release — a real swipe-scroll, not
+       just a fling threshold. Mouse pointers are left to the hold-to-
+       arrange handler. */
     if(strip){
-      strip.addEventListener('touchstart', (e) => {
-        touchX = e.changedTouches[0].clientX;
-        newsSwiped = false;
+      let dragX0 = null, dragY0 = null, dragDx = 0, dragActive = false, dragPid = -1;
+      const unit = () => Math.max(120, strip.clientWidth * 0.34);
+
+      strip.addEventListener('pointerdown', (e) => {
+        if(e.pointerType === 'mouse') return;
+        if(document.body.classList.contains('home-arranging')) return;
+        if(e.target.closest('button')) return;
+        dragX0 = e.clientX; dragY0 = e.clientY; dragDx = 0;
+        dragActive = false; dragPid = e.pointerId;
         clearInterval(newsTimer);
+      });
+      strip.addEventListener('pointermove', (e) => {
+        if(dragPid !== e.pointerId || dragX0 == null) return;
+        const dx = e.clientX - dragX0, dy = e.clientY - dragY0;
+        if(!dragActive){
+          if(Math.abs(dx) < 10) return;
+          if(Math.abs(dy) > Math.abs(dx)){ dragX0 = null; return; }  // vertical page scroll
+          dragActive = true;
+          strip.classList.add('news-dragging');
+        }
+        dragDx = dx;
+        const u = unit();
+        const f = Math.max(-1.35, Math.min(1.35, dragDx / u));
+        const track = document.getElementById('newsTrack');
+        if(track) track.style.transform = `translateX(${-f * u}px)`;
       }, {passive: true});
-      strip.addEventListener('touchend', (e) => {
-        if(touchX == null) return;
-        const dx = e.changedTouches[0].clientX - touchX;
-        if(dx > 48){ newsSwiped = true; stepNews(-1); }
-        else if(dx < -48){ newsSwiped = true; stepNews(1); }
-        else if(newsItems.length) restartNewsTimer();
-        touchX = null;
-      }, {passive: true});
+      const endDrag = (e) => {
+        if(dragPid !== e.pointerId || dragX0 == null) return;
+        const track = document.getElementById('newsTrack');
+        if(track) track.style.transform = '';
+        strip.classList.remove('news-dragging');
+        if(dragActive){
+          newsSwiped = true;
+          const steps = Math.round(dragDx / unit());
+          if(steps) stepNews(-steps);
+          else restartNewsTimer();
+        } else if(newsItems.length){
+          restartNewsTimer();
+        }
+        dragX0 = null; dragActive = false; dragPid = -1;
+      };
+      strip.addEventListener('pointerup', endDrag);
+      strip.addEventListener('pointercancel', endDrag);
     }
   }
 
