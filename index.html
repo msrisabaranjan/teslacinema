@@ -1045,29 +1045,30 @@
       100% { box-shadow: inset 0 0 0 0 hsl(var(--h) var(--acc-sat) var(--acc-lum) / 0); }
     }
 
-    /* ── RAIL AVATARS — collected final forms live in the right nav rail,
-       between the days-left ring and the page buttons. Tap to swap. ── */
-    .rail-avatars{
+    /* ── AVATAR RAIL — its own frosted card above the page rail, holding
+       the collected final forms. Tap a slot to swap it with the stage. ── */
+    .avatar-rail{
       display:flex;
       flex-direction:column;
       align-items:center;
       gap:8px;
+      padding:6px;
       max-height:45vh;
       overflow-y:auto;
       overflow-x:hidden;
       touch-action:pan-y;
       scrollbar-width:thin;
       scrollbar-color:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.4) transparent;
+      background:rgba(20,20,26,.32);
+      backdrop-filter:blur(12px) saturate(1.2);
+      -webkit-backdrop-filter:blur(12px) saturate(1.2);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:20px;
+      box-shadow:0 10px 26px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.06);
     }
-    .rail-avatars[hidden]{display:none;}
-    .rail-avatars::-webkit-scrollbar{width:4px;}
-    .rail-avatars::-webkit-scrollbar-thumb{background:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.4);border-radius:2px;}
-    .rail-avatars-sep{
-      flex:0 0 auto;
-      width:26px;height:1px;
-      background:rgba(255,255,255,.14);
-    }
-    .rail-avatars-sep[hidden]{display:none;}
+    .avatar-rail[hidden]{display:none;}
+    .avatar-rail::-webkit-scrollbar{width:4px;}
+    .avatar-rail::-webkit-scrollbar-thumb{background:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.4);border-radius:2px;}
     .rail-avatar-slot{
       position:relative;
       flex:0 0 auto;
@@ -2148,10 +2149,17 @@
       100% {transform:scaleX(1);}
     }
 
+    /* ── RIGHT DOCK — the avatar collection card + the page rail, stacked
+       as two separate frosted panels ── */
+    .right-dock{
+      position:fixed;right:14px;top:50%;transform:translateY(-50%);
+      z-index:600;display:flex;flex-direction:column;align-items:center;gap:10px;
+      animation:railIn .6s var(--ease-out) calc(var(--boot-delay) + .3s) both;
+    }
     /* ── RIGHT PAGE RAIL ── */
     .page-rail{
-      position:fixed;right:14px;top:50%;transform:translateY(-50%);
-      z-index:600;display:flex;flex-direction:column;gap:8px;
+      position:relative;
+      display:flex;flex-direction:column;gap:8px;
       padding:8px;user-select:none;touch-action:none;
       /* Subtle frosted glass: content scrolling behind the rail stays
          softly visible through a light blur + faint tint. */
@@ -2161,7 +2169,6 @@
       border:1px solid rgba(255,255,255,.10);
       border-radius:20px;
       box-shadow:0 10px 26px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.06);
-      animation:railIn .6s var(--ease-out) calc(var(--boot-delay) + .3s) both;
     }
     @keyframes railIn{
       from{opacity:0;transform:translateY(-50%) translateX(12px);}
@@ -2214,7 +2221,7 @@
     /* ── NARROW / HALF SCREEN ── */
     @media (max-width:640px){
       .page{padding:12px 92px 140px 12px;}
-      .page-rail{right:8px;}
+      .right-dock{right:8px;}
       .island-bar{top:24px;right:6px;width:54px;gap:7px;}
       #pageHome{--hx:12px;--hy:12px;--hxr:92px;}
       .sec-head{padding:0 2px 10px;}
@@ -2458,7 +2465,7 @@
     .island-bar #clock{color:hsl(var(--amb-h1) var(--amb-sat) 94%);}
 
     /* Page rail: circular BMW-dock buttons, glow tracks the mode. */
-    .page-rail{border-radius:24px;}
+    .page-rail,.avatar-rail{border-radius:24px;}
     .rail-btn{border-radius:999px;}
     .rail-indicator{
       border-radius:999px;
@@ -2705,10 +2712,10 @@
   <!-- FROSTED GLASS SWEEP (page transition layer) -->
 
   <!-- RIGHT PAGE RAIL -->
-  <nav class="page-rail" id="pageRail" aria-label="Pages">
-    <div class="rail-indicator" id="railIndicator"></div>
-    <div class="rail-avatars" id="railAvatars" hidden></div>
-    <div class="rail-avatars-sep" id="railAvatarsSep" hidden></div>
+  <div class="right-dock" id="rightDock">
+    <div class="avatar-rail" id="railAvatars" hidden aria-label="Collected avatars"></div>
+    <nav class="page-rail" id="pageRail" aria-label="Pages">
+      <div class="rail-indicator" id="railIndicator"></div>
     <button class="rail-btn active" type="button" data-page="home" data-label="Home" title="Home" aria-label="Home page">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/><path d="M10 21v-6h4v6"/></svg>
     </button>
@@ -2718,7 +2725,8 @@
     <button class="rail-btn" type="button" data-page="filler" data-label="Filler" title="Filler" aria-label="Filler page">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
     </button>
-  </nav>
+    </nav>
+  </div>
 
   <!-- COMET TRAIL LAYER (avatar flights between the widget and the rail) -->
   <div id="trailLayer" aria-hidden="true"></div>
@@ -4359,8 +4367,6 @@
   pageRail.addEventListener('pointerdown', (e) => {
     if(railPointer || pageAnimating) return;
     if(e.pointerType === 'mouse' && e.button !== 0) return;
-    /* The avatar collection strip handles its own taps and scrolling. */
-    if(e.target.closest('.rail-avatars')) return;
     const btn = e.target.closest('.rail-btn');
     railPointer = {
       id: e.pointerId,
@@ -5288,12 +5294,12 @@
        fire:  Torchic → Combusken → Blaziken
      Stages: 1 = 5–10 mi, 2 = 10–20 mi, 3 = 20–25 mi.
      At 25 mi the cycle restarts: the final form streaks to the collection
-     strip in the right nav rail (above the page buttons), a fresh egg
-     appears, and the line is re-rolled at the next hatch. Tap a rail
-     slot to fly that collected form onto the stage (tap the stage, or
-     the slot again, to send it back); a live evolution always takes the
-     stage back. Collected forms and the cycle count persist with the
-     daily session.
+     card in the right dock (its own panel above the page rail), a fresh
+     egg appears, and the line is re-rolled at the next hatch. Tapping a
+     card slot swaps places: the displayed companion flies into that slot
+     and the slot's form flies onto the stage (tap the stage, or the slot
+     again, to swap back); a live evolution always takes the stage back.
+     Collected forms and the cycle count persist with the daily session.
      The egg is shared by all lines: Idle while parked, Tumble while moving,
      and Hurt in the HATCH_SOON_MI window before it hatches (with a gold
      flash build-up).
@@ -5329,7 +5335,6 @@
     const stage = document.getElementById('avatarStage');
     const formLabel = document.getElementById('avatarFormLabel');
     const holdingEl = document.getElementById('railAvatars');
-    const holdSepEl = document.getElementById('railAvatarsSep');
     const holdCountEl = document.getElementById('avatarHoldCount');
     const trailLayer = document.getElementById('trailLayer');
 
@@ -6182,10 +6187,15 @@
     }
 
     /* Crossing a cycle boundary (every CYCLE_MI miles): the final form
-       streaks to the nav rail and a fresh egg takes the stage. The
+       streaks to the avatar rail and a fresh egg takes the stage. The
        line is re-rolled at the next hatch. */
     function retireCycle(){
       const retiringForm = pathIdx >= 0 ? forms[pathIdx][STAGES - 1] : null;
+      /* While swapped, the retiring form sits in a rail slot and a
+         collected form holds the stage — the two flights cross over. */
+      const swappedSlot = activeCollected;
+      const displayedForm = swappedSlot >= 0 && swappedSlot < collected.length
+        ? forms[collected[swappedSlot]][STAGES - 1] : null;
       if (pathIdx >= 0) collected.push(pathIdx);
       const newIdx = collected.length - 1;
       cycle = cycleOf(state.totalMiles);
@@ -6207,14 +6217,30 @@
       }
       renderHolding(-1, newIdx);
       saveAvatarSession(true);
-      /* The retired form streaks to its new rail slot, then pops in. */
-      if (retiringForm && trailLayer) {
-        const slot = slotElFor(newIdx);
-        if (slot) flyAvatar(canvas, slot, retiringForm, 700).then(() => renderHolding(newIdx));
+      if (!retiringForm || !trailLayer) return;
+      const newSlot = slotElFor(newIdx);
+      if (!newSlot) return;
+      if (swappedSlot >= 0 && displayedForm) {
+        /* Retiring form: its slot → the new slot; displayed form: stage → that slot. */
+        const oldSlot = slotElFor(swappedSlot);
+        if (oldSlot) {
+          oldSlot.classList.add('ghost');
+          if (stage) stage.classList.add('stage-empty');
+          Promise.all([
+            flyAvatar(oldSlot, newSlot, retiringForm, 700),
+            flyAvatar(canvas, oldSlot, displayedForm, 700)
+          ]).then(() => {
+            if (stage) stage.classList.remove('stage-empty');
+            renderHolding(newIdx);
+          });
+          return;
+        }
       }
+      /* The retired form streaks to its new rail slot, then pops in. */
+      flyAvatar(canvas, newSlot, retiringForm, 700).then(() => renderHolding(newIdx));
     }
 
-    /* ── RAIL AVATARS — collected final forms in the nav rail, tap to swap ── */
+    /* ── AVATAR RAIL — collected final forms in the dock card, tap to swap ── */
     function drawMini(f, c){
       const mctx = c.getContext('2d');
       mctx.imageSmoothingEnabled = false;
@@ -6232,14 +6258,9 @@
       return holdingEl ? holdingEl.querySelector('.rail-avatar-slot[data-idx="' + i + '"]') : null;
     }
 
-    /* Showing/hiding the strip shifts the page buttons — nudge the rail
-       indicator to re-pin itself (it re-measures on window resize). */
-    function setStripVisible(on){
-      if (!holdingEl) return;
-      if (holdingEl.hidden === !on) return;
-      holdingEl.hidden = !on;
-      if (holdSepEl) holdSepEl.hidden = !on;
-      window.dispatchEvent(new Event('resize'));
+    /* The companion that grows with the odometer (the egg before hatch). */
+    function liveForm(){
+      return forms[pathIdx >= 0 ? pathIdx : 0][formIdx];
     }
 
     /* popIdx: slot whose sprite pops in; ghostIdx: slot left empty while
@@ -6249,24 +6270,27 @@
       holdingEl.innerHTML = '';
       if (holdCountEl) holdCountEl.textContent = collected.length ? '×' + collected.length : '';
       if (!collected.length) {
-        setStripVisible(false);
+        holdingEl.hidden = true;
         return;
       }
-      setStripVisible(true);
+      holdingEl.hidden = false;
       /* Newest first, like the top slot of a party list. */
       for (let i = collected.length - 1; i >= 0; i--) {
         const pi = collected[i];
-        const f = forms[pi][STAGES - 1];
+        /* The selected slot holds the live companion — stage and slot
+           swapped places, so each shows the other's former occupant. */
+        const swapped = i === activeCollected;
+        const f = swapped ? liveForm() : forms[pi][STAGES - 1];
         const slot = document.createElement('button');
         slot.type = 'button';
         slot.className = 'rail-avatar-slot';
         slot.dataset.idx = String(i);
         if (i === collected.length - 1) slot.classList.add('newest');
-        if (i === activeCollected) slot.classList.add('selected');
+        if (swapped) slot.classList.add('selected');
         if (i === ghostIdx) slot.classList.add('ghost');
         if (i === popIdx) slot.classList.add('pop');
-        slot.title = f.label;
-        slot.setAttribute('aria-label', f.label);
+        slot.title = swapped ? f.label + ' · live' : f.label;
+        slot.setAttribute('aria-label', slot.title);
         const c = document.createElement('canvas');
         c.width = 34; c.height = 34;
         slot.appendChild(c);
@@ -6275,12 +6299,10 @@
           selectCollected(i);
         });
         holdingEl.appendChild(slot);
-        /* After a reload the retired form's sheet may not be loaded yet. */
-        loadForm(pi, STAGES - 1).then(() => drawMini(f, c));
+        /* After a reload the slot's sheet may not be loaded yet. */
+        if (swapped) loadForm(pathIdx >= 0 ? pathIdx : 0, formIdx).then(() => drawMini(f, c));
+        else loadForm(pi, STAGES - 1).then(() => drawMini(f, c));
       }
-      /* A taller/shorter strip shifts the page buttons — re-pin the
-         rail indicator (it re-measures on window resize). */
-      window.dispatchEvent(new Event('resize'));
     }
 
     /* White comet flight of a mini sprite between two elements: a glowing
@@ -6328,25 +6350,29 @@
       setTimeout(() => stage.classList.remove('stage-pop'), 450);
     }
 
-    /* Tap a rail slot: the displayed companion flies back to the rail,
-       the stage sits empty for a beat, then the chosen form flies in. */
+    /* Tap a rail slot: a true swap of places. The displayed companion
+       flies into the tapped slot (or home to its own slot if another
+       collected form was on stage), then the slot's form flies in. */
     async function selectCollected(i){
       if (evolveTarget !== -1 || swapBusy) return;
       if (activeCollected === i) { handBack(); return; }
       swapBusy = true;
       const outgoing = activeCollected;
       const outForm = curForm();
+      const slot = slotElFor(i);
       stage.classList.add('stage-empty');
       if (outgoing >= 0) {
+        /* Another collected form was on stage: it flies home first. */
         const outSlot = slotElFor(outgoing);
         if (outSlot) outSlot.classList.add('ghost');
         await flyAvatar(canvas, outSlot || holdingEl, outForm, 520);
         if (outSlot) outSlot.classList.remove('ghost');
       } else {
-        await flyAvatar(canvas, holdingEl, outForm, 520);
+        /* The live companion moves into the tapped slot. */
+        if (slot) slot.classList.add('ghost');
+        await flyAvatar(canvas, slot || holdingEl, outForm, 520);
       }
-      if (evolveTarget !== -1) { swapBusy = false; stageReveal(); updateAvatar(); return; }
-      const slot = slotElFor(i);
+      if (evolveTarget !== -1) { swapBusy = false; renderHolding(); stageReveal(); updateAvatar(); return; }
       if (slot) slot.classList.add('ghost');
       await loadForm(collected[i], STAGES - 1);
       await flyAvatar(slot || holdingEl, canvas, forms[collected[i]][STAGES - 1], 520);
@@ -6354,7 +6380,7 @@
       activeCollected = i;
       frame = 0;
       frameTime = 0;
-      renderHolding();
+      renderHolding(i);
       stageReveal();
       saveAvatarSession(true);
       updateAvatar();
