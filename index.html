@@ -610,163 +610,239 @@
     }
     .arrange-done.show{opacity:1;pointer-events:auto;}
 
+    /* ── NEWS — full-bleed story carousel ──
+       The active story's photo fills the whole tile; a left-weighted
+       scrim keeps the overlaid copy readable. Source chip top-left,
+       headline block bottom-left, segmented progress along the bottom
+       edge, hover arrows on the sides. fitNewsTile() feeds --npad/--nt/
+       --ncpt/--ntl from the live tile size. */
     .news-strip{
-      display:flex;flex-direction:column;
+      --npad:20px;
+      position:relative;
       min-width:0;
       margin:0;
       border:1px solid var(--border);
       border-radius:18px;
       overflow:hidden;
-      background:var(--surface);
+      background:#0d0e12;
     }
-
-    .news-header{
-      display:flex;align-items:center;gap:8px;
-      padding:11px 14px 11px 16px;border-bottom:1px solid var(--border);
-    }
-    .news-label{
-      font-size:10px;font-weight:800;letter-spacing:.14em;
-      text-transform:uppercase;color:var(--accent);
-    }
-    .news-source{font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--muted);}
-    .news-dot{color:var(--muted2);font-size:9px;margin:0 1px;}
-    .news-updated{margin-left:auto;font-size:10px;color:var(--muted2);font-variant-numeric:tabular-nums;}
-    .news-nav-group{display:flex;align-items:center;gap:6px;margin-left:10px;flex-shrink:0;}
-    .news-nav{
-      width:36px;height:36px;border-radius:999px;
-      border:1px solid var(--border-em);background:rgba(255,255,255,.04);
-      color:var(--muted);cursor:pointer;
-      display:flex;align-items:center;justify-content:center;
-      transition:
-        background .25s var(--ease-smooth),
-        border-color .25s var(--ease-smooth),
-        color .25s var(--ease-smooth),
-        transform .35s var(--ease-spring);
-    }
-    .news-nav:hover{
-      color:var(--text);
-      border-color:rgba(255,255,255,.28);
-      background:rgba(255,255,255,.07);
-    }
-    .news-nav:active{
-      background:var(--accent-soft);border-color:var(--accent);color:#fff;
-      transform:scale(.92);
-    }
-    .news-nav svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
-    /* The items area flexes to fill whatever the header + dots leave,
-       so a grown tile never shows dead space and a shrunk tile just
-       gets tighter type (fitNewsTile scales it) instead of clipping. */
-    .news-items{overflow:hidden;position:relative;flex:1 1 auto;min-height:0;touch-action:pan-y;}
-    .news-slide{
+    .news-track{
       position:absolute;inset:0;
-      display:flex;align-items:stretch;
-      opacity:0;transform:translateX(28px);
-      transition:opacity .5s var(--ease-out),transform .5s var(--ease-out);
-      pointer-events:none;
+      touch-action:pan-y;
     }
-    .news-slide.active{opacity:1;transform:translateX(0);pointer-events:auto;cursor:pointer;}
-    .news-slide.exit-left{opacity:0;transform:translateX(-28px);}
-    .news-slide.exit-right{opacity:0;transform:translateX(28px);}
-    .news-slide.from-left{transform:translateX(-28px);}
-    .news-img-wrap{
-      flex:0 0 var(--niw,260px);
-      position:relative;overflow:hidden;
+    /* while a touch-drag is in flight the cards follow the finger
+       directly instead of running their snap transition */
+    .news-strip.news-dragging .news-slide{
+      transition:opacity .5s var(--ease-smooth),visibility 0s;
+    }
+    /* Multi-card carousel: the active story sits large on the left,
+       the next two peek beside it — several stories visible at once.
+       Click a side card to bring it forward. fitNewsTile() steps down
+       to featured + one peek (peek-1) on medium tiles and only drops
+       to a single full-bleed card (no-side) on tiny ones. */
+    .news-slide{
+      position:absolute;top:0;bottom:0;left:0;width:100%;
+      opacity:0;visibility:hidden;
+      transform:translateX(26px) scale(.94);
+      transition:opacity .5s var(--ease-smooth),transform .6s var(--ease-spring),
+        left .6s var(--ease-spring),width .6s var(--ease-spring),visibility 0s linear .5s;
+      pointer-events:none;
+      border-radius:10px;
+      overflow:hidden;
+    }
+    .news-slide.pos-0{
+      left:0;width:54%;
+      opacity:1;visibility:visible;transform:none;
+      pointer-events:auto;cursor:pointer;z-index:2;
+      transition:opacity .5s var(--ease-smooth),transform .6s var(--ease-spring),
+        left .6s var(--ease-spring),width .6s var(--ease-spring),visibility 0s;
+    }
+    .news-slide.pos-1{
+      left:56.5%;width:21%;
+      opacity:1;visibility:visible;transform:none;
+      pointer-events:auto;cursor:pointer;z-index:1;
+      transition:opacity .5s var(--ease-smooth),transform .6s var(--ease-spring),
+        left .6s var(--ease-spring),width .6s var(--ease-spring),visibility 0s;
+    }
+    .news-slide.pos-2{
+      left:79.5%;width:20.5%;
+      opacity:1;visibility:visible;transform:none;
+      pointer-events:auto;cursor:pointer;z-index:1;
+      transition:opacity .5s var(--ease-smooth),transform .6s var(--ease-spring),
+        left .6s var(--ease-spring),width .6s var(--ease-spring),visibility 0s;
+    }
+    /* medium tiles: featured + one peek card */
+    .news-strip.peek-1 .news-slide.pos-0{left:0;width:64%;}
+    .news-strip.peek-1 .news-slide.pos-1{left:68%;width:32%;}
+    .news-strip.peek-1 .news-slide.pos-2{opacity:0;pointer-events:none;}
+    /* tiny tiles: one full-bleed story, no side cards */
+    .news-strip.no-side .news-slide.pos-0{left:0;width:100%;}
+    .news-strip.no-side .news-slide.pos-1,
+    .news-strip.no-side .news-slide.pos-2{opacity:0;pointer-events:none;}
+    /* ken-burns drift on the featured photo */
+    @keyframes newsDrift{from{transform:scale(1.07);}to{transform:scale(1);}}
+    .news-slide.pos-0 .news-img{animation:newsDrift 9s linear forwards;}
+    /* side cards: photo + title only */
+    .news-slide.pos-1 .news-chip,
+    .news-slide.pos-2 .news-chip,
+    .news-slide.pos-1 .news-desc,
+    .news-slide.pos-2 .news-desc,
+    .news-slide.pos-1 .news-cta,
+    .news-slide.pos-2 .news-cta{display:none;}
+    .news-slide.pos-1 .news-shade,
+    .news-slide.pos-2 .news-shade{
+      background:linear-gradient(to top,rgba(6,8,12,.92) 0%,rgba(6,8,12,.28) 55%,transparent 100%);
+    }
+    .news-slide.pos-1 .news-body,
+    .news-slide.pos-2 .news-body{
+      left:10px;right:10px;bottom:10px;gap:0;
+    }
+    .news-slide.pos-1 .news-title,
+    .news-slide.pos-2 .news-title{
+      font-size:12px;font-weight:700;line-height:1.3;
+      -webkit-line-clamp:3;
+    }
+    .news-slide.pos-1:hover,
+    .news-slide.pos-2:hover{filter:brightness(1.15);}
+    .news-img{
+      position:absolute;inset:0;width:100%;height:100%;
+      object-fit:cover;display:block;
+    }
+    /* scrims: left-weighted wash for the copy, top band for the chip,
+       bottom band for the progress bar */
+    .news-shade{
+      position:absolute;inset:0;pointer-events:none;
       background:
-        linear-gradient(160deg,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.22),rgba(0,0,0,.35)),
-        var(--surface-em);
+        linear-gradient(100deg,rgba(6,8,12,.94) 0%,rgba(6,8,12,.8) 32%,rgba(6,8,12,.32) 58%,rgba(6,8,12,.16) 76%,rgba(6,8,12,.5) 100%),
+        linear-gradient(180deg,rgba(6,8,12,.5) 0%,transparent 24%),
+        linear-gradient(to top,rgba(6,8,12,.66) 0%,transparent 30%);
     }
-    .news-img-wrap img{
-      width:100%;height:100%;object-fit:cover;display:block;
-      transition:transform .7s var(--ease-smooth);
+    /* source + age chip */
+    .news-chip{
+      position:absolute;top:var(--npad);left:var(--npad);z-index:3;
+      display:inline-flex;align-items:center;gap:7px;
+      max-width:calc(100% - var(--npad) * 2);
+      height:26px;padding:0 12px;border-radius:999px;
+      background:rgba(8,10,14,.42);
+      border:1px solid rgba(255,255,255,.16);
+      backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      font-size:10px;font-weight:700;letter-spacing:.09em;
+      text-transform:uppercase;color:rgba(255,255,255,.92);
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
     }
-    .news-slide.active .news-img-wrap img{transform:scale(1.04);}
-    .news-img-wrap::after{
-      content:'';position:absolute;inset:0;
-      background:linear-gradient(90deg,transparent 55%,var(--surface));
-      pointer-events:none;
+    .news-chip::before{
+      content:'';flex:0 0 auto;
+      width:6px;height:6px;border-radius:50%;
+      background:var(--accent);
+      box-shadow:0 0 10px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.55);
     }
-    .news-copy{
-      flex:1;min-width:0;
-      display:flex;flex-direction:column;justify-content:center;
-      padding:18px 20px 18px 16px;gap:9px;
+    /* headline block */
+    .news-body{
+      position:absolute;left:var(--npad);right:var(--npad);
+      bottom:calc(var(--npad) + 16px);z-index:2;
+      display:flex;flex-direction:column;align-items:flex-start;gap:9px;
     }
-    .news-meta{
-      display:flex;align-items:center;gap:8px;
-      font-size:10px;font-weight:700;letter-spacing:.08em;
-      text-transform:uppercase;color:var(--muted);
-    }
-    .news-idx{color:var(--accent);font-variant-numeric:tabular-nums;letter-spacing:.04em;}
-    .news-time{font-variant-numeric:tabular-nums;color:var(--muted2);text-transform:none;letter-spacing:0;font-weight:500;}
     .news-title{
-      font-size:var(--nt,20px);font-weight:700;line-height:1.22;letter-spacing:-.02em;
-      color:var(--text);
-      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+      margin:0;
+      font-size:var(--nt,22px);font-weight:800;line-height:1.16;letter-spacing:-.025em;
+      color:#fff;
+      text-shadow:0 2px 18px rgba(0,0,0,.6),0 1px 2px rgba(0,0,0,.5);
+      display:-webkit-box;-webkit-line-clamp:var(--ntl,2);-webkit-box-orient:vertical;
       overflow:hidden;
     }
     .news-desc{
-      font-size:var(--nd,13px);font-weight:400;line-height:1.45;
-      color:rgba(255,255,255,.56);
+      margin:0;max-width:min(62ch,100%);
+      font-size:var(--ncpt,13px);font-weight:400;line-height:1.45;
+      color:rgba(238,242,250,.78);
+      text-shadow:0 1px 10px rgba(0,0,0,.65);
       display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
       overflow:hidden;
     }
-    /* Small tiles: drop the desc line / the image entirely rather than
-       let copy crush against the picture (fitNewsTile toggles these). */
-    .news-strip.no-desc .news-desc{display:none;}
-    .news-strip.no-img .news-img-wrap{display:none;}
-    .news-dots{
-      display:flex;gap:6px;padding:10px 14px;
-      border-top:1px solid var(--border);align-items:center;
-      overflow-x:auto;scrollbar-width:none;
-    }
-    .news-dots::-webkit-scrollbar{display:none;}
-    .news-pip{
-      width:18px;height:4px;border-radius:999px;
-      border:none;padding:0;appearance:none;
-      background:rgba(255,255,255,.12);
-      overflow:hidden;flex-shrink:0;
-      transition:background .4s var(--ease-smooth),width .4s var(--ease-spring),box-shadow .4s var(--ease-smooth);
+    .news-cta{
+      margin-top:2px;
+      display:inline-flex;align-items:center;gap:6px;
+      height:32px;padding:0 15px;border-radius:999px;
+      background:rgba(255,255,255,.13);
+      border:1px solid rgba(255,255,255,.22);
+      backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+      font-family:inherit;font-size:12px;font-weight:700;color:#fff;
       cursor:pointer;
+      transition:background .25s var(--ease-smooth),gap .3s var(--ease-spring),transform .2s var(--ease-spring);
     }
-    .news-pip.on{
-      background:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.25);
-      width:40px;
-      box-shadow:0 0 10px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.25);
+    .news-cta svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+    .news-slide.pos-0:hover .news-cta{background:rgba(255,255,255,.24);gap:9px;}
+    .news-cta:active{transform:scale(.95);}
+    /* Small tiles: drop the desc / CTA / arrows / progress rather than
+       let the copy crush (fitNewsTile toggles these). */
+    .news-strip.no-desc .news-desc{display:none;}
+    .news-strip.no-cta .news-cta{display:none;}
+    .news-strip.no-nav .news-nav{display:none;}
+    .news-strip.no-progress .news-progress{display:none;}
+    /* edge arrows — revealed on hover (always visible on touch) */
+    .news-nav{
+      position:absolute;top:50%;z-index:4;
+      width:36px;height:36px;border-radius:999px;
+      transform:translateY(-50%) scale(.8);
+      display:flex;align-items:center;justify-content:center;
+      appearance:none;border:1px solid rgba(255,255,255,.18);cursor:pointer;
+      background:rgba(8,10,14,.5);color:#fff;
+      backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+      opacity:0;pointer-events:none;
+      transition:opacity .3s var(--ease-smooth),transform .35s var(--ease-spring),background .2s var(--ease-smooth);
     }
-    .news-pip.on::after{
-      content:'';display:block;height:100%;width:0;
-      background:var(--accent);
-      border-radius:999px;
-      animation:newsPipFill 7s linear forwards;
+    .news-nav svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+    .news-prev{left:12px;}
+    .news-next{right:12px;}
+    .news-strip:hover .news-nav,
+    .news-nav:focus-visible{opacity:1;pointer-events:auto;transform:translateY(-50%) scale(1);}
+    .news-nav:hover{background:rgba(255,255,255,.16);}
+    .news-nav:active{transform:translateY(-50%) scale(.9);}
+    @media (hover:none){
+      .news-nav{opacity:1;pointer-events:auto;transform:translateY(-50%) scale(1);}
     }
-    @keyframes newsPipFill{to{width:100%;}}
-    .news-skeleton{
-      height:140px;display:flex;align-items:stretch;
+    /* segmented progress — sits under the featured card; the active
+       segment fills over the dwell time */
+    .news-progress{
+      position:absolute;left:var(--npad);bottom:var(--npad);
+      width:calc(54% - var(--npad) * 2);
+      z-index:3;display:flex;align-items:center;gap:5px;pointer-events:none;
     }
+    .news-strip.peek-1 .news-progress{width:calc(64% - var(--npad) * 2);}
+    .news-strip.no-side .news-progress{width:calc(100% - var(--npad) * 2);}
+    .news-pip{
+      flex:1 1 0;min-width:0;height:3px;border-radius:999px;
+      background:rgba(255,255,255,.22);overflow:hidden;
+    }
+    .news-pip i{display:block;height:100%;width:0;border-radius:999px;background:#fff;}
+    .news-pip.done i{width:100%;}
+    .news-idx{color:var(--accent);font-variant-numeric:tabular-nums;letter-spacing:.04em;}
+    .news-time{font-variant-numeric:tabular-nums;color:var(--muted2);text-transform:none;letter-spacing:0;font-weight:500;}
+    /* loading skeleton — same shape as a slide (photo + copy block) */
+    .news-skeleton{position:absolute;inset:0;}
     .news-skel-img{
-      flex:0 0 260px;
+      position:absolute;inset:0;
       background:rgba(255,255,255,0.06);
       animation:pulse .9s ease infinite;
     }
     .news-skel-copy{
-      flex:1;display:flex;flex-direction:column;justify-content:center;
-      padding:0 20px;gap:12px;
+      position:absolute;left:var(--npad);right:var(--npad);
+      bottom:calc(var(--npad) + 16px);
+      display:flex;flex-direction:column;gap:12px;
     }
     .news-skel-bar{
       height:11px;border-radius:999px;
-      background:rgba(255,255,255,0.07);
+      background:rgba(255,255,255,0.10);
       animation:pulse .9s ease infinite;
     }
     @keyframes pulse{0%,100%{opacity:.35}50%{opacity:.8}}
-    @media (max-width:720px){
-      .news-img-wrap,.news-skel-img{flex-basis:170px;}
-      .news-title{font-size:16px;}
-      .news-desc{display:none;}
-      .news-items,.news-skeleton{height:132px;}
-    }
     .news-error{
-      height:100%;display:flex;flex-direction:column;
+      position:absolute;inset:0;z-index:5;
+      display:flex;flex-direction:column;
       align-items:center;justify-content:center;
       gap:12px;padding:20px;text-align:center;
+      background:
+        radial-gradient(60% 60% at 50% 30%,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.10),transparent 65%),
+        #0d0e12;
     }
     .news-error p{font-size:12px;color:var(--muted);max-width:300px;line-height:1.6;margin:0;}
     .news-retry-btn{
@@ -777,13 +853,19 @@
     }
     .news-retry-btn:active{background:var(--accent-soft);border-color:var(--accent);color:#fff;}
     .news-ph{
-      width:100%;height:100%;
+      position:absolute;inset:0;
       display:flex;align-items:center;justify-content:center;
       font-size:34px;font-weight:800;letter-spacing:.06em;
       color:rgba(255,255,255,.20);
       background:
         radial-gradient(140px 90px at 72% 28%,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.28),transparent 70%),
         linear-gradient(160deg,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.10),rgba(0,0,0,.42));
+    }
+    @media (prefers-reduced-motion:reduce){
+      .news-slide,.news-slide.pos-0,.news-slide.pos-1,.news-slide.pos-2{
+        transition:opacity .3s linear;transform:none;
+      }
+      .news-slide.pos-0 .news-img{animation:none;}
     }
 
     /* ── AVATAR PANEL ── */
@@ -2068,8 +2150,7 @@
       border-radius:8px;
     }
 
-    .card-media,
-    .news-thumb{
+    .card-media{
       border-radius:6px;
     }
 
@@ -2088,336 +2169,6 @@
       border-color:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.45);
     }
 
-    /* ── SPOTIFY-STYLE NEWS CARD ── */
-    .news-strip{
-      position:relative;
-      background:
-        linear-gradient(135deg, hsl(var(--h) var(--acc-sat) var(--acc-lum) /.08), transparent 45%),
-        #121212;
-    }
-
-    .news-header{
-      position:absolute;
-      top:12px;
-      left:12px;
-      z-index:6;
-      border:none;
-      background:rgba(0,0,0,.38);
-      backdrop-filter:blur(10px);
-      -webkit-backdrop-filter:blur(10px);
-      border-radius:999px;
-      padding:6px 8px 6px 12px;
-      gap:8px;
-      pointer-events:none;
-    }
-
-    .news-label{
-      display:inline-flex;
-      align-items:center;
-      color:#fff;
-    }
-
-    .news-label::before{
-      content:'';
-      width:6px;
-      height:6px;
-      border-radius:50%;
-      background:var(--accent);
-      margin-right:6px;
-      box-shadow:0 0 10px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.55);
-    }
-
-    .news-source{
-      color:rgba(255,255,255,.75);
-    }
-
-    .news-updated{
-      margin-left:0;
-      color:rgba(255,255,255,.55);
-    }
-
-    .news-nav-group{
-      margin-left:4px;
-    }
-
-    .news-nav{
-      width:28px;
-      height:28px;
-      background:rgba(0,0,0,.38);
-      border-color:rgba(255,255,255,.18);
-      pointer-events:auto;
-    }
-
-    .news-slide{
-      background:#121212;
-    }
-
-    .news-img-wrap{
-      flex:0 0 var(--niw,44%);
-      background:#111;
-    }
-
-    .news-img-wrap::after{
-      content:none;
-    }
-
-    .news-copy{
-      background:#121212;
-      padding:var(--ncpt,17px) 19px var(--ncpb,17px);
-      justify-content:flex-start;
-      gap:16px;
-    }
-
-    .news-top{
-      display:flex;
-      align-items:center;
-      gap:10px;
-    }
-
-    .news-thumb{
-      width:46px;
-      height:46px;
-      border-radius:6px;
-      overflow:hidden;
-      background:#1a1a1a;
-      border:1px solid var(--border);
-      flex-shrink:0;
-    }
-
-    .news-thumb img{
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      display:block;
-    }
-
-    .news-thumb-ph{
-      width:100%;
-      height:100%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:16px;
-      font-weight:800;
-      letter-spacing:.04em;
-      color:rgba(255,255,255,.30);
-      background:linear-gradient(160deg,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.18),rgba(0,0,0,.35));
-    }
-
-    .news-eyebrow{
-      display:flex;
-      flex-direction:column;
-      gap:3px;
-      min-width:0;
-    }
-
-    .news-eyebrow-title{
-      font-size:14px;
-      font-weight:700;
-      color:#fff;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-
-    .news-eyebrow-sub{
-      font-size:12px;
-      color:var(--muted);
-      font-weight:500;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-
-    .news-title{
-      font-size:var(--nt,22px);
-      line-height:1.15;
-      letter-spacing:-.02em;
-      max-width:100%;
-      display:-webkit-box;
-      -webkit-line-clamp:3;
-      -webkit-box-orient:vertical;
-      overflow:hidden;
-    }
-
-    .news-desc{
-      display:none;
-    }
-
-    .news-actions{
-      display:flex;
-      align-items:center;
-      gap:10px;
-      margin-top:8px;
-    }
-
-    .news-cta{
-      height:36px;
-      padding:0 16px;
-      border:none;
-      border-radius:999px;
-      background:var(--accent);
-      color:#07110C;
-      font-family:'Inter',sans-serif;
-      font-size:12px;
-      font-weight:800;
-      letter-spacing:.02em;
-      cursor:pointer;
-      box-shadow:var(--accent-glow);
-      transition:transform .2s var(--ease-spring), filter .2s var(--ease-smooth);
-    }
-
-    .news-cta:hover{
-      filter:brightness(1.06);
-    }
-
-    .news-cta:active{
-      transform:scale(.96);
-    }
-
-    .news-more{
-      width:36px;
-      height:36px;
-      border-radius:50%;
-      border:1px solid var(--border);
-      background:rgba(255,255,255,.04);
-      color:var(--muted);
-      font-size:18px;
-      line-height:1;
-      letter-spacing:2px;
-      cursor:pointer;
-      transition:background .2s var(--ease-smooth), color .2s var(--ease-smooth), transform .2s var(--ease-spring);
-    }
-
-    .news-more:hover{
-      background:rgba(255,255,255,.08);
-      color:#fff;
-    }
-
-    .news-more:active{
-      transform:scale(.92);
-    }
-
-    .news-dots{
-      position:absolute;
-      right:18px;
-      bottom:12px;
-      z-index:5;
-      border:none;
-      padding:0;
-      background:transparent;
-      display:flex;
-      gap:4px;
-    }
-
-    /* Small-tile fits chosen by fitNewsTile (JS) from the live tile
-       size: shrink the header pill, drop the CTA, clamp the title —
-       so copy never collides with the pill, the dots, or itself. */
-    .news-strip.pill-tight .news-updated{display:none;}
-    .news-strip.no-cta .news-cta{display:none;}
-    .news-strip.clamp2 .news-title{-webkit-line-clamp:2;}
-
-    .news-pip{
-      width:16px;
-      height:3px;
-      border-radius:999px;
-      background:rgba(255,255,255,.18);
-    }
-
-    .news-pip.on{
-      width:28px;
-      background:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.35);
-      box-shadow:0 0 10px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.25);
-    }
-
-    .news-pip.on::after{
-      background:var(--accent);
-    }
-
-    .news-skeleton{
-      height:100%;
-    }
-
-    .news-skel-img{
-      flex:0 0 44%;
-    }
-
-    .news-skel-copy{
-      padding:17px 19px;
-      gap:16px;
-      justify-content:flex-start;
-    }
-
-    .news-skel-top{
-      display:flex;
-      align-items:center;
-      gap:10px;
-      width:100%;
-    }
-
-    .news-skel-thumb{
-      width:46px;
-      height:46px;
-      border-radius:6px;
-      background:rgba(255,255,255,.07);
-      animation:pulse .9s ease infinite;
-    }
-
-    .news-skel-lines{
-      flex:1;
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-    }
-
-    @media (max-width:720px){
-      .news-copy{
-        padding:14px;
-      }
-
-      .news-title{
-        font-size:20px;
-      }
-
-      .news-thumb{
-        width:42px;
-        height:42px;
-      }
-
-      .news-eyebrow-title{
-        font-size:12px;
-      }
-
-      .news-eyebrow-sub{
-        font-size:11px;
-      }
-
-      .news-cta{
-        height:36px;
-        padding:0 14px;
-      }
-
-      .news-more{
-        width:36px;
-        height:36px;
-      }
-
-      .news-dots{
-        right:14px;
-        bottom:10px;
-      }
-    }
-
-    @media (max-width:520px){
-      .news-img-wrap,
-      .news-skel-img{
-        flex-basis:46%;
-      }
-
-      .news-title{
-        font-size:16px;
-      }
-    }
     /* ═════════ AMBIENT MODE — BMW iDrive X-inspired theming ═════════
        My Modes-style presets retint the whole cockpit. html[data-mode]
        drives the aurora field + glow tokens below; JS sets --h (the
@@ -2578,13 +2329,7 @@
         0 -1px 0 rgba(0,0,0,.32) inset,
         0 16px 38px -20px hsl(var(--amb-h1) var(--amb-sat) 42% / calc(var(--amb-glow) * .55));
     }
-    .news-strip{
-      background:
-        linear-gradient(135deg,hsl(var(--amb-h1) var(--amb-sat) 42% /.08),transparent 45%),
-        rgba(16,16,19,.66);
-    }
-    .news-copy,
-    .news-slide{background:rgba(16,16,19,.55);}
+    .news-strip{background:#0d0e12;}
     .stock-tile,
     .avatar-panel,
     .stream-tile{
@@ -2595,8 +2340,7 @@
     .avatar-panel-head{background:transparent;}
     .card,
     .radio-card{border-radius:16px;}
-    .card-media,
-    .news-thumb{border-radius:10px;}
+    .card-media{border-radius:10px;}
 
     /* Island bar: clock picks up a whisper of the mode's hue. */
     .island-bar #clock{color:hsl(var(--amb-h1) var(--amb-sat) 94%);}
@@ -2698,43 +2442,31 @@
          .home-tile content fills its shell. -->
     <div class="grid-stack" id="homeGrid">
 
-    <!-- NEWS (home tile — hold to rearrange) -->
+    <!-- NEWS (home tile — hold to rearrange) — full-bleed story carousel -->
     <div class="grid-stack-item" gs-id="newsStrip" gs-x="0" gs-y="0" gs-w="7" gs-h="4" gs-min-w="4" gs-min-h="2" gs-max-w="12" gs-max-h="5">
       <div class="grid-stack-item-content news-strip home-tile" id="newsStrip">
         <div class="tile-grip" aria-hidden="true"><i></i><i></i><i></i></div>
-        <div class="news-header">
-          <span class="news-label">Live</span>
-          <span class="news-dot">·</span>
-          <span class="news-source" id="newsSourceLabel">Tech + Top</span>
-          <span class="news-updated" id="newsUpdated"></span>
-          <div class="news-nav-group">
-            <button class="news-nav" id="newsPrevBtn" title="Previous story" aria-label="Previous story">
-              <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-            </button>
-            <button class="news-nav" id="newsNextBtn" title="Next story" aria-label="Next story">
-              <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-            </button>
-          </div>
-        </div>
 
-        <div class="news-items" id="newsItems">
+        <div class="news-track" id="newsTrack">
           <div class="news-skeleton">
             <div class="news-skel-img"></div>
             <div class="news-skel-copy">
-              <div class="news-skel-top">
-                <div class="news-skel-thumb"></div>
-                <div class="news-skel-lines">
-                  <div class="news-skel-bar" style="width:45%"></div>
-                  <div class="news-skel-bar" style="width:30%;height:9px;animation-delay:.15s"></div>
-                </div>
-              </div>
-              <div class="news-skel-bar" style="width:88%;height:22px"></div>
-              <div class="news-skel-bar" style="width:110px;height:40px;border-radius:999px;animation-delay:.3s"></div>
+              <div class="news-skel-bar" style="width:120px;height:14px"></div>
+              <div class="news-skel-bar" style="width:82%;height:22px"></div>
+              <div class="news-skel-bar" style="width:54%;height:22px;animation-delay:.15s"></div>
+              <div class="news-skel-bar" style="width:110px;height:32px;border-radius:999px;animation-delay:.3s"></div>
             </div>
           </div>
         </div>
 
-        <div class="news-dots" id="newsDots"></div>
+        <button class="news-nav news-prev" id="newsPrevBtn" title="Previous story" aria-label="Previous story">
+          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <button class="news-nav news-next" id="newsNextBtn" title="Next story" aria-label="Next story">
+          <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+
+        <div class="news-progress" id="newsProgress"></div>
       </div>
     </div>
 
@@ -3377,28 +3109,31 @@
 
   }
 
-  /* News copy scales with the tile: title px and the image column are
-     CSS vars set from the live tile size; the floating header pill is
-     measured so the copy always starts below it when they would
-     collide, and small tiles drop the CTA / clamp the title instead
-     of letting content crush or overlap. */
+  /* News copy scales with the tile: the featured card is always
+     full-bleed, so fitNewsTile only tunes the overlay — padding, title
+     px, desc px, title clamp — keeps two peek cards on wide tiles, one
+     peek card on medium tiles, and only drops to a single card on tiny
+     ones; desc / CTA / arrows / progress go when they'd crush. */
   function fitNewsTile(){
     const strip = document.getElementById('newsStrip');
-    const items = document.getElementById('newsItems');
-    if(!strip || !items) return;
-    const w = strip.clientWidth, h = items.clientHeight;
+    if(!strip) return;
+    const w = strip.clientWidth, h = strip.clientHeight;
     if(w <= 40 || h <= 20) return;
-    strip.style.setProperty('--nt', Math.max(15, Math.min(22, Math.round(h * 0.088))) + 'px');
-    const imgFrac = w < 400 ? 0 : w < 620 ? .34 : .44;
-    strip.style.setProperty('--niw', (imgFrac * 100) + '%');
-    strip.classList.toggle('no-img', imgFrac === 0);
-    const pill = strip.querySelector('.news-header');
-    const pillW = pill ? pill.offsetWidth : 0, pillH = pill ? pill.offsetHeight : 0;
-    strip.style.setProperty('--ncpt', (12 + pillW > w * imgFrac + 19 ? pillH + 14 : 17) + 'px');
-    strip.style.setProperty('--ncpb', '24px');   /* clears the floating dots */
-    strip.classList.toggle('pill-tight', w < 560);
-    strip.classList.toggle('no-cta',  w * (1 - imgFrac) - 38 < 150);
-    strip.classList.toggle('clamp2',  h < 170);
+    const three = w >= 560;                       // featured + two peeks
+    const one   = !three && w >= 300;             // featured + one peek
+    const aw    = three ? w * 0.54 : one ? w * 0.64 : w;  // featured width
+    const pad = Math.max(12, Math.min(22, Math.round(Math.min(w * 0.05, h * 0.10))));
+    strip.style.setProperty('--npad', pad + 'px');
+    strip.style.setProperty('--nt',
+      aw < 420 ? '16px' : h < 170 ? '17px' : h < 240 ? '19px' : h < 310 ? '22px' : '25px');
+    strip.style.setProperty('--ncpt', h < 280 ? '12px' : '13px');
+    strip.style.setProperty('--ntl', h >= 360 && aw >= 560 ? '3' : '2');
+    strip.classList.toggle('peek-1',   one);
+    strip.classList.toggle('no-side',  !three && !one);
+    strip.classList.toggle('no-desc',    h < 210 || aw < 330);
+    strip.classList.toggle('no-cta',     h < 250 || aw < 300);
+    strip.classList.toggle('no-nav',     w < 320);
+    strip.classList.toggle('no-progress', h < 120);
   }
 
   /* Any tile geometry change (resize, breakpoint, restore) re-fits the
@@ -3484,14 +3219,16 @@
   // Sources split into two kinds:
   //   type:'api'  -> direct, CORS-enabled JSON API, no proxy (reliable, fast)
   //   type:'rss'  -> RSS fetched through the public proxy chain (best-effort)
-  // `limit` = how many items to pull per refresh; The Verge is weighted
-  // highest since it's the richest, most visual feed.
+  // `limit` = how many items to pull per refresh. Every source here ships a
+  // real cover image with each story — image-less feeds (dev.to) were dropped
+  // for that reason. The Verge is weighted highest as the richest feed.
   const NEWS_SOURCES = [
-    {id:'devto',    name:'Dev.to',      kind:'tech', type:'api', limit:15},
-    {id:'verge',    name:'The Verge',   kind:'tech', type:'rss', url:'https://www.theverge.com/rss/index.xml', limit:20, weight:2},
-    {id:'bbc-tech', name:'BBC Tech',    kind:'tech', type:'rss', url:'https://feeds.bbci.co.uk/news/technology/rss.xml', limit:10},
-    {id:'tc',       name:'TechCrunch',  kind:'tech', type:'rss', url:'https://techcrunch.com/feed/', limit:10},
-    {id:'bbc-top',  name:'BBC News',    kind:'top',  type:'rss', url:'https://feeds.bbci.co.uk/news/rss.xml', limit:10},
+    {id:'9to5mac',    name:'9to5Mac',     kind:'tech', type:'api', limit:12, url:'https://9to5mac.com/wp-json/wp/v2/posts?per_page=12&_embed'},
+    {id:'9to5google', name:'9to5Google',  kind:'tech', type:'api', limit:12, url:'https://9to5google.com/wp-json/wp/v2/posts?per_page=12&_embed'},
+    {id:'verge',      name:'The Verge',   kind:'tech', type:'rss', url:'https://www.theverge.com/rss/index.xml', limit:20, weight:2},
+    {id:'bbc-tech',   name:'BBC Tech',    kind:'tech', type:'rss', url:'https://feeds.bbci.co.uk/news/technology/rss.xml', limit:10},
+    {id:'tc',         name:'TechCrunch',  kind:'tech', type:'rss', url:'https://techcrunch.com/feed/', limit:10},
+    {id:'bbc-top',    name:'BBC News',    kind:'top',  type:'rss', url:'https://feeds.bbci.co.uk/news/rss.xml', limit:10},
   ];
   // Per-source representation multiplier used when building the deck.
   const NEWS_BOOST = Object.fromEntries(NEWS_SOURCES.filter(s => s.weight > 1).map(s => [s.name, s.weight]));
@@ -3536,35 +3273,37 @@
     throw lastErr || new Error('all proxies failed');
   }
 
-  async function fetchDevto(){
-    // Direct API — our most reliable source. One quick retry on transient
-    // failures (it lands well inside the 25s phase-1 window).
+  async function fetchWpApi(src){
+    // WordPress REST API — direct CORS, and every post carries a featured
+    // image via _embed. One quick retry on transient failures (it lands
+    // well inside the 25s phase-1 window).
     let res = null;
     for(let attempt = 0; attempt < 2; attempt++){
       try {
-        res = await fetch('https://dev.to/api/articles?per_page=15', {signal: AbortSignal.timeout(8000), cache:'no-store'});
+        res = await fetch(src.url, {signal: AbortSignal.timeout(8000), cache:'no-store'});
         if(res.ok) break;
         res = null;
       } catch(e){ res = null; }
       if(attempt === 0) await new Promise(r => setTimeout(r, 1000));
     }
-    if(!res || !res.ok) throw new Error('dev.to unavailable');
+    if(!res || !res.ok) throw new Error(src.name + ' unavailable');
     const j = await res.json();
     return (Array.isArray(j) ? j : []).map(a => ({
-      title: cleanNewsTitle(a.title),
-      pubDate: a.published_at || '',
-      link: a.canonical_url || a.url || '',
-      description: (a.description || '').slice(0, 220),
-      image: a.cover_image || '',
-      source: 'Dev.to',
-      feedId: 'devto',
-      kind: 'tech'
+      title: cleanNewsTitle(decodeHtmlEntities((a.title && a.title.rendered) || '')),
+      pubDate: a.date_gmt ? a.date_gmt.replace(' ', 'T') + 'Z' : '',
+      link: a.link || '',
+      description: decodeHtmlEntities((a.excerpt && a.excerpt.rendered) || '').replace(/<[^>]+>/g, '').trim().slice(0, 220),
+      image: (a._embedded && a._embedded['wp:featuredmedia'] &&
+              a._embedded['wp:featuredmedia'][0] && a._embedded['wp:featuredmedia'][0].source_url) || '',
+      source: src.name,
+      feedId: src.id,
+      kind: src.kind
     })).filter(i => i.title);
   }
 
   async function fetchSource(src){
     if(src.type === 'api'){
-      return src.id === 'devto' ? fetchDevto() : [];
+      return fetchWpApi(src);
     }
     const text = await fetchRssText(src.url);
     const doc  = new DOMParser().parseFromString(text, 'text/xml');
@@ -3718,117 +3457,86 @@
   }
 
   function renderNewsItems(){
-    const container = document.getElementById('newsItems');
-    const dots      = document.getElementById('newsDots');
-    if(!container || !dots) return;
-    container.innerHTML = '';
-    dots.innerHTML      = '';
+    const track    = document.getElementById('newsTrack');
+    const progress = document.getElementById('newsProgress');
+    if(!track || !progress) return;
+    track.innerHTML    = '';
+    progress.innerHTML = '';
     newsIdx = 0;
 
     newsItems.forEach((item, i) => {
       const slide = document.createElement('article');
-      slide.className = 'news-slide' + (i === 0 ? ' active' : '');
+      slide.className = 'news-slide';
       slide.setAttribute('role', 'group');
       slide.setAttribute('aria-label', `Story ${i + 1} of ${newsItems.length}`);
 
-      const imgWrap = document.createElement('div');
-      imgWrap.className = 'news-img-wrap';
       if(item.image){
         const img = document.createElement('img');
-        img.src = item.image;
+        img.className = 'news-img';
+        img.src = newsImageLarge(item.image);
         img.alt = '';
         img.loading = i === 0 ? 'eager' : 'lazy';
-        img.addEventListener('error', () => { img.remove(); addNewsPlaceholder(imgWrap, item); });
-        imgWrap.appendChild(img);
+        img.decoding = 'async';
+        img.referrerPolicy = 'no-referrer';
+        img.addEventListener('error', () => { img.remove(); addNewsPlaceholder(slide, item); });
+        slide.appendChild(img);
       } else {
-        addNewsPlaceholder(imgWrap, item);
+        addNewsPlaceholder(slide, item);
       }
 
-      const copy = document.createElement('div');
-      copy.className = 'news-copy';
+      const shade = document.createElement('div');
+      shade.className = 'news-shade';
+      slide.appendChild(shade);
 
-      const top = document.createElement('div');
-      top.className = 'news-top';
+      const chip = document.createElement('div');
+      chip.className = 'news-chip';
+      const ago = timeAgo(item.pubDate);
+      chip.textContent = (item.source || 'News') + (ago ? ' · ' + ago : '');
+      slide.appendChild(chip);
 
-      const thumb = document.createElement('div');
-      thumb.className = 'news-thumb';
-      if(item.image){
-        const thumbImg = document.createElement('img');
-        thumbImg.src = item.image;
-        thumbImg.alt = '';
-        thumbImg.loading = i === 0 ? 'eager' : 'lazy';
-        thumbImg.addEventListener('error', () => { thumb.innerHTML = ''; addNewsPlaceholder(thumb, item, 'news-thumb-ph'); });
-        thumb.appendChild(thumbImg);
-      } else {
-        addNewsPlaceholder(thumb, item, 'news-thumb-ph');
-      }
-
-      const eyebrow = document.createElement('div');
-      eyebrow.className = 'news-eyebrow';
-
-      const eyebrowTitle = document.createElement('span');
-      eyebrowTitle.className = 'news-eyebrow-title';
-      eyebrowTitle.textContent = item.source || 'News';
-
-      const eyebrowSub = document.createElement('span');
-      eyebrowSub.className = 'news-eyebrow-sub';
-      eyebrowSub.textContent = timeAgo(item.pubDate) || 'Trending';
-
-      eyebrow.append(eyebrowTitle, eyebrowSub);
-      top.append(thumb, eyebrow);
+      const body = document.createElement('div');
+      body.className = 'news-body';
 
       const title = document.createElement('h3');
       title.className = 'news-title';
       title.textContent = item.title || '';
+      body.appendChild(title);
 
-      copy.append(top, title);
-
-      const actions = document.createElement('div');
-      actions.className = 'news-actions';
+      if(item.description){
+        const desc = document.createElement('p');
+        desc.className = 'news-desc';
+        desc.textContent = item.description;
+        body.appendChild(desc);
+      }
 
       const cta = document.createElement('button');
       cta.type = 'button';
       cta.className = 'news-cta';
-      cta.textContent = 'Read story';
+      cta.innerHTML = 'Read story <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
       cta.addEventListener('click', (e) => {
         e.stopPropagation();
         openNewsPopup(item, i);
       });
+      body.appendChild(cta);
 
-      const more = document.createElement('button');
-      more.type = 'button';
-      more.className = 'news-more';
-      more.textContent = '···';
-      more.setAttribute('aria-label', 'Open article');
-      more.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if(document.body.classList.contains('home-arranging')) return;
-        if(item.link) openUrl(item.link);
-        else openNewsPopup(item, i);
-      });
-
-      actions.append(cta, more);
-      copy.appendChild(actions);
-
-      slide.append(imgWrap, copy);
+      slide.appendChild(body);
       slide.addEventListener('click', () => {
         if(newsSwiped){ newsSwiped = false; return; }
+        // side cards jump the queue; the featured card opens the popup
+        if(!slide.classList.contains('pos-0')){ goToNews(i); return; }
         openNewsPopup(item, i);
       });
-      container.appendChild(slide);
+      track.appendChild(slide);
 
-      const pip = document.createElement('button');
-      pip.type = 'button';
-      pip.className = 'news-pip' + (i === 0 ? ' on' : '');
-      pip.setAttribute('aria-label', `Go to story ${i + 1}`);
-      pip.addEventListener('click', (e) => {
-        e.stopPropagation();
-        goToNews(i);
-      });
-      dots.appendChild(pip);
+      const pip = document.createElement('span');
+      pip.className = 'news-pip';
+      pip.appendChild(document.createElement('i'));
+      progress.appendChild(pip);
     });
 
-    setNewsHeaderSource(newsItems[0]?.source);
+    updateNewsUI();
+    paintNewsPips();
+    fitNewsTile();
     restartNewsTimer();
   }
 
@@ -3838,42 +3546,47 @@
     return ((next % n) + n) % n;
   }
 
+  /* Segmented progress: past stories stay filled, the current one
+     fills over the dwell window (kept in sync with NEWS_INTERVAL). */
+  function paintNewsPips(){
+    const pips = document.querySelectorAll('.news-progress .news-pip');
+    pips.forEach((p, i) => {
+      const fill = p.firstElementChild;
+      if(!fill) return;
+      p.classList.toggle('done', i < newsIdx);
+      fill.style.transition = 'none';
+      if(i === newsIdx){
+        fill.style.width = '0%';
+        void fill.offsetWidth;
+        fill.style.transition = 'width ' + NEWS_INTERVAL + 'ms linear';
+        fill.style.width = '100%';
+      } else {
+        fill.style.width = i < newsIdx ? '100%' : '0%';
+      }
+    });
+  }
+
+  /* Position the deck: the featured story (pos-0) sits large on the
+     left, the next two (pos-1/pos-2) peek beside it, everything else
+     stays parked off-stage. */
+  function updateNewsUI(){
+    const slides = document.querySelectorAll('.news-track .news-slide');
+    const n = slides.length;
+    if(!n) return;
+    slides.forEach((s, i) => {
+      const rel = ((i - newsIdx) % n + n) % n;
+      s.classList.toggle('pos-0', rel === 0);
+      s.classList.toggle('pos-1', rel === 1 && n > 1);
+      s.classList.toggle('pos-2', rel === 2 && n > 2);
+    });
+  }
+
   function goToNews(next){
-    const slides = document.querySelectorAll('.news-slide');
-    const pips   = document.querySelectorAll('.news-pip');
+    const slides = document.querySelectorAll('.news-track .news-slide');
     if(!slides.length) return;
-    next = wrapNewsIdx(next);
-    if(next === newsIdx){
-      restartNewsTimer();
-      pips[newsIdx] && pips[newsIdx].classList.remove('on');
-      void (pips[newsIdx] && pips[newsIdx].offsetWidth);
-      pips[newsIdx] && pips[newsIdx].classList.add('on');
-      return;
-    }
-
-    const prev = newsIdx;
-    const goingBack = (next < prev && !(prev === 0 && next === newsItems.length - 1)) ||
-                      (prev === 0 && next === newsItems.length - 1);
-
-    newsIdx = next;
-    slides[prev].classList.remove('active');
-    slides[prev].classList.add(goingBack ? 'exit-right' : 'exit-left');
-    slides[next].classList.remove('exit-left', 'exit-right');
-    if(goingBack) slides[next].classList.add('from-left');
-    void slides[next].offsetWidth;
-    slides[next].classList.remove('from-left');
-    slides[next].classList.add('active');
-    setTimeout(() => {
-      if(slides[prev]) slides[prev].classList.remove('exit-left', 'exit-right');
-    }, 520);
-
-    pips[prev] && pips[prev].classList.remove('on');
-    if(pips[newsIdx]){
-      pips[newsIdx].classList.remove('on');
-      void pips[newsIdx].offsetWidth;
-      pips[newsIdx].classList.add('on');
-    }
-    setNewsHeaderSource(newsItems[newsIdx]?.source);
+    newsIdx = wrapNewsIdx(next);
+    updateNewsUI();
+    paintNewsPips();
     restartNewsTimer();
   }
 
@@ -3885,6 +3598,14 @@
   function stepNews(delta){
     if(!newsItems.length) return;
     goToNews(newsIdx + delta);
+  }
+
+  // WP REST hands back HTML-escaped strings (&#8217; etc); the RSS path gets
+  // entity-decoding for free from DOMParser, so do the same thing here.
+  const newsDecoder = document.createElement('textarea');
+  function decodeHtmlEntities(s){
+    newsDecoder.innerHTML = s || '';
+    return newsDecoder.value;
   }
 
   // Some feeds stuff newlines / bare URLs into <title>; keep the first
@@ -3973,18 +3694,6 @@
     return deck;
   }
 
-  function setNewsUpdated(d){
-    const el = document.getElementById('newsUpdated');
-    if(el){
-      el.textContent = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-    }
-  }
-
-  function setNewsHeaderSource(name){
-    const el = document.getElementById('newsSourceLabel');
-    if(el && name) el.textContent = name;
-  }
-
   function clearNewsRetry(){
     if(newsRetryTimer){ clearTimeout(newsRetryTimer); newsRetryTimer = null; }
   }
@@ -3997,11 +3706,11 @@
   }
 
   function renderNewsError(){
-    const container = document.getElementById('newsItems');
-    const dots      = document.getElementById('newsDots');
-    if(!container || !dots) return;
-    container.innerHTML = '';
-    dots.innerHTML      = '';
+    const track    = document.getElementById('newsTrack');
+    const progress = document.getElementById('newsProgress');
+    if(!track || !progress) return;
+    track.innerHTML    = '';
+    progress.innerHTML = '';
     const box = document.createElement('div');
     box.className = 'news-error';
     const p = document.createElement('p');
@@ -4050,7 +3759,6 @@
       newsFailCount = 0;
       clearNewsRetry();
       if(!newsPopupOpen) renderNewsItems();
-      setNewsUpdated(new Date());
 
       // Phase 2 — if the deck is single-sourced, top up the mix when the
       // slower RSS sources land (never more than ~40s after page load).
@@ -4081,7 +3789,6 @@
 
   function bindNewsControls(){
     const strip = document.getElementById('newsStrip');
-    const stage = document.getElementById('newsItems');
     const prev  = document.getElementById('newsPrevBtn');
     const next  = document.getElementById('newsNextBtn');
     const pop   = document.getElementById('newsPop');
@@ -4104,21 +3811,54 @@
       if(e.key === 'Escape') closeNewsPopup();
     });
 
-    let touchX = null;
-    if(stage){
-      stage.addEventListener('touchstart', (e) => {
-        touchX = e.changedTouches[0].clientX;
-        newsSwiped = false;
+    /* Touch / pen drag: the deck follows the finger while sliding and
+       snaps to the nearest story on release — a real swipe-scroll, not
+       just a fling threshold. Mouse pointers are left to the hold-to-
+       arrange handler. */
+    if(strip){
+      let dragX0 = null, dragY0 = null, dragDx = 0, dragActive = false, dragPid = -1;
+      const unit = () => Math.max(120, strip.clientWidth * 0.34);
+
+      strip.addEventListener('pointerdown', (e) => {
+        if(e.pointerType === 'mouse') return;
+        if(document.body.classList.contains('home-arranging')) return;
+        if(e.target.closest('button')) return;
+        dragX0 = e.clientX; dragY0 = e.clientY; dragDx = 0;
+        dragActive = false; dragPid = e.pointerId;
         clearInterval(newsTimer);
+      });
+      strip.addEventListener('pointermove', (e) => {
+        if(dragPid !== e.pointerId || dragX0 == null) return;
+        const dx = e.clientX - dragX0, dy = e.clientY - dragY0;
+        if(!dragActive){
+          if(Math.abs(dx) < 10) return;
+          if(Math.abs(dy) > Math.abs(dx)){ dragX0 = null; return; }  // vertical page scroll
+          dragActive = true;
+          strip.classList.add('news-dragging');
+        }
+        dragDx = dx;
+        const u = unit();
+        const f = Math.max(-1.35, Math.min(1.35, dragDx / u));
+        const track = document.getElementById('newsTrack');
+        if(track) track.style.transform = `translateX(${-f * u}px)`;
       }, {passive: true});
-      stage.addEventListener('touchend', (e) => {
-        if(touchX == null) return;
-        const dx = e.changedTouches[0].clientX - touchX;
-        if(dx > 48){ newsSwiped = true; stepNews(-1); }
-        else if(dx < -48){ newsSwiped = true; stepNews(1); }
-        else if(newsItems.length) restartNewsTimer();
-        touchX = null;
-      }, {passive: true});
+      const endDrag = (e) => {
+        if(dragPid !== e.pointerId || dragX0 == null) return;
+        const track = document.getElementById('newsTrack');
+        if(track) track.style.transform = '';
+        strip.classList.remove('news-dragging');
+        if(dragActive){
+          newsSwiped = true;
+          const steps = Math.round(dragDx / unit());
+          if(steps) stepNews(-steps);
+          else restartNewsTimer();
+        } else if(newsItems.length){
+          restartNewsTimer();
+        }
+        dragX0 = null; dragActive = false; dragPid = -1;
+      };
+      strip.addEventListener('pointerup', endDrag);
+      strip.addEventListener('pointercancel', endDrag);
     }
   }
 
