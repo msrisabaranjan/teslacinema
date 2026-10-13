@@ -630,26 +630,70 @@
       position:absolute;inset:0;
       touch-action:pan-y;
     }
-    /* Slides cross-fade; the active photo drifts slowly (ken-burns)
-       while the story is on screen. */
+    /* Multi-card carousel: the active story sits large on the left,
+       the next two peek beside it — several stories visible at once.
+       Click a side card to bring it forward. fitNewsTile() collapses
+       to a single full-bleed card (no-side) on narrow tiles. */
     .news-slide{
-      position:absolute;inset:0;
+      position:absolute;top:0;bottom:0;left:0;width:100%;
       opacity:0;visibility:hidden;
-      transform:scale(1.05);
-      transition:opacity .65s var(--ease-smooth),transform 1s var(--ease-out),visibility 0s linear .65s;
+      transform:translateX(26px) scale(.94);
+      transition:opacity .5s var(--ease-smooth),transform .6s var(--ease-spring),
+        left .6s var(--ease-spring),width .6s var(--ease-spring),visibility 0s linear .5s;
       pointer-events:none;
+      border-radius:10px;
+      overflow:hidden;
     }
-    .news-slide.active{
-      opacity:1;visibility:visible;
-      transform:scale(1);
-      transition:opacity .65s var(--ease-smooth),transform 9s linear,visibility 0s;
-      pointer-events:auto;cursor:pointer;
+    .news-slide.pos-0{
+      left:0;width:54%;
+      opacity:1;visibility:visible;transform:none;
+      pointer-events:auto;cursor:pointer;z-index:2;
+      transition:opacity .5s var(--ease-smooth),transform .6s var(--ease-spring),
+        left .6s var(--ease-spring),width .6s var(--ease-spring),visibility 0s;
     }
-    .news-slide.exit{
-      opacity:0;visibility:visible;
-      transform:scale(1.02);
-      transition:opacity .65s var(--ease-smooth),transform 1s var(--ease-out),visibility 0s;
+    .news-slide.pos-1{
+      left:56.5%;width:21%;
+      opacity:1;visibility:visible;transform:none;
+      pointer-events:auto;cursor:pointer;z-index:1;
+      transition:opacity .5s var(--ease-smooth),transform .6s var(--ease-spring),
+        left .6s var(--ease-spring),width .6s var(--ease-spring),visibility 0s;
     }
+    .news-slide.pos-2{
+      left:79.5%;width:20.5%;
+      opacity:1;visibility:visible;transform:none;
+      pointer-events:auto;cursor:pointer;z-index:1;
+      transition:opacity .5s var(--ease-smooth),transform .6s var(--ease-spring),
+        left .6s var(--ease-spring),width .6s var(--ease-spring),visibility 0s;
+    }
+    /* narrow tiles: one full-bleed story, no side cards */
+    .news-strip.no-side .news-slide.pos-0{left:0;width:100%;}
+    .news-strip.no-side .news-slide.pos-1,
+    .news-strip.no-side .news-slide.pos-2{opacity:0;pointer-events:none;}
+    /* ken-burns drift on the featured photo */
+    @keyframes newsDrift{from{transform:scale(1.07);}to{transform:scale(1);}}
+    .news-slide.pos-0 .news-img{animation:newsDrift 9s linear forwards;}
+    /* side cards: photo + title only */
+    .news-slide.pos-1 .news-chip,
+    .news-slide.pos-2 .news-chip,
+    .news-slide.pos-1 .news-desc,
+    .news-slide.pos-2 .news-desc,
+    .news-slide.pos-1 .news-cta,
+    .news-slide.pos-2 .news-cta{display:none;}
+    .news-slide.pos-1 .news-shade,
+    .news-slide.pos-2 .news-shade{
+      background:linear-gradient(to top,rgba(6,8,12,.92) 0%,rgba(6,8,12,.28) 55%,transparent 100%);
+    }
+    .news-slide.pos-1 .news-body,
+    .news-slide.pos-2 .news-body{
+      left:10px;right:10px;bottom:10px;gap:0;
+    }
+    .news-slide.pos-1 .news-title,
+    .news-slide.pos-2 .news-title{
+      font-size:12px;font-weight:700;line-height:1.3;
+      -webkit-line-clamp:3;
+    }
+    .news-slide.pos-1:hover,
+    .news-slide.pos-2:hover{filter:brightness(1.15);}
     .news-img{
       position:absolute;inset:0;width:100%;height:100%;
       object-fit:cover;display:block;
@@ -716,7 +760,7 @@
       transition:background .25s var(--ease-smooth),gap .3s var(--ease-spring),transform .2s var(--ease-spring);
     }
     .news-cta svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
-    .news-slide.active:hover .news-cta{background:rgba(255,255,255,.24);gap:9px;}
+    .news-slide.pos-0:hover .news-cta{background:rgba(255,255,255,.24);gap:9px;}
     .news-cta:active{transform:scale(.95);}
     /* Small tiles: drop the desc / CTA / arrows / progress rather than
        let the copy crush (fitNewsTile toggles these). */
@@ -746,11 +790,14 @@
     @media (hover:none){
       .news-nav{opacity:1;pointer-events:auto;transform:translateY(-50%) scale(1);}
     }
-    /* segmented progress — the active segment fills over the dwell time */
+    /* segmented progress — sits under the featured card; the active
+       segment fills over the dwell time */
     .news-progress{
-      position:absolute;left:var(--npad);right:var(--npad);bottom:var(--npad);
+      position:absolute;left:var(--npad);bottom:var(--npad);
+      width:calc(54% - var(--npad) * 2);
       z-index:3;display:flex;align-items:center;gap:5px;pointer-events:none;
     }
+    .news-strip.no-side .news-progress{width:calc(100% - var(--npad) * 2);}
     .news-pip{
       flex:1 1 0;min-width:0;height:3px;border-radius:999px;
       background:rgba(255,255,255,.22);overflow:hidden;
@@ -804,9 +851,10 @@
         linear-gradient(160deg,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.10),rgba(0,0,0,.42));
     }
     @media (prefers-reduced-motion:reduce){
-      .news-slide,.news-slide.active,.news-slide.exit{
+      .news-slide,.news-slide.pos-0,.news-slide.pos-1,.news-slide.pos-2{
         transition:opacity .3s linear;transform:none;
       }
+      .news-slide.pos-0 .news-img{animation:none;}
     }
 
     /* ── AVATAR PANEL ── */
@@ -3050,23 +3098,27 @@
 
   }
 
-  /* News copy scales with the tile: the photo is always full-bleed, so
-     fitNewsTile only tunes the overlay — padding, title px, desc px,
-     title clamp — and drops the desc / CTA / arrows / progress when the
-     tile gets too short for them to stack without crushing. */
+  /* News copy scales with the tile: the featured card is always
+     full-bleed, so fitNewsTile only tunes the overlay — padding, title
+     px, desc px, title clamp — shows the two peek cards when there's
+     room, and drops the desc / CTA / arrows / progress when the tile
+     gets too short for them to stack without crushing. */
   function fitNewsTile(){
     const strip = document.getElementById('newsStrip');
     if(!strip) return;
     const w = strip.clientWidth, h = strip.clientHeight;
     if(w <= 40 || h <= 20) return;
+    const side = w >= 560;                       // room for the two peek cards
+    const aw   = side ? w * 0.54 : w;            // featured card width
     const pad = Math.max(12, Math.min(22, Math.round(Math.min(w * 0.05, h * 0.10))));
     strip.style.setProperty('--npad', pad + 'px');
     strip.style.setProperty('--nt',
-      w < 420 ? '16px' : h < 170 ? '17px' : h < 240 ? '19px' : h < 310 ? '22px' : '25px');
+      aw < 420 ? '16px' : h < 170 ? '17px' : h < 240 ? '19px' : h < 310 ? '22px' : '25px');
     strip.style.setProperty('--ncpt', h < 280 ? '12px' : '13px');
-    strip.style.setProperty('--ntl', h >= 360 && w >= 620 ? '3' : '2');
-    strip.classList.toggle('no-desc',    h < 210 || w < 400);
-    strip.classList.toggle('no-cta',     h < 250 || w < 340);
+    strip.style.setProperty('--ntl', h >= 360 && aw >= 560 ? '3' : '2');
+    strip.classList.toggle('no-side',    !side);
+    strip.classList.toggle('no-desc',    h < 210 || aw < 330);
+    strip.classList.toggle('no-cta',     h < 250 || aw < 300);
     strip.classList.toggle('no-nav',     w < 320);
     strip.classList.toggle('no-progress', h < 120);
   }
@@ -3397,7 +3449,7 @@
 
     newsItems.forEach((item, i) => {
       const slide = document.createElement('article');
-      slide.className = 'news-slide' + (i === 0 ? ' active' : '');
+      slide.className = 'news-slide';
       slide.setAttribute('role', 'group');
       slide.setAttribute('aria-label', `Story ${i + 1} of ${newsItems.length}`);
 
@@ -3453,6 +3505,8 @@
       slide.appendChild(body);
       slide.addEventListener('click', () => {
         if(newsSwiped){ newsSwiped = false; return; }
+        // side cards jump the queue; the featured card opens the popup
+        if(!slide.classList.contains('pos-0')){ goToNews(i); return; }
         openNewsPopup(item, i);
       });
       track.appendChild(slide);
@@ -3463,6 +3517,7 @@
       progress.appendChild(pip);
     });
 
+    updateNewsUI();
     paintNewsPips();
     fitNewsTile();
     restartNewsTimer();
@@ -3494,26 +3549,26 @@
     });
   }
 
+  /* Position the deck: the featured story (pos-0) sits large on the
+     left, the next two (pos-1/pos-2) peek beside it, everything else
+     stays parked off-stage. */
+  function updateNewsUI(){
+    const slides = document.querySelectorAll('.news-track .news-slide');
+    const n = slides.length;
+    if(!n) return;
+    slides.forEach((s, i) => {
+      const rel = ((i - newsIdx) % n + n) % n;
+      s.classList.toggle('pos-0', rel === 0);
+      s.classList.toggle('pos-1', rel === 1 && n > 1);
+      s.classList.toggle('pos-2', rel === 2 && n > 2);
+    });
+  }
+
   function goToNews(next){
-    const slides = document.querySelectorAll('.news-slide');
+    const slides = document.querySelectorAll('.news-track .news-slide');
     if(!slides.length) return;
-    next = wrapNewsIdx(next);
-    if(next === newsIdx){
-      restartNewsTimer();
-      paintNewsPips();
-      return;
-    }
-
-    const prev = newsIdx;
-    newsIdx = next;
-    slides[prev].classList.remove('active');
-    slides[prev].classList.add('exit');
-    slides[next].classList.remove('exit');
-    slides[next].classList.add('active');
-    setTimeout(() => {
-      if(slides[prev]) slides[prev].classList.remove('exit');
-    }, 700);
-
+    newsIdx = wrapNewsIdx(next);
+    updateNewsUI();
     paintNewsPips();
     restartNewsTimer();
   }
