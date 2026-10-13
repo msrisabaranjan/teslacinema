@@ -26,6 +26,25 @@
   })();
   </script>
 
+  <script>
+  /* ── AMBIENT MODE PRE-PAINT RESTORE ──
+     Applies the saved mode (html[data-mode]) and its accent hue before
+     the stylesheet paints, so the cockpit never flashes the default.
+     Mirrors the MODE_HUES map in the accent-panel script below. */
+  (function(){
+    try{
+      var HUES = {personal:141,efficient:178,sport:8,silent:214,theater:32,white:0};
+      var raw = localStorage.getItem('tcinema.mode');
+      var m = (raw && HUES.hasOwnProperty(raw)) ? raw : null;
+      var v = parseInt(localStorage.getItem('tcinema.accentHue'), 10);
+      if(!m) m = (Number.isFinite(v) && v !== 141) ? 'custom' : 'personal';
+      document.documentElement.setAttribute('data-mode', m);
+      var h = (m === 'custom' && Number.isFinite(v)) ? v : HUES[m];
+      document.documentElement.style.setProperty('--h', h);
+    }catch(e){/* never break page boot on compat failure */}
+  })();
+  </script>
+
   <title>T / Cinema</title>
   <link rel="icon" href="images/miff4.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -39,21 +58,24 @@
          141 is the default Spotify green: #1DB954 = hsl(141 73% 42%),
          #1ED760 ≈ hsl(141 75% 48%). Every UI green derives from it. */
       --h:141;
+      /* Accent saturation/lightness: modes can desaturate + brighten
+         the whole accent system (White mode = monochrome glow). */
+      --acc-sat:73%;--acc-lum:42%;
       --bg:#0B0B0E;
       --bg-raised:#111114;
       --surface:#18181D;
       --surface-em:#22222A;
-      --surface-active:hsl(var(--h) 73% 42% / .14);
+      --surface-active:hsl(var(--h) var(--acc-sat) var(--acc-lum) / .14);
       --border:rgba(255,255,255,.08);
       --border-em:rgba(255,255,255,.16);
-      --accent:hsl(var(--h) 73% 42%);
-      --accent-soft:hsl(var(--h) 73% 42% / .16);
+      --accent:hsl(var(--h) var(--acc-sat) var(--acc-lum));
+      --accent-soft:hsl(var(--h) var(--acc-sat) var(--acc-lum) / .16);
       --accent-2:#8B5CF6;
       --accent-3:#3B82F6;
       --text:#FFFFFF;
       --muted:rgba(255,255,255,.62);
       --muted2:rgba(255,255,255,.34);
-      --green:hsl(var(--h) 75% 48%);
+      --green:hsl(var(--h) var(--acc-sat) calc(var(--acc-lum) + 6%));
       --red:#FF453A;
       --yellow:#FFD166;
       --ease-out:cubic-bezier(.16,.84,.44,1);
@@ -61,16 +83,28 @@
       --ease-smooth:cubic-bezier(.22,.61,.36,1);
       --ease-fluid:cubic-bezier(.4,0,.2,1);
       --ease-duo:cubic-bezier(.32,.72,0,1);
-      --accent-glow:0 10px 30px -8px hsl(var(--h) 73% 42% / .42),0 0 0 1px hsl(var(--h) 73% 42% / .28);
+      --accent-glow:0 10px 30px -8px hsl(var(--h) var(--acc-sat) var(--acc-lum) / .42),0 0 0 1px hsl(var(--h) var(--acc-sat) var(--acc-lum) / .28);
       --tile-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 -1px 0 rgba(0,0,0,.32) inset;
       --boot-delay:1.7s;
       --speed-glow:0;
+      /* Ambient mode (iDrive X "My Modes"): aurora field hues/alphas +
+         glow strength, overridden per html[data-mode] further below.
+         --h (the accent knob) is set inline by JS to the mode's hue. */
+      --amb-h1:var(--h);--amb-h2:265;--amb-h3:200;
+      --amb-sat:73%;
+      --amb-a1:.10;--amb-a2:.08;--amb-a3:.02;
+      --amb-glow:.42;
     }
 
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 
-    html,body{
+    /* Background lives on <html> only: body must stay transparent so
+       the z-index:-1 ambient layers (body::before, .amb-field) paint
+       above the canvas but below all content. */
+    html{
       background:var(--bg);
+    }
+    body{
       color:var(--text);
       font-family:'Inter',system-ui,sans-serif;
       min-height:100vh;
@@ -82,9 +116,9 @@
       position:fixed;inset:-20%;
       z-index:-1;pointer-events:none;
       background:
-        radial-gradient(60% 50% at 18% 22%,hsl(var(--h) 73% 42% /.10),transparent 60%),
-        radial-gradient(50% 40% at 82% 78%,rgba(139,92,246,.08),transparent 65%),
-        radial-gradient(40% 30% at 50% 50%,rgba(255,255,255,.02),transparent 70%);
+        radial-gradient(60% 50% at 18% 22%,hsl(var(--amb-h1) var(--amb-sat) 42% / var(--amb-a1)),transparent 60%),
+        radial-gradient(50% 40% at 82% 78%,hsl(var(--amb-h2) var(--amb-sat) 45% / var(--amb-a2)),transparent 65%),
+        radial-gradient(40% 30% at 50% 50%,hsl(var(--amb-h3) var(--amb-sat) 50% / var(--amb-a3)),transparent 70%);
       animation:ambientDrift 22s var(--ease-smooth) infinite alternate;
       will-change:transform,opacity;
     }
@@ -101,14 +135,15 @@
       z-index:-1;
       pointer-events:none;
       background:
-        radial-gradient(55% 45% at 50% 28%, hsl(var(--h) 73% 42% /.18), transparent 68%),
-        radial-gradient(35% 30% at 50% 70%, hsl(var(--h) 73% 42% /.08), transparent 70%);
+        radial-gradient(55% 45% at 50% 28%, hsl(var(--h) var(--acc-sat) var(--acc-lum) /.18), transparent 68%),
+        radial-gradient(35% 30% at 50% 70%, hsl(var(--h) var(--acc-sat) var(--acc-lum) /.08), transparent 70%);
       opacity:var(--speed-glow,0);
       transition:opacity 1.2s var(--ease-smooth);
     }
 
     @media (prefers-reduced-motion:reduce){
       body::before{animation:none;}
+      .amb-field i{animation:none;}
       *,*::before,*::after{
         animation-duration:.001ms !important;
         animation-iteration-count:1 !important;
@@ -118,9 +153,9 @@
 
     /* Shared pulsing dot for the LIVE status chips. */
     @keyframes livePulse{
-      0%   {box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /.55);transform:scale(1);}
-      70%  {box-shadow:0 0 0 7px hsl(var(--h) 73% 42% /0);transform:scale(1.12);}
-      100% {box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /0);transform:scale(1);}
+      0%   {box-shadow:0 0 0 0 hsl(var(--h) var(--acc-sat) var(--acc-lum) /.55);transform:scale(1);}
+      70%  {box-shadow:0 0 0 7px hsl(var(--h) var(--acc-sat) var(--acc-lum) /0);transform:scale(1.12);}
+      100% {box-shadow:0 0 0 0 hsl(var(--h) var(--acc-sat) var(--acc-lum) /0);transform:scale(1);}
     }
     /* ── STOCKS TILE (live, best performer floats to the top) ── */
     .stock-tile{
@@ -133,7 +168,7 @@
       border-radius:18px;
       overflow:hidden;
       background:
-        linear-gradient(180deg,hsl(var(--h) 73% 42% /.08),transparent 42%),
+        linear-gradient(180deg,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.08),transparent 42%),
         var(--surface);
       box-shadow:var(--tile-shadow);
     }
@@ -261,15 +296,15 @@
       width:36px;height:36px;background:var(--accent);border-radius:11px;
       display:flex;align-items:center;justify-content:center;
       font-weight:800;font-size:15px;color:#07110C;letter-spacing:-.02em;
-      box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /.4),0 8px 20px hsl(var(--h) 73% 42% /.18);
+      box-shadow:0 0 0 0 hsl(var(--h) var(--acc-sat) var(--acc-lum) /.4),0 8px 20px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.18);
       animation:logoBreathe 4.5s var(--ease-smooth) infinite;
       flex-shrink:0;
       cursor:pointer; /* tap → accent hue panel */
       margin-bottom:10px; /* extra breathing room between logo and time */
     }
     @keyframes logoBreathe{
-      0%,100% {box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /0),0 2px 8px hsl(var(--h) 73% 42% /.18);}
-      50%     {box-shadow:0 0 0 5px hsl(var(--h) 73% 42% /.06),0 8px 18px hsl(var(--h) 73% 42% /.32);}
+      0%,100% {box-shadow:0 0 0 0 hsl(var(--h) var(--acc-sat) var(--acc-lum) /0),0 2px 8px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.18);}
+      50%     {box-shadow:0 0 0 5px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.06),0 8px 18px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.32);}
     }
     #clock-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;}
     #clock{
@@ -366,13 +401,13 @@
       width:18px;height:18px;border-radius:50%;margin-top:-5px;
       background:var(--accent);
       border:2px solid #fff;
-      box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 10px hsl(var(--h) 73% 42% /.55);
+      box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 10px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.55);
     }
     .accent-hue::-moz-range-thumb{
       width:14px;height:14px;border-radius:50%;
       background:var(--accent);
       border:2px solid #fff;
-      box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 10px hsl(var(--h) 73% 42% /.55);
+      box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 10px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.55);
     }
     .accent-foot{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
     .accent-hex{font-size:11px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.04em;}
@@ -514,8 +549,8 @@
        (replaces the old drop ghost), the lifted tile, and the corner
        resize handle. */
     .grid-stack-placeholder>.placeholder-content{
-      background:hsl(var(--h) 73% 42% /.06);
-      border:2px dashed hsl(var(--h) 73% 42% /.6);
+      background:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.06);
+      border:2px dashed hsl(var(--h) var(--acc-sat) var(--acc-lum) /.6);
       border-radius:18px;
     }
     .grid-stack-item.ui-draggable-dragging>.grid-stack-item-content{
@@ -637,7 +672,7 @@
       flex:0 0 var(--niw,260px);
       position:relative;overflow:hidden;
       background:
-        linear-gradient(160deg,hsl(var(--h) 73% 42% /.22),rgba(0,0,0,.35)),
+        linear-gradient(160deg,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.22),rgba(0,0,0,.35)),
         var(--surface-em);
     }
     .news-img-wrap img{
@@ -693,9 +728,9 @@
       cursor:pointer;
     }
     .news-pip.on{
-      background:hsl(var(--h) 73% 42% /.25);
+      background:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.25);
       width:40px;
-      box-shadow:0 0 10px hsl(var(--h) 73% 42% /.25);
+      box-shadow:0 0 10px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.25);
     }
     .news-pip.on::after{
       content:'';display:block;height:100%;width:0;
@@ -747,8 +782,8 @@
       font-size:34px;font-weight:800;letter-spacing:.06em;
       color:rgba(255,255,255,.20);
       background:
-        radial-gradient(140px 90px at 72% 28%,hsl(var(--h) 73% 42% /.28),transparent 70%),
-        linear-gradient(160deg,hsl(var(--h) 73% 42% /.10),rgba(0,0,0,.42));
+        radial-gradient(140px 90px at 72% 28%,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.28),transparent 70%),
+        linear-gradient(160deg,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.10),rgba(0,0,0,.42));
     }
 
     /* ── AVATAR PANEL ── */
@@ -758,7 +793,7 @@
       border:1px solid var(--border);
       border-radius:18px;
       background:
-        linear-gradient(180deg,hsl(var(--h) 73% 42% /.08),transparent 42%),
+        linear-gradient(180deg,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.08),transparent 42%),
         var(--surface);
       box-shadow:var(--tile-shadow);
       display:flex;
@@ -791,12 +826,12 @@
     .avatar-head-dot{
       width:8px;height:8px;border-radius:50%;
       background:var(--muted2);
-      box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /0);
+      box-shadow:0 0 0 0 hsl(var(--h) var(--acc-sat) var(--acc-lum) /0);
       transition:background .3s var(--ease-smooth),box-shadow .3s var(--ease-smooth);
     }
     .avatar-head-dot.ok{
       background:var(--accent);
-      box-shadow:0 0 12px hsl(var(--h) 73% 42% /.5);
+      box-shadow:0 0 12px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.5);
       animation:ping 1.4s ease-out infinite;
     }
     .avatar-stage{
@@ -807,7 +842,7 @@
       padding:12px 12px 4px;
       position:relative;
       background:
-        radial-gradient(60% 50% at 50% 35%, hsl(var(--h) 73% 42% /.12), transparent 65%),
+        radial-gradient(60% 50% at 50% 35%, hsl(var(--h) var(--acc-sat) var(--acc-lum) /.12), transparent 65%),
         radial-gradient(50% 40% at 75% 75%, rgba(139,92,246,.08), transparent 70%),
         var(--surface-em);
       overflow:hidden;
@@ -858,11 +893,11 @@
     }
 
     .avatar-panel[data-speed="moving"] #avatarCanvas {
-      filter: drop-shadow(0 0 8px hsl(var(--h) 73% 42% / 0.25));
+      filter: drop-shadow(0 0 8px hsl(var(--h) var(--acc-sat) var(--acc-lum) / 0.25));
     }
 
     .avatar-panel[data-speed="fast"] #avatarCanvas {
-      filter: drop-shadow(0 0 14px hsl(var(--h) 73% 42% / 0.45));
+      filter: drop-shadow(0 0 14px hsl(var(--h) var(--acc-sat) var(--acc-lum) / 0.45));
     }
 
     .avatar-panel[data-weather="storm"] #avatarCanvas {
@@ -878,7 +913,7 @@
     }
 
     .avatar-panel[data-weather="evolve"] #avatarCanvas {
-      filter: drop-shadow(0 0 14px hsl(var(--h) 73% 42% / 0.65));
+      filter: drop-shadow(0 0 14px hsl(var(--h) var(--acc-sat) var(--acc-lum) / 0.65));
     }
 
     .avatar-stage.evolving {
@@ -886,9 +921,9 @@
     }
 
     @keyframes evolveFlash {
-      0%   { box-shadow: inset 0 0 0 0 hsl(var(--h) 73% 42% / 0); }
-      35%  { box-shadow: inset 0 0 34px 8px hsl(var(--h) 73% 42% / 0.45); }
-      100% { box-shadow: inset 0 0 0 0 hsl(var(--h) 73% 42% / 0); }
+      0%   { box-shadow: inset 0 0 0 0 hsl(var(--h) var(--acc-sat) var(--acc-lum) / 0); }
+      35%  { box-shadow: inset 0 0 34px 8px hsl(var(--h) var(--acc-sat) var(--acc-lum) / 0.45); }
+      100% { box-shadow: inset 0 0 0 0 hsl(var(--h) var(--acc-sat) var(--acc-lum) / 0); }
     }
 
     .avatar-panel[data-weather="hatch"] #avatarCanvas {
@@ -1113,7 +1148,7 @@
     .news-pop-img{
       position:relative;flex:0 0 260px;min-height:190px;
       background:
-        linear-gradient(160deg,hsl(var(--h) 73% 42% /.22),rgba(0,0,0,.35)),
+        linear-gradient(160deg,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.22),rgba(0,0,0,.35)),
         var(--surface-em);
       overflow:hidden;
     }
@@ -1168,7 +1203,7 @@
       border-radius:18px;
       overflow:hidden;
       background:
-        linear-gradient(180deg,hsl(var(--h) 73% 42% /.08),transparent 42%),
+        linear-gradient(180deg,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.08),transparent 42%),
         var(--surface);
       box-shadow:var(--tile-shadow);
     }
@@ -1330,6 +1365,23 @@
       font-variant-numeric:tabular-nums;
     }
     .sw-pop-views svg{width:12px;height:12px;fill:var(--red);}
+    /* teslurk jump-out: teslurk.com itself refuses iframing (X-Frame-Options:
+       DENY), so the popup hands off to it in a new tab — that's the pipe that
+       keeps working in the Tesla browser while driving. */
+    .sw-pop-teslurk{
+      flex-shrink:0;display:inline-flex;align-items:center;gap:7px;
+      padding:7px 13px;border-radius:999px;text-decoration:none;
+      font-size:12px;font-weight:700;white-space:nowrap;
+      border:1px solid hsl(var(--h) var(--acc-sat) var(--acc-lum) / .55);
+      background:hsl(var(--h) var(--acc-sat) var(--acc-lum) / .14);
+      color:var(--accent);
+      transition:background .25s var(--ease-smooth),box-shadow .25s var(--ease-smooth);
+    }
+    .sw-pop-teslurk:hover{
+      background:hsl(var(--h) var(--acc-sat) var(--acc-lum) / .26);
+      box-shadow:0 0 14px hsl(var(--h) var(--acc-sat) var(--acc-lum) / .35);
+    }
+    .sw-pop-teslurk img{width:15px;height:15px;border-radius:4px;}
     .sw-pop-close{
       appearance:none;border:none;cursor:pointer;flex-shrink:0;
       width:36px;height:36px;border-radius:50%;
@@ -1408,7 +1460,7 @@
     .sec-head::before{
       content:'';width:3px;height:16px;
       background:var(--accent);border-radius:999px;flex-shrink:0;
-      box-shadow:0 0 10px hsl(var(--h) 73% 42% /.45);
+      box-shadow:0 0 10px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.45);
       animation:accentBarBreathe 3.5s var(--ease-smooth) infinite;
     }
     @keyframes accentBarBreathe{
@@ -1499,7 +1551,7 @@
     .card:active{
       transform:scale(0.955);
       background:var(--surface-active);
-      border-color:hsl(var(--h) 73% 42% /.55);
+      border-color:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.55);
       box-shadow:var(--accent-glow),var(--tile-shadow);
     }
     .card-media{
@@ -1605,16 +1657,16 @@
       box-shadow:0 18px 34px rgba(0,0,0,.26),var(--tile-shadow);
     }
     .radio-card.playing{
-      border-color:hsl(var(--h) 73% 42% /.55);
+      border-color:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.55);
       background:
-        radial-gradient(120% 80% at 50% 0%,hsl(var(--h) 73% 42% /.18),transparent 60%),
-        hsl(var(--h) 73% 42% /.06);
+        radial-gradient(120% 80% at 50% 0%,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.18),transparent 60%),
+        hsl(var(--h) var(--acc-sat) var(--acc-lum) /.06);
       box-shadow:var(--accent-glow),var(--tile-shadow);
       animation:fadeUp .65s var(--ease-out) forwards,playingPulse 3.2s var(--ease-smooth) infinite;
     }
     @keyframes playingPulse{
-      0%,100% {box-shadow:0 6px 22px -8px hsl(var(--h) 73% 42% /.35),0 0 0 1px hsl(var(--h) 73% 42% /.28),var(--tile-shadow);}
-      50%     {box-shadow:0 10px 32px -6px hsl(var(--h) 73% 42% /.55),0 0 0 1px hsl(var(--h) 73% 42% /.45),var(--tile-shadow);}
+      0%,100% {box-shadow:0 6px 22px -8px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.35),0 0 0 1px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.28),var(--tile-shadow);}
+      50%     {box-shadow:0 10px 32px -6px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.55),0 0 0 1px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.45),var(--tile-shadow);}
     }
     .radio-card:active{transform:scale(0.955);}
     .radio-icon{
@@ -1864,8 +1916,8 @@
       to{opacity:1;transform:scale(1);filter:blur(0);}
     }
     @keyframes bootTGlow{
-      0%,100% {box-shadow:0 0 0 0 hsl(var(--h) 73% 42% /.4),0 8px 28px hsl(var(--h) 73% 42% /.32);}
-      50%     {box-shadow:0 0 0 16px hsl(var(--h) 73% 42% /0),0 14px 44px hsl(var(--h) 73% 42% /.55);}
+      0%,100% {box-shadow:0 0 0 0 hsl(var(--h) var(--acc-sat) var(--acc-lum) /.4),0 8px 28px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.32);}
+      50%     {box-shadow:0 0 0 16px hsl(var(--h) var(--acc-sat) var(--acc-lum) /0),0 14px 44px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.55);}
     }
     .boot-name{
       font-size:13px;font-weight:700;letter-spacing:.45em;
@@ -1888,12 +1940,12 @@
     .boot-progress::after{
       content:'';position:absolute;left:0;top:0;bottom:0;width:100%;
       background:linear-gradient(90deg,
-        hsl(var(--h) 73% 42% /.4) 0%,
+        hsl(var(--h) var(--acc-sat) var(--acc-lum) /.4) 0%,
         var(--accent) 50%,
-        hsl(var(--h) 73% 42% /.6) 100%);
+        hsl(var(--h) var(--acc-sat) var(--acc-lum) /.6) 100%);
       transform-origin:left center;
       transform:scaleX(0);
-      box-shadow:0 0 10px hsl(var(--h) 73% 42% /.55);
+      box-shadow:0 0 10px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.55);
       animation:bootProgFill .95s var(--ease-smooth) .9s forwards;
     }
     @keyframes bootProgShow{to{opacity:1;}}
@@ -1925,8 +1977,8 @@
       position:absolute;left:6px;right:6px;height:40px;top:8px;
       border-radius:12px;pointer-events:none;
       background:var(--accent-soft);
-      border:1px solid hsl(var(--h) 73% 42% /.5);
-      box-shadow:0 0 18px hsl(var(--h) 73% 42% /.35),inset 0 1px 0 rgba(255,255,255,.12);
+      border:1px solid hsl(var(--h) var(--acc-sat) var(--acc-lum) /.5);
+      box-shadow:0 0 18px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.35),inset 0 1px 0 rgba(255,255,255,.12);
       transition:top .5s var(--ease-spring);
     }
     .rail-btn{
@@ -2033,14 +2085,14 @@
 
     .card:active,
     .radio-card.playing{
-      border-color:hsl(var(--h) 73% 42% /.45);
+      border-color:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.45);
     }
 
     /* ── SPOTIFY-STYLE NEWS CARD ── */
     .news-strip{
       position:relative;
       background:
-        linear-gradient(135deg, hsl(var(--h) 73% 42% /.08), transparent 45%),
+        linear-gradient(135deg, hsl(var(--h) var(--acc-sat) var(--acc-lum) /.08), transparent 45%),
         #121212;
     }
 
@@ -2072,7 +2124,7 @@
       border-radius:50%;
       background:var(--accent);
       margin-right:6px;
-      box-shadow:0 0 10px hsl(var(--h) 73% 42% /.55);
+      box-shadow:0 0 10px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.55);
     }
 
     .news-source{
@@ -2149,7 +2201,7 @@
       font-weight:800;
       letter-spacing:.04em;
       color:rgba(255,255,255,.30);
-      background:linear-gradient(160deg,hsl(var(--h) 73% 42% /.18),rgba(0,0,0,.35));
+      background:linear-gradient(160deg,hsl(var(--h) var(--acc-sat) var(--acc-lum) /.18),rgba(0,0,0,.35));
     }
 
     .news-eyebrow{
@@ -2274,8 +2326,8 @@
 
     .news-pip.on{
       width:28px;
-      background:hsl(var(--h) 73% 42% /.35);
-      box-shadow:0 0 10px hsl(var(--h) 73% 42% /.25);
+      background:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.35);
+      box-shadow:0 0 10px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.25);
     }
 
     .news-pip.on::after{
@@ -2366,9 +2418,212 @@
         font-size:16px;
       }
     }
+    /* ═════════ AMBIENT MODE — BMW iDrive X-inspired theming ═════════
+       My Modes-style presets retint the whole cockpit. html[data-mode]
+       drives the aurora field + glow tokens below; JS sets --h (the
+       accent knob) inline to the mode's hue. The head script restores
+       both before first paint; the mode chips live in the panel that
+       opens when you tap the T logo. */
+    :root[data-mode="personal"],
+    :root[data-mode="custom"],
+    :root:not([data-mode]){
+      --amb-h1:var(--h);--amb-h2:265;--amb-h3:200;
+      --amb-a1:.16;--amb-a2:.12;--amb-a3:.05;--amb-glow:.42;
+    }
+    :root[data-mode="efficient"]{
+      --amb-h1:178;--amb-h2:205;--amb-h3:160;
+      --amb-a1:.16;--amb-a2:.11;--amb-a3:.05;--amb-glow:.40;
+    }
+    :root[data-mode="sport"]{
+      --amb-h1:6;--amb-h2:32;--amb-h3:340;
+      --amb-a1:.22;--amb-a2:.16;--amb-a3:.07;--amb-glow:.58;
+    }
+    :root[data-mode="silent"]{
+      --amb-h1:214;--amb-h2:232;--amb-h3:198;
+      --amb-a1:.11;--amb-a2:.09;--amb-a3:.04;--amb-glow:.26;
+    }
+    :root[data-mode="theater"]{
+      --amb-h1:30;--amb-h2:45;--amb-h3:12;
+      --amb-a1:.09;--amb-a2:.07;--amb-a3:.03;--amb-glow:.20;
+    }
+    /* White: monochrome mode — every accent and aurora blob goes to
+       0% saturation and the accent lightness climbs to a silvery 80%,
+       for a clean white glow floating on the dark cockpit. */
+    :root[data-mode="white"]{
+      --acc-sat:0%;--acc-lum:80%;
+      --amb-sat:0%;--amb-h1:0;--amb-h2:0;--amb-h3:0;
+      --amb-a1:.15;--amb-a2:.10;--amb-a3:.05;--amb-glow:.50;
+    }
+
+    /* Dynamic ambient field: four soft aurora blobs drifting on long
+       independent loops, tinted by the active mode. Transform-only
+       animation (GPU-composited, no repaint) so the Tesla browser
+       stays smooth; gradients are pre-soft, no blur filters. */
+    .amb-field{
+      position:fixed;inset:-25%;z-index:-1;pointer-events:none;
+    }
+    .amb-field i{
+      position:absolute;display:block;border-radius:50%;
+      will-change:transform;
+    }
+    .amb-field i:nth-child(1){
+      left:-4%;top:-6%;width:64%;height:60%;
+      background:radial-gradient(circle at 50% 50%,hsl(var(--amb-h1) var(--amb-sat) 45% / calc(var(--amb-a1) * 1.5)),transparent 66%);
+      animation:ambBlob1 22s var(--ease-smooth) infinite alternate;
+    }
+    .amb-field i:nth-child(2){
+      right:-6%;bottom:-8%;width:58%;height:56%;
+      background:radial-gradient(circle at 50% 50%,hsl(var(--amb-h2) var(--amb-sat) 48% / calc(var(--amb-a2) * 1.5)),transparent 66%);
+      animation:ambBlob2 30s var(--ease-smooth) infinite alternate;
+    }
+    .amb-field i:nth-child(3){
+      left:38%;top:30%;width:46%;height:44%;
+      background:radial-gradient(circle at 50% 50%,hsl(var(--amb-h3) var(--amb-sat) 50% / calc(var(--amb-a3) * 2)),transparent 68%);
+      animation:ambBlob3 25s var(--ease-smooth) infinite alternate-reverse;
+    }
+    .amb-field i:nth-child(4){
+      left:8%;bottom:-14%;width:52%;height:48%;
+      background:radial-gradient(circle at 50% 50%,hsl(var(--h) var(--acc-sat) var(--acc-lum) / calc(var(--amb-a1) * .8)),transparent 64%);
+      animation:ambBlob4 34s var(--ease-smooth) infinite alternate;
+    }
+    @keyframes ambBlob1{
+      0%  {transform:translate3d(0,0,0) scale(1);}
+      50% {transform:translate3d(9%,7%,0) scale(1.12);}
+      100%{transform:translate3d(-4%,10%,0) scale(.96);}
+    }
+    @keyframes ambBlob2{
+      0%  {transform:translate3d(0,0,0) scale(1);}
+      50% {transform:translate3d(-10%,-6%,0) scale(1.08);}
+      100%{transform:translate3d(6%,-11%,0) scale(1.16);}
+    }
+    @keyframes ambBlob3{
+      0%  {transform:translate3d(0,0,0) scale(.9);}
+      50% {transform:translate3d(-12%,6%,0) scale(1.1);}
+      100%{transform:translate3d(10%,-8%,0) scale(.95);}
+    }
+    @keyframes ambBlob4{
+      0%  {transform:translate3d(0,0,0) scale(1);}
+      50% {transform:translate3d(12%,-9%,0) scale(1.14);}
+      100%{transform:translate3d(-8%,-4%,0) scale(1);}
+    }
+
+    /* Mode-change sweep: a one-shot tint flash across the screen. */
+    .amb-sweep{
+      position:fixed;inset:0;z-index:900;pointer-events:none;opacity:0;
+      background:radial-gradient(70% 60% at 50% 45%,hsl(var(--amb-h1) var(--amb-sat) 50% /.20),transparent 70%);
+    }
+    .amb-sweep.go{animation:ambSweep .9s var(--ease-fluid) forwards;}
+    @keyframes ambSweep{
+      0%  {opacity:0;transform:scale(.92);}
+      35% {opacity:1;}
+      100%{opacity:0;transform:scale(1.04);}
+    }
+
+    /* Mode chips — the accent panel becomes the Ambient panel. */
+    .mode-row{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px;}
+    .mode-chip{
+      display:inline-flex;align-items:center;gap:6px;
+      border:1px solid var(--border-em);border-radius:999px;
+      background:rgba(255,255,255,.04);color:var(--muted);
+      font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.06em;
+      padding:5px 10px;cursor:pointer;
+      transition:background .2s var(--ease-smooth),color .2s var(--ease-smooth),
+        border-color .2s var(--ease-smooth),box-shadow .25s var(--ease-smooth),
+        transform .3s var(--ease-spring);
+    }
+    .mode-chip::before{
+      content:'';width:8px;height:8px;border-radius:50%;flex-shrink:0;
+      background:hsl(var(--mh) 73% 48%);
+      box-shadow:0 0 8px hsl(var(--mh) 73% 48% /.7);
+    }
+    .mode-chip[data-mode="personal"] {--mh:141;}
+    .mode-chip[data-mode="efficient"]{--mh:178;}
+    .mode-chip[data-mode="sport"]    {--mh:8;}
+    .mode-chip[data-mode="silent"]   {--mh:214;}
+    .mode-chip[data-mode="theater"]  {--mh:32;}
+    .mode-chip[data-mode="white"]    {--mh:0;}
+    .mode-chip[data-mode="custom"]   {--mh:var(--h);}
+    .mode-chip:hover{background:rgba(255,255,255,.08);color:#fff;}
+    .mode-chip:active{transform:scale(.94);}
+    /* White chip: its dot + active state go monochrome (the shared
+       ::before dot is hue-tinted and would read red at --mh:0). */
+    .mode-chip[data-mode="white"]::before{background:#fff;box-shadow:0 0 8px rgba(255,255,255,.7);}
+    .mode-chip[data-mode="white"].active{
+      border-color:rgba(255,255,255,.65);
+      background:rgba(255,255,255,.14);
+      box-shadow:0 0 14px rgba(255,255,255,.35),inset 0 1px 0 rgba(255,255,255,.1);
+    }
+    .mode-chip.active{
+      color:#fff;
+      border-color:hsl(var(--mh) 73% 52% /.65);
+      background:hsl(var(--mh) 73% 42% /.18);
+      box-shadow:0 0 14px hsl(var(--mh) 73% 42% /.35),inset 0 1px 0 rgba(255,255,255,.1);
+    }
+    .accent-sub{
+      font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+      color:var(--muted2);margin:2px 0 4px;
+    }
+
+    /* QuickSelect-style glass tiles: roomier radii, hairline light
+       border, mode-tinted outer glow, frosted see-through surfaces.
+       This block sits last in the sheet, so these equal-specificity
+       rules win over the per-tile definitions above. */
+    .home-tile{
+      border:1px solid rgba(255,255,255,.13);
+      border-radius:18px;
+      backdrop-filter:blur(12px) saturate(1.3);
+      -webkit-backdrop-filter:blur(12px) saturate(1.3);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.05) inset,
+        0 -1px 0 rgba(0,0,0,.32) inset,
+        0 16px 38px -20px hsl(var(--amb-h1) var(--amb-sat) 42% / calc(var(--amb-glow) * .55));
+    }
+    .news-strip{
+      background:
+        linear-gradient(135deg,hsl(var(--amb-h1) var(--amb-sat) 42% /.08),transparent 45%),
+        rgba(16,16,19,.66);
+    }
+    .news-copy,
+    .news-slide{background:rgba(16,16,19,.55);}
+    .stock-tile,
+    .avatar-panel,
+    .stream-tile{
+      background:
+        linear-gradient(180deg,hsl(var(--amb-h1) var(--amb-sat) 42% /.08),transparent 42%),
+        rgba(24,24,29,.66);
+    }
+    .avatar-panel-head{background:transparent;}
+    .card,
+    .radio-card{border-radius:16px;}
+    .card-media,
+    .news-thumb{border-radius:10px;}
+
+    /* Island bar: clock picks up a whisper of the mode's hue. */
+    .island-bar #clock{color:hsl(var(--amb-h1) var(--amb-sat) 94%);}
+
+    /* Page rail: circular BMW-dock buttons, glow tracks the mode. */
+    .page-rail{border-radius:24px;}
+    .rail-btn{border-radius:999px;}
+    .rail-indicator{
+      border-radius:999px;
+      box-shadow:
+        0 0 calc(10px + 14px * var(--amb-glow)) hsl(var(--h) var(--acc-sat) var(--acc-lum) / calc(.18 + .3 * var(--amb-glow))),
+        inset 0 1px 0 rgba(255,255,255,.12);
+    }
+
+    /* Boot curtain carries the mode's aurora. */
+    .boot-overlay{
+      background:
+        radial-gradient(60% 55% at 50% 42%,hsl(var(--amb-h1) var(--amb-sat) 18% /.5),transparent 70%),
+        radial-gradient(45% 40% at 78% 70%,hsl(var(--amb-h2) var(--amb-sat) 20% /.3),transparent 70%),
+        #000;
+    }
   </style>
 </head>
 <body>
+
+  <!-- AMBIENT FIELD (dynamic mode-tinted aurora behind everything) -->
+  <div class="amb-field" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 
   <!-- BOOT OVERLAY -->
   <div class="boot-overlay" id="bootOverlay" aria-hidden="true">
@@ -2378,6 +2633,9 @@
       <div class="boot-progress"></div>
     </div>
   </div>
+
+  <!-- MODE SWEEP (one-shot tint flash when the ambient mode changes) -->
+  <div class="amb-sweep" id="ambSweep" aria-hidden="true"></div>
 
   <!-- RIGHT ISLAND BAR (replaces the old top header) -->
   <div class="island-bar" id="islandBar">
@@ -2398,14 +2656,24 @@
     </div>
   </div>
 
-  <!-- ACCENT PANEL (toggled by tapping the T logo) -->
-  <div class="accent-panel" id="accentPanel" role="dialog" aria-label="Accent color">
+  <!-- AMBIENT MODE PANEL (toggled by tapping the T logo) -->
+  <div class="accent-panel" id="accentPanel" role="dialog" aria-label="Ambient mode and accent color">
     <div class="accent-head">
-      <span class="accent-title">Accent</span>
-      <button class="accent-close" id="accentClose" type="button" aria-label="Close accent settings">
+      <span class="accent-title">Ambient</span>
+      <button class="accent-close" id="accentClose" type="button" aria-label="Close ambient settings">
         <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
     </div>
+    <div class="mode-row" id="modeRow" role="group" aria-label="Ambient modes">
+      <button class="mode-chip" type="button" data-mode="personal" aria-pressed="false">Personal</button>
+      <button class="mode-chip" type="button" data-mode="efficient" aria-pressed="false">Efficient</button>
+      <button class="mode-chip" type="button" data-mode="sport" aria-pressed="false">Sport</button>
+      <button class="mode-chip" type="button" data-mode="silent" aria-pressed="false">Silent</button>
+      <button class="mode-chip" type="button" data-mode="theater" aria-pressed="false">Theater</button>
+      <button class="mode-chip" type="button" data-mode="white" aria-pressed="false">White</button>
+      <button class="mode-chip" type="button" data-mode="custom" aria-pressed="false">Custom</button>
+    </div>
+    <div class="accent-sub">Accent hue</div>
     <input class="accent-hue" type="range" id="accentHue" min="0" max="360" value="141" step="1" aria-label="Accent hue"/>
     <div class="accent-foot">
       <span class="accent-hex" id="accentHex">#1DB954</span>
@@ -2635,6 +2903,11 @@
           <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.7 7.6 1 12c1.7 4.4 6 7.5 11 7.5s9.3-3.1 11-7.5c-1.7-4.4-6-7.5-11-7.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
           <span id="swPopViewCount"></span>
         </span>
+        <a class="sw-pop-teslurk" id="swTeslurkBtn" href="https://teslurk.com"
+           target="_blank" rel="noopener"
+           title="Watch on teslurk — works in the Tesla browser while driving">
+          <img src="https://teslurk.com/icons/icon.svg" alt="">teslurk
+        </a>
         <button class="sw-pop-close" id="swPopClose" type="button" aria-label="Close stream" title="Close">
           <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
@@ -2819,19 +3092,25 @@
     window.location.href = FS_URL;
   });
 
-  /* ── ACCENT HUE (tap the T logo → slider recolors every UI green) ──
-     One knob: --h on :root. Every accent/green in the sheet derives
-     from it as hsl(var(--h) S% L%). The choice persists in
-     localStorage and is restored before first paint (script is
-     parser-blocking at the end of <body>). */
+  /* ── AMBIENT MODES + ACCENT HUE (tap the T logo) ──
+     My Modes-style presets (BMW iDrive X): each mode sets the accent
+     hue (--h, inline on :root) and html[data-mode], which drives the
+     aurora field + glow tokens in the sheet. Custom keeps the slider
+     hue. Mode + hue persist in localStorage; the head script restores
+     them before first paint, this block re-applies and wires the UI. */
   const ACCENT_KEY = 'tcinema.accentHue';
+  const MODE_KEY   = 'tcinema.mode';
   const ACCENT_DEFAULT = 141; // Spotify green
+  const MODE_HUES = {personal:141, efficient:178, sport:8, silent:214, theater:32, white:0};
+  const MODES = ['personal','efficient','sport','silent','theater','white','custom'];
   const logoT       = document.querySelector('.logo-t');
   const accentPanel = document.getElementById('accentPanel');
   const accentHue   = document.getElementById('accentHue');
   const accentHex   = document.getElementById('accentHex');
   const accentReset = document.getElementById('accentReset');
   const accentClose = document.getElementById('accentClose');
+  const modeRow     = document.getElementById('modeRow');
+  const ambSweep    = document.getElementById('ambSweep');
 
   function hueToHex(h, s, l){
     s /= 100; l /= 100;
@@ -2841,6 +3120,13 @@
     const to2 = x => Math.round(255 * x).toString(16).padStart(2, '0');
     return ('#' + to2(f(0)) + to2(f(8)) + to2(f(4))).toUpperCase();
   }
+  function savedHue(){
+    try{
+      const v = parseInt(localStorage.getItem(ACCENT_KEY), 10);
+      if(Number.isFinite(v) && v >= 0 && v <= 360) return v;
+    }catch(e){}
+    return ACCENT_DEFAULT;
+  }
   function setAccentHue(h, persist){
     h = Math.round(Number(h));
     if(!Number.isFinite(h) || h < 0 || h > 360) h = ACCENT_DEFAULT;
@@ -2849,16 +3135,38 @@
     if(accentHex) accentHex.textContent = hueToHex(h, 73, 42);
     if(persist){ try{ localStorage.setItem(ACCENT_KEY, String(h)); }catch(e){} }
   }
-  (function restoreAccentHue(){
-    let saved = ACCENT_DEFAULT;
+  let curMode = 'personal';
+  function setMode(m, persist, sweep){
+    if(MODES.indexOf(m) < 0) m = 'personal';
+    curMode = m;
+    document.documentElement.setAttribute('data-mode', m);
+    setAccentHue(m === 'custom' ? savedHue() : MODE_HUES[m], false);
+    if(modeRow){
+      modeRow.querySelectorAll('.mode-chip').forEach((c) => {
+        const on = c.dataset.mode === m;
+        c.classList.toggle('active', on);
+        c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+    if(persist){ try{ localStorage.setItem(MODE_KEY, m); }catch(e){} }
+    if(sweep && ambSweep){
+      ambSweep.classList.remove('go');
+      void ambSweep.offsetWidth;            /* restart the one-shot */
+      ambSweep.classList.add('go');
+    }
+  }
+  (function restoreMode(){
+    let m = 'personal';
     try{
-      const v = parseInt(localStorage.getItem(ACCENT_KEY), 10);
-      if(Number.isFinite(v) && v >= 0 && v <= 360) saved = v;
+      const s = localStorage.getItem(MODE_KEY);
+      if(s && MODES.indexOf(s) >= 0) m = s;
+      /* pre-mode users keep their chosen hue */
+      else if(savedHue() !== ACCENT_DEFAULT) m = 'custom';
     }catch(e){}
-    setAccentHue(saved, false);
+    setMode(m, false, false);
   })();
   if(logoT){
-    logoT.title = 'T / Cinema — tap for accent color';
+    logoT.title = 'T / Cinema — tap for ambient modes';
     logoT.addEventListener('click', (e) => {
       e.stopPropagation();
       accentPanel.classList.toggle('open');
@@ -2868,7 +3176,17 @@
     e.stopPropagation();
     accentPanel.classList.remove('open');
   });
-  if(accentHue)   accentHue.addEventListener('input', () => setAccentHue(accentHue.value, true));
+  if(modeRow) modeRow.addEventListener('click', (e) => {
+    const chip = e.target.closest('.mode-chip');
+    if(!chip) return;
+    e.stopPropagation();
+    setMode(chip.dataset.mode, true, true);
+  });
+  if(accentHue) accentHue.addEventListener('input', () => {
+    const v = accentHue.value;   /* capture before setMode re-applies the saved hue */
+    if(curMode !== 'custom') setMode('custom', true, false);
+    setAccentHue(v, true);
+  });
   if(accentReset) accentReset.addEventListener('click', () => setAccentHue(ACCENT_DEFAULT, true));
   document.addEventListener('click', (e) => {
     if(!accentPanel.classList.contains('open')) return;
@@ -4285,6 +4603,7 @@
   const swPopViews    = document.getElementById('swPopViewCount');
   const swPlayerFrame = document.getElementById('swPlayerFrame');
   const swChatFrame   = document.getElementById('swChatFrame');
+  const swTeslurkBtn  = document.getElementById('swTeslurkBtn');
 
   /* YouTube category — stubs until a data source is picked */
   const SW_YT_STUBS = [
@@ -4472,6 +4791,10 @@
        previews and msrisabaranjan.github.io both embed cleanly. */
     const parent = encodeURIComponent(location.hostname);
     const ch     = encodeURIComponent(s.login);
+    /* teslurk hand-off: their own player (proxied HLS) is the one that
+       survives Tesla's while-driving block — we can't embed it (frame
+       deny), so point the popup's teslurk button at the channel. */
+    swTeslurkBtn.href = 'https://teslurk.com/' + ch;
     swPlayerFrame.src = `https://player.twitch.tv/?channel=${ch}&parent=${parent}&muted=true&autoplay=true`;
     setTimeout(() => {
       if(swPopupOpen)
