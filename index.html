@@ -26,6 +26,25 @@
   })();
   </script>
 
+  <script>
+  /* ── AMBIENT MODE PRE-PAINT RESTORE ──
+     Applies the saved mode (html[data-mode]) and its accent hue before
+     the stylesheet paints, so the cockpit never flashes the default.
+     Mirrors the MODE_HUES map in the accent-panel script below. */
+  (function(){
+    try{
+      var HUES = {personal:141,efficient:178,sport:8,silent:214,theater:32};
+      var raw = localStorage.getItem('tcinema.mode');
+      var m = (raw && HUES.hasOwnProperty(raw)) ? raw : null;
+      var v = parseInt(localStorage.getItem('tcinema.accentHue'), 10);
+      if(!m) m = (Number.isFinite(v) && v !== 141) ? 'custom' : 'personal';
+      document.documentElement.setAttribute('data-mode', m);
+      var h = (m === 'custom' && Number.isFinite(v)) ? v : HUES[m];
+      document.documentElement.style.setProperty('--h', h);
+    }catch(e){/* never break page boot on compat failure */}
+  })();
+  </script>
+
   <title>T / Cinema</title>
   <link rel="icon" href="images/miff4.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -65,12 +84,23 @@
       --tile-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 -1px 0 rgba(0,0,0,.32) inset;
       --boot-delay:1.7s;
       --speed-glow:0;
+      /* Ambient mode (iDrive X "My Modes"): aurora field hues/alphas +
+         glow strength, overridden per html[data-mode] further below.
+         --h (the accent knob) is set inline by JS to the mode's hue. */
+      --amb-h1:var(--h);--amb-h2:265;--amb-h3:200;
+      --amb-a1:.10;--amb-a2:.08;--amb-a3:.02;
+      --amb-glow:.42;
     }
 
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 
-    html,body{
+    /* Background lives on <html> only: body must stay transparent so
+       the z-index:-1 ambient layers (body::before, .amb-field) paint
+       above the canvas but below all content. */
+    html{
       background:var(--bg);
+    }
+    body{
       color:var(--text);
       font-family:'Inter',system-ui,sans-serif;
       min-height:100vh;
@@ -82,9 +112,9 @@
       position:fixed;inset:-20%;
       z-index:-1;pointer-events:none;
       background:
-        radial-gradient(60% 50% at 18% 22%,hsl(var(--h) 73% 42% /.10),transparent 60%),
-        radial-gradient(50% 40% at 82% 78%,rgba(139,92,246,.08),transparent 65%),
-        radial-gradient(40% 30% at 50% 50%,rgba(255,255,255,.02),transparent 70%);
+        radial-gradient(60% 50% at 18% 22%,hsl(var(--amb-h1) 73% 42% / var(--amb-a1)),transparent 60%),
+        radial-gradient(50% 40% at 82% 78%,hsl(var(--amb-h2) 70% 45% / var(--amb-a2)),transparent 65%),
+        radial-gradient(40% 30% at 50% 50%,hsl(var(--amb-h3) 60% 50% / var(--amb-a3)),transparent 70%);
       animation:ambientDrift 22s var(--ease-smooth) infinite alternate;
       will-change:transform,opacity;
     }
@@ -109,6 +139,7 @@
 
     @media (prefers-reduced-motion:reduce){
       body::before{animation:none;}
+      .amb-field i{animation:none;}
       *,*::before,*::after{
         animation-duration:.001ms !important;
         animation-iteration-count:1 !important;
@@ -2366,9 +2397,195 @@
         font-size:16px;
       }
     }
+    /* ═════════ AMBIENT MODE — BMW iDrive X-inspired theming ═════════
+       My Modes-style presets retint the whole cockpit. html[data-mode]
+       drives the aurora field + glow tokens below; JS sets --h (the
+       accent knob) inline to the mode's hue. The head script restores
+       both before first paint; the mode chips live in the panel that
+       opens when you tap the T logo. */
+    :root[data-mode="personal"],
+    :root[data-mode="custom"],
+    :root:not([data-mode]){
+      --amb-h1:var(--h);--amb-h2:265;--amb-h3:200;
+      --amb-a1:.16;--amb-a2:.12;--amb-a3:.05;--amb-glow:.42;
+    }
+    :root[data-mode="efficient"]{
+      --amb-h1:178;--amb-h2:205;--amb-h3:160;
+      --amb-a1:.16;--amb-a2:.11;--amb-a3:.05;--amb-glow:.40;
+    }
+    :root[data-mode="sport"]{
+      --amb-h1:6;--amb-h2:32;--amb-h3:340;
+      --amb-a1:.22;--amb-a2:.16;--amb-a3:.07;--amb-glow:.58;
+    }
+    :root[data-mode="silent"]{
+      --amb-h1:214;--amb-h2:232;--amb-h3:198;
+      --amb-a1:.11;--amb-a2:.09;--amb-a3:.04;--amb-glow:.26;
+    }
+    :root[data-mode="theater"]{
+      --amb-h1:30;--amb-h2:45;--amb-h3:12;
+      --amb-a1:.09;--amb-a2:.07;--amb-a3:.03;--amb-glow:.20;
+    }
+
+    /* Dynamic ambient field: four soft aurora blobs drifting on long
+       independent loops, tinted by the active mode. Transform-only
+       animation (GPU-composited, no repaint) so the Tesla browser
+       stays smooth; gradients are pre-soft, no blur filters. */
+    .amb-field{
+      position:fixed;inset:-25%;z-index:-1;pointer-events:none;
+    }
+    .amb-field i{
+      position:absolute;display:block;border-radius:50%;
+      will-change:transform;
+    }
+    .amb-field i:nth-child(1){
+      left:-4%;top:-6%;width:64%;height:60%;
+      background:radial-gradient(circle at 50% 50%,hsl(var(--amb-h1) 73% 45% / calc(var(--amb-a1) * 1.5)),transparent 66%);
+      animation:ambBlob1 22s var(--ease-smooth) infinite alternate;
+    }
+    .amb-field i:nth-child(2){
+      right:-6%;bottom:-8%;width:58%;height:56%;
+      background:radial-gradient(circle at 50% 50%,hsl(var(--amb-h2) 70% 48% / calc(var(--amb-a2) * 1.5)),transparent 66%);
+      animation:ambBlob2 30s var(--ease-smooth) infinite alternate;
+    }
+    .amb-field i:nth-child(3){
+      left:38%;top:30%;width:46%;height:44%;
+      background:radial-gradient(circle at 50% 50%,hsl(var(--amb-h3) 62% 50% / calc(var(--amb-a3) * 2)),transparent 68%);
+      animation:ambBlob3 25s var(--ease-smooth) infinite alternate-reverse;
+    }
+    .amb-field i:nth-child(4){
+      left:8%;bottom:-14%;width:52%;height:48%;
+      background:radial-gradient(circle at 50% 50%,hsl(var(--h) 73% 42% / calc(var(--amb-a1) * .8)),transparent 64%);
+      animation:ambBlob4 34s var(--ease-smooth) infinite alternate;
+    }
+    @keyframes ambBlob1{
+      0%  {transform:translate3d(0,0,0) scale(1);}
+      50% {transform:translate3d(9%,7%,0) scale(1.12);}
+      100%{transform:translate3d(-4%,10%,0) scale(.96);}
+    }
+    @keyframes ambBlob2{
+      0%  {transform:translate3d(0,0,0) scale(1);}
+      50% {transform:translate3d(-10%,-6%,0) scale(1.08);}
+      100%{transform:translate3d(6%,-11%,0) scale(1.16);}
+    }
+    @keyframes ambBlob3{
+      0%  {transform:translate3d(0,0,0) scale(.9);}
+      50% {transform:translate3d(-12%,6%,0) scale(1.1);}
+      100%{transform:translate3d(10%,-8%,0) scale(.95);}
+    }
+    @keyframes ambBlob4{
+      0%  {transform:translate3d(0,0,0) scale(1);}
+      50% {transform:translate3d(12%,-9%,0) scale(1.14);}
+      100%{transform:translate3d(-8%,-4%,0) scale(1);}
+    }
+
+    /* Mode-change sweep: a one-shot tint flash across the screen. */
+    .amb-sweep{
+      position:fixed;inset:0;z-index:900;pointer-events:none;opacity:0;
+      background:radial-gradient(70% 60% at 50% 45%,hsl(var(--amb-h1) 73% 50% /.20),transparent 70%);
+    }
+    .amb-sweep.go{animation:ambSweep .9s var(--ease-fluid) forwards;}
+    @keyframes ambSweep{
+      0%  {opacity:0;transform:scale(.92);}
+      35% {opacity:1;}
+      100%{opacity:0;transform:scale(1.04);}
+    }
+
+    /* Mode chips — the accent panel becomes the Ambient panel. */
+    .mode-row{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 12px;}
+    .mode-chip{
+      display:inline-flex;align-items:center;gap:6px;
+      border:1px solid var(--border-em);border-radius:999px;
+      background:rgba(255,255,255,.04);color:var(--muted);
+      font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.06em;
+      padding:5px 10px;cursor:pointer;
+      transition:background .2s var(--ease-smooth),color .2s var(--ease-smooth),
+        border-color .2s var(--ease-smooth),box-shadow .25s var(--ease-smooth),
+        transform .3s var(--ease-spring);
+    }
+    .mode-chip::before{
+      content:'';width:8px;height:8px;border-radius:50%;flex-shrink:0;
+      background:hsl(var(--mh) 73% 48%);
+      box-shadow:0 0 8px hsl(var(--mh) 73% 48% /.7);
+    }
+    .mode-chip[data-mode="personal"] {--mh:141;}
+    .mode-chip[data-mode="efficient"]{--mh:178;}
+    .mode-chip[data-mode="sport"]    {--mh:8;}
+    .mode-chip[data-mode="silent"]   {--mh:214;}
+    .mode-chip[data-mode="theater"]  {--mh:32;}
+    .mode-chip[data-mode="custom"]   {--mh:var(--h);}
+    .mode-chip:hover{background:rgba(255,255,255,.08);color:#fff;}
+    .mode-chip:active{transform:scale(.94);}
+    .mode-chip.active{
+      color:#fff;
+      border-color:hsl(var(--mh) 73% 52% /.65);
+      background:hsl(var(--mh) 73% 42% /.18);
+      box-shadow:0 0 14px hsl(var(--mh) 73% 42% /.35),inset 0 1px 0 rgba(255,255,255,.1);
+    }
+    .accent-sub{
+      font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+      color:var(--muted2);margin:2px 0 4px;
+    }
+
+    /* QuickSelect-style glass tiles: roomier radii, hairline light
+       border, mode-tinted outer glow, frosted see-through surfaces.
+       This block sits last in the sheet, so these equal-specificity
+       rules win over the per-tile definitions above. */
+    .home-tile{
+      border:1px solid rgba(255,255,255,.13);
+      border-radius:18px;
+      backdrop-filter:blur(12px) saturate(1.3);
+      -webkit-backdrop-filter:blur(12px) saturate(1.3);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.05) inset,
+        0 -1px 0 rgba(0,0,0,.32) inset,
+        0 16px 38px -20px hsl(var(--amb-h1) 73% 42% / calc(var(--amb-glow) * .55));
+    }
+    .news-strip{
+      background:
+        linear-gradient(135deg,hsl(var(--amb-h1) 73% 42% /.08),transparent 45%),
+        rgba(16,16,19,.66);
+    }
+    .news-copy,
+    .news-slide{background:rgba(16,16,19,.55);}
+    .stock-tile,
+    .avatar-panel,
+    .stream-tile{
+      background:
+        linear-gradient(180deg,hsl(var(--amb-h1) 73% 42% /.08),transparent 42%),
+        rgba(24,24,29,.66);
+    }
+    .avatar-panel-head{background:transparent;}
+    .card,
+    .radio-card{border-radius:16px;}
+    .card-media,
+    .news-thumb{border-radius:10px;}
+
+    /* Island bar: clock picks up a whisper of the mode's hue. */
+    .island-bar #clock{color:hsl(var(--amb-h1) 35% 94%);}
+
+    /* Page rail: circular BMW-dock buttons, glow tracks the mode. */
+    .page-rail{border-radius:24px;}
+    .rail-btn{border-radius:999px;}
+    .rail-indicator{
+      border-radius:999px;
+      box-shadow:
+        0 0 calc(10px + 14px * var(--amb-glow)) hsl(var(--h) 73% 42% / calc(.18 + .3 * var(--amb-glow))),
+        inset 0 1px 0 rgba(255,255,255,.12);
+    }
+
+    /* Boot curtain carries the mode's aurora. */
+    .boot-overlay{
+      background:
+        radial-gradient(60% 55% at 50% 42%,hsl(var(--amb-h1) 65% 18% /.5),transparent 70%),
+        radial-gradient(45% 40% at 78% 70%,hsl(var(--amb-h2) 60% 20% /.3),transparent 70%),
+        #000;
+    }
   </style>
 </head>
 <body>
+
+  <!-- AMBIENT FIELD (dynamic mode-tinted aurora behind everything) -->
+  <div class="amb-field" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 
   <!-- BOOT OVERLAY -->
   <div class="boot-overlay" id="bootOverlay" aria-hidden="true">
@@ -2378,6 +2595,9 @@
       <div class="boot-progress"></div>
     </div>
   </div>
+
+  <!-- MODE SWEEP (one-shot tint flash when the ambient mode changes) -->
+  <div class="amb-sweep" id="ambSweep" aria-hidden="true"></div>
 
   <!-- RIGHT ISLAND BAR (replaces the old top header) -->
   <div class="island-bar" id="islandBar">
@@ -2398,14 +2618,23 @@
     </div>
   </div>
 
-  <!-- ACCENT PANEL (toggled by tapping the T logo) -->
-  <div class="accent-panel" id="accentPanel" role="dialog" aria-label="Accent color">
+  <!-- AMBIENT MODE PANEL (toggled by tapping the T logo) -->
+  <div class="accent-panel" id="accentPanel" role="dialog" aria-label="Ambient mode and accent color">
     <div class="accent-head">
-      <span class="accent-title">Accent</span>
-      <button class="accent-close" id="accentClose" type="button" aria-label="Close accent settings">
+      <span class="accent-title">Ambient</span>
+      <button class="accent-close" id="accentClose" type="button" aria-label="Close ambient settings">
         <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
     </div>
+    <div class="mode-row" id="modeRow" role="group" aria-label="Ambient modes">
+      <button class="mode-chip" type="button" data-mode="personal" aria-pressed="false">Personal</button>
+      <button class="mode-chip" type="button" data-mode="efficient" aria-pressed="false">Efficient</button>
+      <button class="mode-chip" type="button" data-mode="sport" aria-pressed="false">Sport</button>
+      <button class="mode-chip" type="button" data-mode="silent" aria-pressed="false">Silent</button>
+      <button class="mode-chip" type="button" data-mode="theater" aria-pressed="false">Theater</button>
+      <button class="mode-chip" type="button" data-mode="custom" aria-pressed="false">Custom</button>
+    </div>
+    <div class="accent-sub">Accent hue</div>
     <input class="accent-hue" type="range" id="accentHue" min="0" max="360" value="141" step="1" aria-label="Accent hue"/>
     <div class="accent-foot">
       <span class="accent-hex" id="accentHex">#1DB954</span>
@@ -2820,19 +3049,25 @@
     window.location.href = FS_URL;
   });
 
-  /* ── ACCENT HUE (tap the T logo → slider recolors every UI green) ──
-     One knob: --h on :root. Every accent/green in the sheet derives
-     from it as hsl(var(--h) S% L%). The choice persists in
-     localStorage and is restored before first paint (script is
-     parser-blocking at the end of <body>). */
+  /* ── AMBIENT MODES + ACCENT HUE (tap the T logo) ──
+     My Modes-style presets (BMW iDrive X): each mode sets the accent
+     hue (--h, inline on :root) and html[data-mode], which drives the
+     aurora field + glow tokens in the sheet. Custom keeps the slider
+     hue. Mode + hue persist in localStorage; the head script restores
+     them before first paint, this block re-applies and wires the UI. */
   const ACCENT_KEY = 'tcinema.accentHue';
+  const MODE_KEY   = 'tcinema.mode';
   const ACCENT_DEFAULT = 141; // Spotify green
+  const MODE_HUES = {personal:141, efficient:178, sport:8, silent:214, theater:32};
+  const MODES = ['personal','efficient','sport','silent','theater','custom'];
   const logoT       = document.querySelector('.logo-t');
   const accentPanel = document.getElementById('accentPanel');
   const accentHue   = document.getElementById('accentHue');
   const accentHex   = document.getElementById('accentHex');
   const accentReset = document.getElementById('accentReset');
   const accentClose = document.getElementById('accentClose');
+  const modeRow     = document.getElementById('modeRow');
+  const ambSweep    = document.getElementById('ambSweep');
 
   function hueToHex(h, s, l){
     s /= 100; l /= 100;
@@ -2842,6 +3077,13 @@
     const to2 = x => Math.round(255 * x).toString(16).padStart(2, '0');
     return ('#' + to2(f(0)) + to2(f(8)) + to2(f(4))).toUpperCase();
   }
+  function savedHue(){
+    try{
+      const v = parseInt(localStorage.getItem(ACCENT_KEY), 10);
+      if(Number.isFinite(v) && v >= 0 && v <= 360) return v;
+    }catch(e){}
+    return ACCENT_DEFAULT;
+  }
   function setAccentHue(h, persist){
     h = Math.round(Number(h));
     if(!Number.isFinite(h) || h < 0 || h > 360) h = ACCENT_DEFAULT;
@@ -2850,16 +3092,38 @@
     if(accentHex) accentHex.textContent = hueToHex(h, 73, 42);
     if(persist){ try{ localStorage.setItem(ACCENT_KEY, String(h)); }catch(e){} }
   }
-  (function restoreAccentHue(){
-    let saved = ACCENT_DEFAULT;
+  let curMode = 'personal';
+  function setMode(m, persist, sweep){
+    if(MODES.indexOf(m) < 0) m = 'personal';
+    curMode = m;
+    document.documentElement.setAttribute('data-mode', m);
+    setAccentHue(m === 'custom' ? savedHue() : MODE_HUES[m], false);
+    if(modeRow){
+      modeRow.querySelectorAll('.mode-chip').forEach((c) => {
+        const on = c.dataset.mode === m;
+        c.classList.toggle('active', on);
+        c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+    if(persist){ try{ localStorage.setItem(MODE_KEY, m); }catch(e){} }
+    if(sweep && ambSweep){
+      ambSweep.classList.remove('go');
+      void ambSweep.offsetWidth;            /* restart the one-shot */
+      ambSweep.classList.add('go');
+    }
+  }
+  (function restoreMode(){
+    let m = 'personal';
     try{
-      const v = parseInt(localStorage.getItem(ACCENT_KEY), 10);
-      if(Number.isFinite(v) && v >= 0 && v <= 360) saved = v;
+      const s = localStorage.getItem(MODE_KEY);
+      if(s && MODES.indexOf(s) >= 0) m = s;
+      /* pre-mode users keep their chosen hue */
+      else if(savedHue() !== ACCENT_DEFAULT) m = 'custom';
     }catch(e){}
-    setAccentHue(saved, false);
+    setMode(m, false, false);
   })();
   if(logoT){
-    logoT.title = 'T / Cinema — tap for accent color';
+    logoT.title = 'T / Cinema — tap for ambient modes';
     logoT.addEventListener('click', (e) => {
       e.stopPropagation();
       accentPanel.classList.toggle('open');
@@ -2869,7 +3133,17 @@
     e.stopPropagation();
     accentPanel.classList.remove('open');
   });
-  if(accentHue)   accentHue.addEventListener('input', () => setAccentHue(accentHue.value, true));
+  if(modeRow) modeRow.addEventListener('click', (e) => {
+    const chip = e.target.closest('.mode-chip');
+    if(!chip) return;
+    e.stopPropagation();
+    setMode(chip.dataset.mode, true, true);
+  });
+  if(accentHue) accentHue.addEventListener('input', () => {
+    const v = accentHue.value;   /* capture before setMode re-applies the saved hue */
+    if(curMode !== 'custom') setMode('custom', true, false);
+    setAccentHue(v, true);
+  });
   if(accentReset) accentReset.addEventListener('click', () => setAccentHue(ACCENT_DEFAULT, true));
   document.addEventListener('click', (e) => {
     if(!accentPanel.classList.contains('open')) return;
