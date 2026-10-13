@@ -3219,14 +3219,16 @@
   // Sources split into two kinds:
   //   type:'api'  -> direct, CORS-enabled JSON API, no proxy (reliable, fast)
   //   type:'rss'  -> RSS fetched through the public proxy chain (best-effort)
-  // `limit` = how many items to pull per refresh; The Verge is weighted
-  // highest since it's the richest, most visual feed.
+  // `limit` = how many items to pull per refresh. Every source here ships a
+  // real cover image with each story — image-less feeds (dev.to) were dropped
+  // for that reason. The Verge is weighted highest as the richest feed.
   const NEWS_SOURCES = [
-    {id:'devto',    name:'Dev.to',      kind:'tech', type:'api', limit:15},
-    {id:'verge',    name:'The Verge',   kind:'tech', type:'rss', url:'https://www.theverge.com/rss/index.xml', limit:20, weight:2},
-    {id:'bbc-tech', name:'BBC Tech',    kind:'tech', type:'rss', url:'https://feeds.bbci.co.uk/news/technology/rss.xml', limit:10},
-    {id:'tc',       name:'TechCrunch',  kind:'tech', type:'rss', url:'https://techcrunch.com/feed/', limit:10},
-    {id:'bbc-top',  name:'BBC News',    kind:'top',  type:'rss', url:'https://feeds.bbci.co.uk/news/rss.xml', limit:10},
+    {id:'9to5mac',    name:'9to5Mac',     kind:'tech', type:'api', limit:12, url:'https://9to5mac.com/wp-json/wp/v2/posts?per_page=12&_embed'},
+    {id:'9to5google', name:'9to5Google',  kind:'tech', type:'api', limit:12, url:'https://9to5google.com/wp-json/wp/v2/posts?per_page=12&_embed'},
+    {id:'verge',      name:'The Verge',   kind:'tech', type:'rss', url:'https://www.theverge.com/rss/index.xml', limit:20, weight:2},
+    {id:'bbc-tech',   name:'BBC Tech',    kind:'tech', type:'rss', url:'https://feeds.bbci.co.uk/news/technology/rss.xml', limit:10},
+    {id:'tc',         name:'TechCrunch',  kind:'tech', type:'rss', url:'https://techcrunch.com/feed/', limit:10},
+    {id:'bbc-top',    name:'BBC News',    kind:'top',  type:'rss', url:'https://feeds.bbci.co.uk/news/rss.xml', limit:10},
   ];
   // Per-source representation multiplier used when building the deck.
   const NEWS_BOOST = Object.fromEntries(NEWS_SOURCES.filter(s => s.weight > 1).map(s => [s.name, s.weight]));
@@ -3271,35 +3273,37 @@
     throw lastErr || new Error('all proxies failed');
   }
 
-  async function fetchDevto(){
-    // Direct API — our most reliable source. One quick retry on transient
-    // failures (it lands well inside the 25s phase-1 window).
+  async function fetchWpApi(src){
+    // WordPress REST API — direct CORS, and every post carries a featured
+    // image via _embed. One quick retry on transient failures (it lands
+    // well inside the 25s phase-1 window).
     let res = null;
     for(let attempt = 0; attempt < 2; attempt++){
       try {
-        res = await fetch('https://dev.to/api/articles?per_page=15', {signal: AbortSignal.timeout(8000), cache:'no-store'});
+        res = await fetch(src.url, {signal: AbortSignal.timeout(8000), cache:'no-store'});
         if(res.ok) break;
         res = null;
       } catch(e){ res = null; }
       if(attempt === 0) await new Promise(r => setTimeout(r, 1000));
     }
-    if(!res || !res.ok) throw new Error('dev.to unavailable');
+    if(!res || !res.ok) throw new Error(src.name + ' unavailable');
     const j = await res.json();
     return (Array.isArray(j) ? j : []).map(a => ({
-      title: cleanNewsTitle(a.title),
-      pubDate: a.published_at || '',
-      link: a.canonical_url || a.url || '',
-      description: (a.description || '').slice(0, 220),
-      image: a.cover_image || '',
-      source: 'Dev.to',
-      feedId: 'devto',
-      kind: 'tech'
+      title: cleanNewsTitle(decodeHtmlEntities((a.title && a.title.rendered) || '')),
+      pubDate: a.date_gmt ? a.date_gmt.replace(' ', 'T') + 'Z' : '',
+      link: a.link || '',
+      description: decodeHtmlEntities((a.excerpt && a.excerpt.rendered) || '').replace(/<[^>]+>/g, '').trim().slice(0, 220),
+      image: (a._embedded && a._embedded['wp:featuredmedia'] &&
+              a._embedded['wp:featuredmedia'][0] && a._embedded['wp:featuredmedia'][0].source_url) || '',
+      source: src.name,
+      feedId: src.id,
+      kind: src.kind
     })).filter(i => i.title);
   }
 
   async function fetchSource(src){
     if(src.type === 'api'){
-      return src.id === 'devto' ? fetchDevto() : [];
+      return fetchWpApi(src);
     }
     const text = await fetchRssText(src.url);
     const doc  = new DOMParser().parseFromString(text, 'text/xml');
@@ -3594,6 +3598,14 @@
   function stepNews(delta){
     if(!newsItems.length) return;
     goToNews(newsIdx + delta);
+  }
+
+  // WP REST hands back HTML-escaped strings (&#8217; etc); the RSS path gets
+  // entity-decoding for free from DOMParser, so do the same thing here.
+  const newsDecoder = document.createElement('textarea');
+  function decodeHtmlEntities(s){
+    newsDecoder.innerHTML = s || '';
+    return newsDecoder.value;
   }
 
   // Some feeds stuff newlines / bare URLs into <title>; keep the first
