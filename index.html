@@ -1034,6 +1034,65 @@
       100% { box-shadow: inset 0 0 0 0 rgba(255, 244, 200, 0); }
     }
 
+    /* Retire burst: the final form leaves the stage for the holding rail. */
+    .avatar-stage.retiring {
+      animation:retireBurst 1.1s ease-out 1;
+    }
+
+    @keyframes retireBurst {
+      0%   { box-shadow: inset 0 0 0 0 hsl(var(--h) var(--acc-sat) var(--acc-lum) / 0); }
+      40%  { box-shadow: inset 0 0 60px 24px hsl(var(--h) var(--acc-sat) var(--acc-lum) / 0.6); }
+      100% { box-shadow: inset 0 0 0 0 hsl(var(--h) var(--acc-sat) var(--acc-lum) / 0); }
+    }
+
+    /* ── HOLDING RAIL — collected final forms, tap to swap the stage ── */
+    .avatar-holding{
+      position:absolute;
+      top:10px;right:6px;bottom:10px;
+      width:44px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:6px;
+      overflow-y:auto;
+      overflow-x:hidden;
+      z-index:3;
+      scrollbar-width:thin;
+      scrollbar-color:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.4) transparent;
+    }
+    .avatar-holding[hidden]{display:none;}
+    .avatar-holding::-webkit-scrollbar{width:4px;}
+    .avatar-holding::-webkit-scrollbar-thumb{background:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.4);border-radius:2px;}
+    .avatar-stage.has-holding{padding-right:56px;}
+    .avatar-hold-slot{
+      flex:0 0 auto;
+      width:40px;height:40px;
+      padding:2px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:var(--surface-em);
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;
+      transition:border-color .2s var(--ease-smooth),box-shadow .2s var(--ease-smooth),transform .2s var(--ease-smooth);
+    }
+    .avatar-hold-slot canvas{
+      width:34px;height:34px;
+      display:block;
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .avatar-hold-slot.newest{border-color:hsl(var(--h) var(--acc-sat) var(--acc-lum) /.55);}
+    .avatar-hold-slot.selected{
+      border-color:var(--accent);
+      box-shadow:0 0 10px hsl(var(--h) var(--acc-sat) var(--acc-lum) /.45);
+      transform:scale(1.08);
+    }
+    .avatar-hold-count{
+      font-size:9px;
+      color:var(--muted);
+      letter-spacing:.08em;
+    }
+
     @media (max-width:1100px){
       .avatar-panel{min-height:210px;}
       .avatar-sprite,#avatarCanvas{width:min(100%,160px);}
@@ -2480,11 +2539,13 @@
         <div class="tile-grip" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="avatar-panel-head">
           <span id="avatarFormLabel">Egg</span>
+          <span class="avatar-hold-count" id="avatarHoldCount"></span>
           <span class="avatar-head-dot" id="avatarGpsDot"></span>
         </div>
 
         <div class="avatar-stage" id="avatarStage">
           <canvas id="avatarCanvas" class="avatar-sprite" width="150" height="150" aria-hidden="true"></canvas>
+          <div class="avatar-holding" id="avatarHolding" hidden></div>
         </div>
 
         <div class="avatar-meta">
@@ -5166,7 +5227,14 @@
        grass: Bulbasaur → Ivysaur → Venusaur
        water: Mudkip → Marshtomp → Swampert
        fire:  Torchic → Combusken → Blaziken
-     Stages: 1 = 5–10 mi, 2 = 10–20 mi, 3 = 20+ mi.
+     Stages: 1 = 5–10 mi, 2 = 10–20 mi, 3 = 20–25 mi.
+     At 25 mi the cycle restarts: the final form retires to the holding
+     rail — a vertical strip of mini sprites on the right of the stage —
+     a fresh egg appears, and the line is re-rolled at the next hatch.
+     Tap a rail slot to put that collected form on the stage (tap the
+     stage, or the slot again, to go back); a live evolution always
+     takes the stage back. Collected forms and the cycle count persist
+     with the daily session.
      The egg is shared by all lines: Idle while parked, Tumble while moving,
      and Hurt in the HATCH_SOON_MI window before it hatches (with a gold
      flash build-up).
@@ -5201,6 +5269,8 @@
     const gpsDot = document.getElementById('avatarGpsDot');
     const stage = document.getElementById('avatarStage');
     const formLabel = document.getElementById('avatarFormLabel');
+    const holdingEl = document.getElementById('avatarHolding');
+    const holdCountEl = document.getElementById('avatarHoldCount');
 
     /* ── EVOLUTION PATHS ──
        The egg (shared stage 0) hatches into one of four lines, chosen
@@ -5227,7 +5297,8 @@
         { id:'blaziken',  label:'Blaze',    dir:'images/blaziken/',  suffix:'' } ]
     ];
     const STAGES          = 4;                  // egg + 3 per line
-    const FORM_AT_MILES   = [0, 5, 10, 20];     // stage i starts at this many miles
+    const FORM_AT_MILES   = [0, 5, 10, 20];     // stage i starts at this many miles into the cycle
+    const CYCLE_MI        = 25;                 // final form retires here and a fresh egg appears
     const KM_PER_MILE       = 1.609344;
     const PREFETCH_AHEAD_MI = 2;           // start loading the next form this close
     const HATCH_SOON_MI     = 2;           // egg shows Hurt this close to hatching
@@ -5610,7 +5681,8 @@
        ?test_drive additionally accrues ~75 mi/h of distance so form
        transitions (e.g. the egg hatching) can be watched live.
        ?test_path=0..3 forces a specific evolution line; ?test_weather=61
-       fakes the Open-Meteo weather code so the emoji can be previewed. */
+       fakes the Open-Meteo weather code so the emoji can be previewed;
+       ?test_collect=3 pre-seeds the holding rail with 3 collected forms. */
     const urlParams  = new URLSearchParams(location.search);
     const TEST_MILES = parseFloat(urlParams.get('test_miles'));
     const TEST_SPEED = parseFloat(urlParams.get('test_speed'));
@@ -5618,6 +5690,7 @@
     const TEST_DRIVE = urlParams.has('test_drive');
     const TEST_PATH  = parseInt(urlParams.get('test_path'), 10);
     const TEST_WEATHER = parseInt(urlParams.get('test_weather'), 10);
+    const TEST_COLLECT = parseInt(urlParams.get('test_collect'), 10);
 
     /* Per-stage runtime state. The egg is shared by all four paths, so it's
        one object referenced as stage 0 of every path. */
@@ -5642,15 +5715,19 @@
     ]);
 
     /* Active stage for the current (path, stage). Before the egg hatches the
-       path is still unknown, so stage 0 uses path 0's egg (same files). */
+       path is still unknown, so stage 0 uses path 0's egg (same files).
+       While a collected form is selected on the rail, it holds the stage. */
     function curForm(){
+      if (activeCollected >= 0 && activeCollected < collected.length) {
+        return forms[collected[activeCollected]][STAGES - 1];
+      }
       return forms[pathIdx >= 0 ? pathIdx : 0][formIdx];
     }
 
     /* ── "Driven today" session — persists across page reloads (the in-car
        browser can reload/kill the page). Storage is best-effort: if it's
        unavailable the session simply stays in memory. */
-    const AVATAR_SESSION_KEY = 'tcinema.avatarSession.v1';
+    const AVATAR_SESSION_KEY = 'tcinema.avatarSession.v2';
 
     function todayKey(){
       const d = new Date();
@@ -5658,21 +5735,27 @@
     }
 
     function loadAvatarSession(){
+      const empty = { miles: 0, last: null, path: null, cycle: 0, collected: [], active: -1 };
       try {
         const raw = localStorage.getItem(AVATAR_SESSION_KEY);
-        if (!raw) return { miles: 0, last: null, path: null };
+        if (!raw) return empty;
         const p = JSON.parse(raw);
-        if (!p || p.date !== todayKey()) return { miles: 0, last: null, path: null };
+        if (!p || p.date !== todayKey()) return empty;
         const miles = Number(p.miles);
-        if (!Number.isFinite(miles) || miles < 0) return { miles: 0, last: null, path: null };
+        if (!Number.isFinite(miles) || miles < 0) return empty;
         let last = null;
         if (Number.isFinite(p.lat) && Number.isFinite(p.lon) && Number.isFinite(p.t)) {
           last = { lat: p.lat, lon: p.lon, t: p.t };
         }
         const path = Number.isInteger(p.path) && p.path >= 0 && p.path < PATHS.length ? p.path : null;
-        return { miles, last, path };
+        const cycle = Number.isInteger(p.cycle) && p.cycle >= 0 ? p.cycle : 0;
+        const collected = Array.isArray(p.collected)
+          ? p.collected.filter(x => Number.isInteger(x) && x >= 0 && x < PATHS.length)
+          : [];
+        const active = Number.isInteger(p.active) && p.active >= 0 && p.active < collected.length ? p.active : -1;
+        return { miles, last, path, cycle, collected, active };
       } catch(_) {
-        return { miles: 0, last: null, path: null };
+        return empty;
       }
     }
 
@@ -5690,6 +5773,9 @@
           lon: state.last ? state.last.lon : null,
           t: state.last ? state.last.t : null,
           path: pathIdx,
+          cycle,
+          collected,
+          active: activeCollected,
           date: todayKey()
         }));
       } catch(_) { /* storage unavailable — session stays in memory */ }
@@ -5712,6 +5798,12 @@
        predate the multi-path change (or have been saved while still an egg),
        in which case an already-hatched companion rolls its line now. */
     let pathIdx = -1;
+    /* Completed 25-mi cycles today, the final forms retired to the holding
+       rail (path indices, oldest first), and which rail slot is currently
+       displayed on the stage (-1 = the live companion). */
+    let cycle = restored ? restored.cycle : 0;
+    let collected = restored ? restored.collected : [];
+    let activeCollected = restored ? restored.active : -1;
     if (formIdx > 0) {
       const savedPath = restored && restored.path !== null && restored.path !== undefined ? restored.path : -1;
       pathIdx = savedPath >= 0 ? savedPath : Math.floor(Math.random() * PATHS.length);
@@ -5732,6 +5824,7 @@
     let evolveAnimName = 'Idle';
     let evolveUntil = 0;        // until this timestamp the evolve animation plays
     let evolveIsHatch = false;  // true when the evolution is the egg hatching
+    let retireUntil = 0;        // until this timestamp the "New egg!" beat plays
     let speedClassState = 'parked';
     let pendingAnim = null;     // {name, since} — animation-change debounce
     let current = { name: 'Idle', loop: true };
@@ -5757,9 +5850,19 @@
       return 2 * R * Math.asin(Math.sqrt(a));
     }
 
+    /* Miles into the current 25-mi cycle, and how many cycles completed. */
+    function milesInCycle(mi){
+      return Number.isFinite(mi) ? mi % CYCLE_MI : 0;
+    }
+
+    function cycleOf(mi){
+      return Number.isFinite(mi) ? Math.floor(mi / CYCLE_MI) : 0;
+    }
+
     function formIndexForMiles(mi){
+      const m = milesInCycle(mi);
       for(let i = STAGES - 1; i >= 0; i--){
-        if (mi >= FORM_AT_MILES[i]) return i;
+        if (m >= FORM_AT_MILES[i]) return i;
       }
       return 0;
     }
@@ -5823,9 +5926,9 @@
     }
 
     function milesInfo(){
-      const mi = state.totalMiles;
-      if (formIdx >= STAGES - 1) return mi.toFixed(1) + ' mi total';
-      const rem = Math.max(0, FORM_AT_MILES[formIdx + 1] - mi);
+      const m = milesInCycle(state.totalMiles);
+      if (formIdx >= STAGES - 1) return Math.max(0, CYCLE_MI - m).toFixed(1) + ' mi to new egg';
+      const rem = Math.max(0, FORM_AT_MILES[formIdx + 1] - m);
       // While still an egg, keep the line a mystery — never reveal what's about to hatch.
       const next = formIdx === 0 ? '???' : forms[pathIdx][formIdx + 1].label;
       return rem.toFixed(1) + ' mi to ' + next;
@@ -5878,7 +5981,7 @@
     function eggHatchingSoon(){
       return formIdx === 0 &&
              formIdx + 1 < STAGES &&
-             state.totalMiles >= FORM_AT_MILES[1] - HATCH_SOON_MI;
+             milesInCycle(state.totalMiles) >= FORM_AT_MILES[1] - HATCH_SOON_MI;
     }
 
     function chooseAnimation(){
@@ -5962,9 +6065,15 @@
        happens in startEvolution.) */
     function checkPrefetch(){
       if (pathIdx >= 0 && formIdx + 1 < STAGES &&
-          state.totalMiles >= FORM_AT_MILES[formIdx + 1] - PREFETCH_AHEAD_MI &&
+          milesInCycle(state.totalMiles) >= FORM_AT_MILES[formIdx + 1] - PREFETCH_AHEAD_MI &&
           !forms[pathIdx][formIdx + 1].loadPromise) {
         loadForm(pathIdx, formIdx + 1);
+      }
+      /* Final form nearing the cycle rollover: warm the egg for the retire. */
+      if (formIdx === STAGES - 1 &&
+          milesInCycle(state.totalMiles) >= CYCLE_MI - PREFETCH_AHEAD_MI &&
+          !forms[0][0].loadPromise) {
+        loadForm(0, 0);
       }
     }
 
@@ -5973,6 +6082,11 @@
        evolve flash, and is where the evolution line is rolled. */
     function startEvolution(target){
       if (evolveTarget !== -1) return;
+      /* A live evolution always takes the stage back from a collected form. */
+      if (activeCollected !== -1) {
+        activeCollected = -1;
+        renderHolding();
+      }
       // Roll the line once at hatch and persist it so a page reload doesn't
       // re-roll the companion.
       if (formIdx === 0 && pathIdx === -1) {
@@ -6005,7 +6119,100 @@
       });
     }
 
+    /* Crossing a cycle boundary (every CYCLE_MI miles): the final form
+       retires to the holding rail and a fresh egg takes the stage. The
+       line is re-rolled at the next hatch. */
+    function retireCycle(){
+      if (pathIdx >= 0) collected.push(pathIdx);
+      cycle = cycleOf(state.totalMiles);
+      pathIdx = -1;
+      formIdx = 0;
+      activeCollected = -1;
+      evolveTarget = -1;
+      evolveUntil = 0;
+      retireUntil = Date.now() + 1600;
+      playAnim('Idle');
+      /* The egg isn't in the load path anymore once a line is running —
+         warm it now so the fresh egg has sprites from the first frame. */
+      loadForm(0, 0);
+      if (stage) {
+        stage.classList.remove('evolving', 'hatching', 'hatch-pulse', 'retiring');
+        void stage.offsetWidth;
+        stage.classList.add('retiring');
+        setTimeout(() => stage.classList.remove('retiring'), 1200);
+      }
+      renderHolding();
+      saveAvatarSession(true);
+    }
+
+    /* ── HOLDING RAIL — collected final forms, tap to swap the stage ── */
+    function drawMini(f, c){
+      const mctx = c.getContext('2d');
+      mctx.imageSmoothingEnabled = false;
+      mctx.clearRect(0, 0, c.width, c.height);
+      const meta = resolveAnim(f, 'Idle');
+      const key = meta.copyOf || meta.name;
+      const img = f.images.anim[key];
+      if (!img || !img.naturalWidth) return;
+      const scale = Math.min(c.width / meta.w, c.height / meta.h);
+      const dw = meta.w * scale, dh = meta.h * scale;
+      mctx.drawImage(img, 0, 0, meta.w, meta.h, (c.width - dw) / 2, (c.height - dh) / 2, dw, dh);
+    }
+
+    function renderHolding(){
+      if (!holdingEl) return;
+      holdingEl.innerHTML = '';
+      if (holdCountEl) holdCountEl.textContent = collected.length ? '×' + collected.length : '';
+      if (!collected.length) {
+        holdingEl.hidden = true;
+        if (stage) stage.classList.remove('has-holding');
+        return;
+      }
+      holdingEl.hidden = false;
+      if (stage) stage.classList.add('has-holding');
+      /* Newest first, like the top slot of a party list. */
+      for (let i = collected.length - 1; i >= 0; i--) {
+        const pi = collected[i];
+        const f = forms[pi][STAGES - 1];
+        const slot = document.createElement('button');
+        slot.type = 'button';
+        slot.className = 'avatar-hold-slot';
+        if (i === collected.length - 1) slot.classList.add('newest');
+        if (i === activeCollected) slot.classList.add('selected');
+        slot.title = f.label;
+        slot.setAttribute('aria-label', f.label);
+        const c = document.createElement('canvas');
+        c.width = 34; c.height = 34;
+        slot.appendChild(c);
+        slot.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectCollected(i);
+        });
+        holdingEl.appendChild(slot);
+        /* After a reload the retired form's sheet may not be loaded yet. */
+        loadForm(pi, STAGES - 1).then(() => drawMini(f, c));
+      }
+    }
+
+    function selectCollected(i){
+      if (evolveTarget !== -1) return;
+      activeCollected = (activeCollected === i) ? -1 : i;
+      frame = 0;
+      frameTime = 0;
+      renderHolding();
+      saveAvatarSession(true);
+      updateAvatar();
+    }
+
+    /* Tap the stage itself to hand it back to the live companion. */
+    if (stage) stage.addEventListener('click', () => {
+      if (activeCollected >= 0) selectCollected(activeCollected);
+    });
+
     function updateAvatar(){
+      const cyc = cycleOf(state.totalMiles);
+      if (cyc > cycle) retireCycle();
+
       const target = formIndexForMiles(state.totalMiles);
       if (target !== formIdx) startEvolution(target);
 
@@ -6016,6 +6223,8 @@
       let chosen;
       if (evolving) {
         chosen = { name: evolveAnimName, label: (evolveIsHatch ? 'Hatching → ' : 'Evolving → ') + curForm().label, cat: 'unknown', night: isNightNow() };
+      } else if (Date.now() < retireUntil) {
+        chosen = { name: 'Idle', label: 'New egg!', cat: 'unknown', night: isNightNow() };
       } else {
         chosen = chooseAnimation();
         requestAnim(chosen.name);
@@ -6283,6 +6492,10 @@
           lastFreshFixAt = 0;
           formIdx = 0;
           pathIdx = -1; // back to the egg — the line is re-rolled at hatch
+          cycle = 0;
+          collected = [];
+          activeCollected = -1;
+          renderHolding();
           saveAvatarSession(true);
           updateAvatar();
           return;
@@ -6607,6 +6820,14 @@
     }
 
     async function init(){
+      /* ?test_collect=N pre-seeds the holding rail for layout/swap testing. */
+      if (Number.isInteger(TEST_COLLECT) && TEST_COLLECT > 0) {
+        for (let i = 0; i < TEST_COLLECT; i++) {
+          collected.push(Math.floor(Math.random() * PATHS.length));
+        }
+      }
+      renderHolding();
+
       updateAvatar();
 
       await loadForm(pathIdx >= 0 ? pathIdx : 0, formIdx);
