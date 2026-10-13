@@ -1365,6 +1365,23 @@
       font-variant-numeric:tabular-nums;
     }
     .sw-pop-views svg{width:12px;height:12px;fill:var(--red);}
+    /* teslurk jump-out: teslurk.com itself refuses iframing (X-Frame-Options:
+       DENY), so the popup hands off to it in a new tab — that's the pipe that
+       keeps working in the Tesla browser while driving. */
+    .sw-pop-teslurk{
+      flex-shrink:0;display:inline-flex;align-items:center;gap:7px;
+      padding:7px 13px;border-radius:999px;text-decoration:none;
+      font-size:12px;font-weight:700;white-space:nowrap;
+      border:1px solid hsl(var(--h) var(--acc-sat) var(--acc-lum) / .55);
+      background:hsl(var(--h) var(--acc-sat) var(--acc-lum) / .14);
+      color:var(--accent);
+      transition:background .25s var(--ease-smooth),box-shadow .25s var(--ease-smooth);
+    }
+    .sw-pop-teslurk:hover{
+      background:hsl(var(--h) var(--acc-sat) var(--acc-lum) / .26);
+      box-shadow:0 0 14px hsl(var(--h) var(--acc-sat) var(--acc-lum) / .35);
+    }
+    .sw-pop-teslurk img{width:15px;height:15px;border-radius:4px;}
     .sw-pop-close{
       appearance:none;border:none;cursor:pointer;flex-shrink:0;
       width:36px;height:36px;border-radius:50%;
@@ -2886,6 +2903,11 @@
           <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.7 7.6 1 12c1.7 4.4 6 7.5 11 7.5s9.3-3.1 11-7.5c-1.7-4.4-6-7.5-11-7.5zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></svg>
           <span id="swPopViewCount"></span>
         </span>
+        <a class="sw-pop-teslurk" id="swTeslurkBtn" href="https://teslurk.com"
+           target="_blank" rel="noopener"
+           title="Watch on teslurk — works in the Tesla browser while driving">
+          <img src="https://teslurk.com/icons/icon.svg" alt="">teslurk
+        </a>
         <button class="sw-pop-close" id="swPopClose" type="button" aria-label="Close stream" title="Close">
           <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
@@ -4582,6 +4604,7 @@
   const swPopViews    = document.getElementById('swPopViewCount');
   const swPlayerFrame = document.getElementById('swPlayerFrame');
   const swChatFrame   = document.getElementById('swChatFrame');
+  const swTeslurkBtn  = document.getElementById('swTeslurkBtn');
 
   /* YouTube category — stubs until a data source is picked */
   const SW_YT_STUBS = [
@@ -4769,6 +4792,10 @@
        previews and msrisabaranjan.github.io both embed cleanly. */
     const parent = encodeURIComponent(location.hostname);
     const ch     = encodeURIComponent(s.login);
+    /* teslurk hand-off: their own player (proxied HLS) is the one that
+       survives Tesla's while-driving block — we can't embed it (frame
+       deny), so point the popup's teslurk button at the channel. */
+    swTeslurkBtn.href = 'https://teslurk.com/' + ch;
     swPlayerFrame.src = `https://player.twitch.tv/?channel=${ch}&parent=${parent}&muted=true&autoplay=true`;
     setTimeout(() => {
       if(swPopupOpen)
